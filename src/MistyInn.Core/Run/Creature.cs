@@ -21,6 +21,12 @@ public enum CreatureActivity
 
     /// <summary>Standing still for a moment.</summary>
     Idle,
+
+    /// <summary>Walking to a back room with a companion (CMP-04).</summary>
+    GoingToRoom,
+
+    /// <summary>In a back room: off the board, occupied (CMP-04).</summary>
+    InRoom,
 }
 
 /// <summary>A creature's agitation state (AGI-03).</summary>
@@ -44,6 +50,7 @@ internal sealed class Creature
         Position = TilePosition.Center(spawn);
         PreviousPosition = Position;
         Agitation = def.Agitation.Arrival;
+        Health = def.Combat.Health;
     }
 
     public CreatureId Id { get; }
@@ -87,44 +94,60 @@ internal sealed class Creature
 
     public bool IsTurned => State == CreatureState.Turned;
 
+    public double Health { get; set; }
+
+    public double MaxHealth => Def.Combat.Health;
+
+    /// <summary>Off the board, in a back room (CMP-04): nothing outside can see it or reach it.</summary>
+    public bool IsInRoom => Activity == CreatureActivity.InRoom;
+
+    /// <summary>A turned creature's escalation stage (ESC-01).</summary>
+    public EscalationStage Stage { get; set; }
+
+    /// <summary>Game seconds at which the current stage began.</summary>
+    public double StageSince { get; set; }
+
+    /// <summary>Destroyed a fixture in its current stage (ESC-01).</summary>
+    public bool BrokeSomething { get; set; }
+
+    /// <summary>Made a unit or creature fall in its current stage (ESC-01).</summary>
+    public bool MadeSomeoneFall { get; set; }
+
+    /// <summary>The fighter it has turned on, after being hit (ESC-03).</summary>
+    public UnitId? EngagedBy { get; set; }
+
+    /// <summary>The fighter holding it with Grapple (STF-02).</summary>
+    public UnitId? GrappledBy { get; set; }
+
+    public double NextAttackAt { get; set; }
+
+    public double RepathAt { get; set; }
+
+    /// <summary>What it is going for, as a key, to notice when the target changes.</summary>
+    public string? TargetKey { get; set; }
+
+    /// <summary>The companion giving it floor company, and since when (CMP-04).</summary>
+    public UnitId? CompanyWith { get; set; }
+
+    public double CompanySince { get; set; }
+
+    /// <summary>Has had a room session this cycle; it is not taken to a room again (D-071).</summary>
+    public bool HadRoom { get; set; }
+
     /// <summary>The tiles still to walk, in order.</summary>
     public IReadOnlyCollection<Tile> Path => _path;
 
     /// <summary>Replaces the path; the first tile (where it stands) is skipped.</summary>
-    public void SetPath(IReadOnlyList<Tile> path)
-    {
-        _path.Clear();
-        foreach (var tile in path.Skip(1))
-        {
-            _path.Enqueue(tile);
-        }
-    }
+    public void SetPath(IReadOnlyList<Tile> path) => Walking.SetPath(_path, path);
 
     public void ClearPath() => _path.Clear();
 
     /// <summary>Walks up to <paramref name="distance"/> tiles along the path.</summary>
-    public void Advance(double distance)
-    {
-        while (distance > 0 && _path.Count > 0)
-        {
-            var next = TilePosition.Center(_path.Peek());
-            var gap = Position.DistanceTo(next);
-            if (gap <= distance)
-            {
-                Position = next;
-                distance -= gap;
-                _path.Dequeue();
-            }
-            else
-            {
-                Position = Position.MoveTowards(next, distance);
-                distance = 0;
-            }
-        }
-    }
+    public void Advance(double distance) => Position = Walking.Advance(Position, _path, distance);
 
     public CreatureSnapshot Snapshot() =>
-        new(Id, Def.Id, Def.Name, Def.PlaneId, Position, PreviousPosition, Activity, Agitation, State, ServedBy);
+        new(Id, Def.Id, Def.Name, Def.PlaneId, Position, PreviousPosition, Activity, Agitation, State, ServedBy,
+            Health, MaxHealth, IsTurned ? Stage : (EscalationStage?)null);
 }
 
 /// <summary>A read-only view of a creature for the presentation (ARC-03).</summary>
@@ -138,4 +161,11 @@ public sealed record CreatureSnapshot(
     CreatureActivity Activity,
     double Agitation,
     CreatureState State,
-    string? ServedBy);
+    string? ServedBy,
+    double Health,
+    double MaxHealth,
+    EscalationStage? Stage)
+{
+    /// <summary>Shown on the board: not inside a back room (CMP-04).</summary>
+    public bool IsVisible => Activity != CreatureActivity.InRoom;
+}

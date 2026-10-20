@@ -8,5 +8,25 @@
     "id": "hosting-room-1", "context": "company.room",
     "text": "The door closes on a long, unhurried conversation.",
     "filterSafe": true, "bloodSafe": true
+  },
+  {
+    "id": "company-room-2", "context": "company.room",
+    "text": "The curtain falls. For once, the guest forgets how far from home it is.",
+    "filterSafe": false, "bloodSafe": true
+  },
+  {
+    "id": "fell-1", "context": "unit.fell",
+    "text": "They go down hard, and the floorboards darken beneath them.",
+    "filterSafe": true, "bloodSafe": false
+  },
+  {
+    "id": "fell-2", "context": "unit.fell",
+    "text": "They go down, and do not get up again tonight.",
+    "filterSafe": true, "bloodSafe": true
+  },
+  {
+    "id": "banished-1", "context": "creature.banished",
+    "text": "It comes apart into mist, and the mist into nothing.",
+    "filterSafe": true, "bloodSafe": true
   }
 ]

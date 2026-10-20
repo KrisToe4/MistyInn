@@ -48,6 +48,29 @@
     "reseekAfterSeconds": 8
   },
   "bestiary": { "studiedPoints": 3 },
+  "combat": {
+    "guardRadius": 4,
+    "integrityShare": 0.25,
+    "wallDamageMultiplier": 1.0,
+    "violenceRadius": 4,
+    "violenceSeconds": 2,
+    "bloodRadius": 4,
+    "woundChance": 0.7,
+    "shakenSoothe": 0.8,
+    "grappleSlow": 1.5,
+    "repathSeconds": 0.5,
+    "integrityPerSilver": 5,
+    "maxMarks": 64
+  },
+  "company": {
+    "roomAfterSeconds": 8,
+    "roomSessionSeconds": 25,
+    "roomRestSeconds": 10,
+    "roomSootheMultiplier": 3,
+    "preferredSoothe": 1.5,
+    "interruptRadius": 4,
+    "doorHealth": 40
+  },
   "shop": {
     "staffOffers": 3,
     "itemOffers": 3,

@@ -23,11 +23,42 @@ public class BoardLayoutTests
         }));
         Assert.That(layout.ZoneAt(new Tile(11, 12)), Is.EqualTo("entrance"));
         Assert.That(layout.ZoneAt(new Tile(7, 5)), Is.EqualTo("kitchen"));
-        Assert.That(layout.ZoneAt(new Tile(7, 9)), Is.EqualTo("rooms"));
+        Assert.That(layout.ZoneAt(new Tile(7, 9)), Is.EqualTo("room-1"));
         Assert.That(layout.ZoneIds, Is.SupersetOf(new[]
         {
-            "entrance", "common-room", "bar", "kitchen", "lounge", "stage", "rooms", "cellar-door",
+            "entrance", "common-room", "bar", "kitchen", "lounge", "stage", "room-1", "room-2", "cellar-door",
         }));
+    }
+
+    [Test]
+    [Property("Requirement", "BRD-01")]
+    [Property("Requirement", "CMP-04")]
+    public void EachBackRoomIsItsOwnZoneWithOneDoor()
+    {
+        Assert.That(Layout.Rooms.Select(r => (r.Zone, r.Door)), Is.EqualTo(new[]
+        {
+            ("room-1", new Tile(9, 9)), ("room-2", new Tile(9, 12)),
+        }));
+        Assert.That(Layout.KindAt(new Tile(9, 9)), Is.EqualTo(TileKind.RoomDoor));
+        Assert.That(Layout.Rooms[0].Tiles, Has.Count.EqualTo(6));
+        Assert.That(Layout.Rooms[0].Tiles.All(t => Layout.ZoneAt(t) == "room-1"), Is.True);
+    }
+
+    [TestCase("D.rR|...R", "", TestName = "Room door with no zone")]
+    [TestCase("D.rR|..rR", "room", TestName = "Room with two doors")]
+    [TestCase("D.r.|....", "empty-room", TestName = "Room door with no floor")]
+    [Property("Requirement", "BRD-01")]
+    public void BrokenRoomsAreRejected(string map, string doorZone)
+    {
+        var legend = new Dictionary<char, LegendEntry>
+        {
+            ['.'] = new(TileKind.Floor, "floor"),
+            ['D'] = new(TileKind.Door, "door"),
+            ['R'] = new(TileKind.Floor, "room"),
+            ['r'] = new(TileKind.RoomDoor, doorZone),
+        };
+
+        Assert.That(() => BoardLayout.Parse(map.Split('|'), legend), Throws.TypeOf<FormatException>());
     }
 
     [Test]

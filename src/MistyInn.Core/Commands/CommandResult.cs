@@ -39,6 +39,15 @@ public enum CommandFailure
 
     /// <summary>The fixture may only go in another zone (FIX-01).</summary>
     WrongZone,
+
+    /// <summary>Integrity is already full (BRD-07).</summary>
+    NothingToRepair,
+
+    /// <summary>That character is already in the inn (STF-01).</summary>
+    AlreadyOwned,
+
+    /// <summary>The bench has no room for another staff member (section 6.4).</summary>
+    BenchFull,
 }
 
 /// <summary>The outcome of <see cref="GameSession.Execute"/>.</summary>

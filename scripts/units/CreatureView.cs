@@ -1,4 +1,5 @@
 using Godot;
+using MistyInn.Core.Content;
 using MistyInn.Core.Entities;
 using MistyInn.Core.Run;
 
@@ -6,7 +7,7 @@ namespace MistyInn.Units;
 
 /// <summary>
 /// A creature on the board, tinted by its plane. Its position comes from Core every frame (SIM-03); its label shows
-/// agitation and state (UI-05, until the UI pass).
+/// agitation and state, and once it has turned, its escalation stage and health (UI-05, until the UI pass).
 /// </summary>
 public partial class CreatureView : Node3D
 {
@@ -16,9 +17,10 @@ public partial class CreatureView : Node3D
 
     private StandardMaterial3D _material = null!;
     private Color _planeColor;
-    private int _shownAgitation = -1;
-    private CreatureState _shownState;
-    private bool _shownServed;
+    private string _shown = "";
+    private double _flashSeconds;
+    private Color _flashColor;
+    private Color _labelColor = Colors.White;
 
     public CreatureId Id { get; private set; }
 
@@ -40,19 +42,26 @@ public partial class CreatureView : Node3D
         Body.MaterialOverride = _material;
     }
 
-    public void SetStatus(double agitation, CreatureState state, bool served)
+    public void SetStatus(CreatureSnapshot creature)
     {
-        var rounded = (int)agitation;
-        if (rounded == _shownAgitation && state == _shownState && served == _shownServed)
+        var text = $"{DisplayName}\n{creature.State} {(int)creature.Agitation}{(creature.ServedBy is not null ? "  (served)" : "")}";
+        if (creature.Stage is { } stage)
+        {
+            text = $"{DisplayName}\n{Tr(StageName(stage))}  {Mathf.CeilToInt(creature.Health)}/{Mathf.CeilToInt(creature.MaxHealth)}";
+        }
+        else if (creature.Health < creature.MaxHealth)
+        {
+            text += $"\n{Mathf.CeilToInt(creature.Health)}/{Mathf.CeilToInt(creature.MaxHealth)}";
+        }
+
+        if (text == _shown)
         {
             return;
         }
 
-        _shownAgitation = rounded;
-        _shownState = state;
-        _shownServed = served;
-
-        var stateColor = state switch
+        _shown = text;
+        var state = creature.State;
+        _labelColor = state switch
         {
             CreatureState.Calm => new Color(0.6f, 0.9f, 0.6f),
             CreatureState.Restless => new Color(0.95f, 0.85f, 0.4f),
@@ -60,8 +69,8 @@ public partial class CreatureView : Node3D
             _ => new Color(1f, 0.2f, 0.2f),
         };
 
-        Label.Text = $"{DisplayName}\n{state} {rounded}{(served ? "  (served)" : "")}";
-        Label.Modulate = stateColor;
+        Label.Text = text;
+        Label.Modulate = _labelColor;
         _material.EmissionEnergyMultiplier = state switch
         {
             CreatureState.Calm => 0.6f,
@@ -71,4 +80,29 @@ public partial class CreatureView : Node3D
         };
         _material.Emission = state == CreatureState.Turned ? new Color(1f, 0.15f, 0.1f) : _planeColor;
     }
+
+    /// <summary>A short flash when hit: red with blood, white with the Blood filter on (RAT-09).</summary>
+    public void Flash(Color color)
+    {
+        _flashColor = color;
+        _flashSeconds = 0.18;
+    }
+
+    public override void _Process(double delta)
+    {
+        if (_flashSeconds <= 0)
+        {
+            return;
+        }
+
+        _flashSeconds -= delta;
+        Label.Modulate = _flashSeconds > 0 ? _flashColor : _labelColor;
+    }
+
+    private static string StageName(EscalationStage stage) => stage switch
+    {
+        EscalationStage.Wreck => "Wrecking",
+        EscalationStage.Prey => "Preying",
+        _ => "Hunting the innkeeper",
+    };
 }

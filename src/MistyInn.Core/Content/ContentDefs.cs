@@ -55,6 +55,8 @@ public sealed record BalanceDef(
     double FixtureSoothe,
     AgitationBalanceDef Agitation,
     BestiaryBalanceDef Bestiary,
+    CombatBalanceDef Combat,
+    CompanyBalanceDef Company,
     ShopDef Shop);
 
 /// <summary>A bundle of supplies in the build menu (FIX-06).</summary>
@@ -79,6 +81,50 @@ public sealed record AgitationBalanceDef(
     double LikesStrength = 0.5,
     double ColdRadius = 3,
     double ReseekAfterSeconds = 8);
+
+/// <summary>The combat and damage tuning of section 10 and BRD-06 (D-070).</summary>
+/// <param name="GuardRadius">Fighters engage turned creatures in their zone or within this many tiles of their post (ESC-07).</param>
+/// <param name="IntegrityShare">The part of the damage a fixture or room door takes that also comes off integrity (BRD-06).</param>
+/// <param name="WallDamageMultiplier">Integrity lost per point of damage dealt to a wall (BRD-06).</param>
+/// <param name="ViolenceRadius">An attack sets off <c>Violence</c> triggers within this many tiles (AGI-08).</param>
+/// <param name="ViolenceSeconds">How long an attack counts as violence nearby (AGI-08, CMP-05).</param>
+/// <param name="BloodRadius">A fallen unit sets off <c>Blood</c> triggers within this many tiles (AGI-08).</param>
+/// <param name="WoundChance">The chance a fallen staff member is only wounded at Dawn; otherwise they die (ESC-09).</param>
+/// <param name="ShakenSoothe">The soothe multiplier of a staff member who fell and survived, for the next cycle (STF-12).</param>
+/// <param name="GrappleSlow">A grappled creature's attack interval is multiplied by this (STF-02).</param>
+/// <param name="RepathSeconds">How often a moving fighter or turned creature looks for a new path.</param>
+/// <param name="IntegrityPerSilver">Integrity points one silver repairs at Dawn (BRD-07).</param>
+/// <param name="MaxMarks">At most this many recent attacks and blood marks are kept (INV-05).</param>
+public sealed record CombatBalanceDef(
+    double GuardRadius = 4,
+    double IntegrityShare = 0.25,
+    double WallDamageMultiplier = 1,
+    double ViolenceRadius = 4,
+    double ViolenceSeconds = 2,
+    double BloodRadius = 4,
+    double WoundChance = 0.7,
+    double ShakenSoothe = 0.8,
+    double GrappleSlow = 1.5,
+    double RepathSeconds = 0.5,
+    int IntegrityPerSilver = 5,
+    int MaxMarks = 64);
+
+/// <summary>The Company tuning of section 11.5 (D-071).</summary>
+/// <param name="RoomAfterSeconds">Floor company a creature must have had before the pair goes to a room (CMP-04).</param>
+/// <param name="RoomSessionSeconds">How long a room session lasts (CMP-04).</param>
+/// <param name="RoomRestSeconds">The companion's rest after a session, out of play (CMP-04).</param>
+/// <param name="RoomSootheMultiplier">The room soothes at this many times the floor rate (CMP-04).</param>
+/// <param name="PreferredSoothe">A preferred guest is soothed this many times more (CMP-02).</param>
+/// <param name="InterruptRadius">Violence this close ends floor company (CMP-05).</param>
+/// <param name="DoorHealth">A room door's health; a broken door closes the room until Dawn (CMP-05, D-069).</param>
+public sealed record CompanyBalanceDef(
+    double RoomAfterSeconds = 8,
+    double RoomSessionSeconds = 25,
+    double RoomRestSeconds = 10,
+    double RoomSootheMultiplier = 3,
+    double PreferredSoothe = 1.5,
+    double InterruptRadius = 4,
+    double DoorHealth = 40);
 
 /// <summary>The bestiary's reveal thresholds (BST-02).</summary>
 /// <param name="StudiedPoints">Cycles of being served and staying calm until dawn before a creature is Studied.</param>
@@ -172,7 +218,10 @@ public sealed record StaffFileDef(InnkeeperDef Innkeeper, IReadOnlyList<StaffDef
 /// <summary>The innkeeper: a unit the player places, with no class or tree (ESC-06).</summary>
 public sealed record InnkeeperDef(string Id, string Name, bool Adult, StatsDef Stats);
 
-/// <summary>A staff character (STF-01). <paramref name="Origin"/> is a plane ID or <c>mortal-realm</c>.</summary>
+/// <summary>
+/// A staff character (STF-01). <paramref name="Origin"/> is a plane ID or <c>mortal-realm</c>. <paramref name="Prefers"/>
+/// and <paramref name="Refuses"/> are creature IDs a companion likes to entertain or will not entertain (CMP-01).
+/// </summary>
 public sealed record StaffDef(
     string Id,
     string Name,
@@ -185,7 +234,9 @@ public sealed record StaffDef(
     string BaseTechnique,
     StatsDef Stats,
     IReadOnlyList<TreeRankDef> Tree,
-    IReadOnlyList<PresetDef> Presets);
+    IReadOnlyList<PresetDef> Presets,
+    IReadOnlyList<string>? Prefers = null,
+    IReadOnlyList<string>? Refuses = null);
 
 public sealed record StatsDef(
     double Health,

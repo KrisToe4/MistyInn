@@ -13,10 +13,15 @@ namespace MistyInn.Core.Logging;
 /// <param name="Cause">Why it happened.</param>
 /// <param name="Subject">The entity it happened to, if any.</param>
 /// <param name="Source">The entity that caused it, if any.</param>
+/// <param name="Flavour">
+/// A flavour context (for example <c>company.room</c>) whose line the UI may show; the line is picked when it is read,
+/// with the content filters of that moment (RAT-09, DAT-06).
+/// </param>
 public sealed record CycleLogEntry(
     long Sequence,
     TimeSpan At,
     string Kind,
     string Cause,
     EntityRef? Subject = null,
-    EntityRef? Source = null);
+    EntityRef? Source = null,
+    string? Flavour = null);

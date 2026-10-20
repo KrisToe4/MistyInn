@@ -3,8 +3,8 @@
 
 | | |
 |---|---|
-| **Version** | 1.7 (approved) |
-| **Supersedes** | 1.6 |
+| **Version** | 1.8 (approved) |
+| **Supersedes** | 1.7 |
 | **Audience** | LLM-based coding agents and the human developer |
 | **Genre** | Dark roguelike autobattler: prepare the inn, then survive the mist |
 | **Engine** | Godot 4.7.2 (.NET build) |
@@ -76,6 +76,7 @@ step starts.
 
 | Version | Change | Reason |
 |---|---|---|
+| 1.8 | BRD-01: each back room is its own zone with a `RoomDoor` tile. BRD-06: integrity loses 25 % of fixture and door damage, and walls take damage directly. BRD-07: fixtures repair automatically and for free at Dawn; integrity costs 1 silver per 5 points. ESC-01: Prey does not target the innkeeper. ESC-06: the innkeeper strikes back from its post. CMP-04: one room session per guest per cycle; doors have health. STF-01: `prefers` and `refuses` lists. Section 6.4: `combat` and `company` tuning. ARC-11: development-only commands, and `SetContentFilters` in every phase | Step 5 report (D-069 to D-076) |
 | 1.7 | INV-12: the cycle log records causes and turning points, not every step of agitation. STF-10: until step 6 adds ranks, each unit knows only its ★1 base technique | Step 4 report (D-065 to D-068) |
 | 1.6 | FIX-02: Shadowed alcove (`Darkness`) and Ledger desk (`Order`). STF-02: Cards also answers `Order`, Tales also answers `Darkness`. AGI-08: `Cold` is the draught within 3 tiles of the front door during the mist. RUN-01: the base fixtures and supplies start in storage (`balance.json`). FIX-01: a fixture has a shape (tile offsets, rotated in 90° steps) and seats; every fixture blocks movement | Step 4 questions (D-060 to D-063) |
 | 1.5 | SIM-04 and TST-07: the board view is built from `inn.json`, so there are no scene markers to compare (until hand-built inn art arrives). STF-02: a technique says whether it needs a fixture, and fixtures' `Enables` effects say which. DAT-04: an export build falls back to the whole built-in set. Step 4: add providers for the `Order` and `Darkness` appetites | Step 3 report (D-054, D-058, D-059, D-060) |
@@ -344,7 +345,8 @@ MistyInn/                            (repository root, also the Godot project ro
   `ContinueFromDawn`, `SetSpeed(multiplier)`, `StartRun(seed)`.
 - **ARC-11** `Execute` returns a `CommandResult` (success, or a reason code such as `WrongPhase`, `NotEnoughSilver`,
   `TileBlocked`, `BoardFull`). A command that is not valid changes nothing. During the mist phase only `SetSpeed` is
-  accepted (`SCP-13`).
+  accepted (`SCP-13`); `SetContentFilters` is accepted in every phase (`SET-04`). Development-only commands
+  (`DevAddStaff`, `DevSetConvergingPlanes`) exist for the debug dev panel and are never sent by a release build (D-074).
 - **ARC-12** Core raises domain events (`PhaseChanged`, `CreatureArrived`, `ServiceStarted`, `AgitationChanged`,
   `ThresholdCrossed`, `CreatureTurned`, `AttackHit`, `UnitFell`, `FixtureDamaged`, `FixtureDestroyed`,
   `CreatureBanished`, `TributeLeft`, `BestiaryRevealed`, `OmenStarted`, `UnitUpgraded`, `RoomEntered`,
@@ -456,6 +458,8 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
 | Rank odds | see `SHP-03` |
 | Staff item slots | 2 per staff member |
 | Rooms | 2 at the start |
+| Combat (`combat`) | guard radius 4; violence within 4 tiles for 2 s; blood within 4 tiles; wound chance 70 %; Shaken soothe ×0.8; Grapple ×1.5 attack interval; integrity share 25 %; walls ×1.0; 5 integrity per silver (D-070, D-073) |
+| Company (`company`) | room after 8 s of floor company; session 25 s; rest 10 s; room soothe ×3; preferred guest ×1.5; violence interrupts within 4 tiles; door health 40 (D-071) |
 
 ---
 
@@ -564,7 +568,7 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
   | Stage | Target | Moves to the next stage when |
   |---|---|---|
   | 1. **Wreck** | The nearest fixture | It has destroyed one fixture, or 10 s have passed |
-  | 2. **Prey** | The nearest creature or staff member | It has made one unit fall, or 15 s have passed |
+  | 2. **Prey** | The nearest creature or staff member (not the innkeeper) | It has made one unit fall, or 15 s have passed |
   | 3. **Hunt** | The innkeeper | (final stage) |
 
 - **ESC-02** A creature's escalation profile may change the timings or skip a stage (for example Pale Court creatures
@@ -580,7 +584,8 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
   armour and speed. A hit does `max(1, attack − armour)` damage. There are no random critical hits or misses; variety
   comes from positions, timing and abilities.
 - **ESC-06** The innkeeper is a unit with low attack and moderate health. The player places it during Dusk like any
-  other unit (it may not be sold or benched). **If the innkeeper falls, the run ends at once** (`RUN-03`).
+  other unit (it may not be sold or benched). It never leaves its post, but strikes the nearest turned creature in
+  reach (D-073). **If the innkeeper falls, the run ends at once** (`RUN-03`).
 - **ESC-07** Staff with a Fighter technique (Fists or Weapons, `STF-02`) engage any turned creature in their zone or
   within their guard radius, in order of threat (Hunt before Prey before Wreck, then nearest). Engaging a turned
   creature always takes priority over serving appetites (`STF-04`).
@@ -601,8 +606,9 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
 - **STF-01** Staff are **unique named characters** (`data/staff.json`), each with an ID, a name, an origin (a plane,
   or the Mortal Realm), an optional hidden **ancestry** (`STF-15`), a base cost (1 to 3), a **main class**, base stats
   (health, attack, attack interval, range,
-  armour, speed, soothe), a ★1 base technique, an upgrade tree (`STF-07`) and a preset build for each rank
-  (`STF-10`). At most one copy of a character is ever in the inn.
+  armour, speed, soothe), a ★1 base technique, an upgrade tree (`STF-07`), a preset build for each rank
+  (`STF-10`) and, for characters who can learn Company, optional `prefers` and `refuses` lists of creature IDs
+  (`CMP-01`). At most one copy of a character is ever in the inn.
 - **STF-02** Classes and their techniques (closed sets, `DAT-03`):
 
   | Class | Technique | Answers | Notes |
@@ -695,7 +701,8 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
   room is free, the pair goes to the room. The session lasts 25 s and happens **off-screen**: the door closes, and one
   line of flavour text may appear in the cycle log. During the session the creature counts as occupied at three times
   the floor rate, and it comes out Calm. The companion is **out of play** for the session plus a 10 s rest: it serves
-  no one and cannot fight.
+  no one and cannot fight. A guest has at most one room session per cycle. A room's door has health; a broken door
+  closes the room until Dawn (D-069, D-071).
 - **CMP-05** **Interruptions**: floor company ends at once when violence happens within 4 tiles. A turned creature in
   its Wreck stage may target an occupied room's door like a fixture; when the door is attacked, the session ends at
   once and both come out before any violence is shown (`INV-06`). Suggestive content and violence are never shown
@@ -711,9 +718,10 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
 ## 12.1 The board
 
 - **BRD-01** The inn is a grid of 1 m tiles (prototype: 14 × 10) divided into **zones**: Entrance, Common Room, Bar,
-  Kitchen, Lounge, Stage, **Rooms** (two back rooms at the start, each with a door) and Cellar door. The layout is
-  defined in `data/inn.json` (`SIM-04`). Inn items may add rooms (`ITM-06`), from a fixed set of extra room slots in
-  the layout.
+  Kitchen, Lounge, Stage, **Rooms** (two back rooms at the start) and Cellar door. Each back room is its own zone
+  (`room-1`, `room-2`) with one door, a `RoomDoor` tile in that zone: walkable, never built on, closed during a
+  session (D-069). The layout is defined in `data/inn.json` (`SIM-04`). Inn items may add rooms (`ITM-06`), from a
+  fixed set of extra room slots in the layout.
 - **BRD-02** During Dusk, the player places units and fixtures on free floor tiles by drag and drop. Some fixtures
   belong to a zone (the bar counter in the Bar, the stage in the Stage zone); some techniques need a fixture to work
   (Drink needs a bar counter, Food a table, Cards a card table, `STF-02`).
@@ -724,9 +732,12 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
   broken, until they are repaired.
 - **BRD-05** The front door is where every creature enters. Fixtures may not be placed on the door tile or the two
   tiles in front of it.
-- **BRD-06** **Integrity** is the inn's overall health (100 at the start of a run). Damage to fixtures and walls lowers
-  it. The run is lost if integrity is 0 at the end of the mist phase (`RUN-03`).
-- **BRD-07** At Dawn, the player may pay silver to repair fixtures and integrity. Unrepaired damage carries over.
+- **BRD-06** **Integrity** is the inn's overall health (100 at the start of a run). It loses 25 % of the damage
+  fixtures and room doors take; a Wreck-stage creature with nothing in reach to wreck hits a wall, which takes
+  integrity directly (D-070). The run is lost if integrity is 0 at the end of the mist phase (`RUN-03`).
+- **BRD-07** At Dawn, every fixture and room door is repaired automatically and for free. The player may pay silver to
+  repair integrity, 1 silver per 5 points; only what is missing is charged, and partial repairs are allowed.
+  Unrepaired integrity carries over (D-072).
 
 ## 12.2 Fixtures
 
@@ -1095,7 +1106,7 @@ acceptance criteria and a demo. After each step the human builds, tests, plays t
 
 **Common preamble** (put before every step prompt):
 
-> You are implementing Misty Inn from SDD v1.7. Work **only** on the step below; do not start later steps. Read
+> You are implementing Misty Inn from SDD v1.8. Work **only** on the step below; do not start later steps. Read
 > sections 0, 2, 17 and 22 and the sections the step lists first. Apply the invariants (section 2) and the agent
 > rules (section 22). If anything is ambiguous, contradictory or missing, **stop and ask** before writing code. Do not
 > run builds, tests, Godot or git: list the exact commands for the human and mark results NOT RUN. Finish with the
@@ -1515,7 +1526,7 @@ regenerate it whenever the SDD changes.
 | BRD-04 | Placements stay from cycle to cycle until the player moves them; destroyed fixtures... | 12.1 |
 | BRD-05 | The front door is where every creature enters | 12.1 |
 | BRD-06 | Integrity is the inn's overall health (100 at the start of a run) | 12.1 |
-| BRD-07 | At Dawn, the player may pay silver to repair fixtures and integrity | 12.1 |
+| BRD-07 | At Dawn, every fixture and room door is repaired automatically and for free | 12.1 |
 | FIX-01 | A fixture (`data/fixtures.json`) has an ID, a name, a shape (tile offsets from its... | 12.2 |
 | FIX-02 | Prototype fixtures: | 12.2 |
 | FIX-03 | Adjacency effects apply to fixtures and units next to each other (8 neighbours), for... | 12.2 |

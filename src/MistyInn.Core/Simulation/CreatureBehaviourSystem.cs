@@ -28,7 +28,10 @@ internal sealed class CreatureBehaviourSystem
         _run = run;
         _random = random;
         _wanderTiles = wanderTiles;
-        _innTiles = content.Layout.AllTiles().Where(t => content.Layout.KindAt(t) == TileKind.Floor).ToList();
+        var rooms = content.Layout.Rooms.Select(r => r.Zone).ToHashSet();
+        _innTiles = content.Layout.AllTiles()
+            .Where(t => content.Layout.KindAt(t) == TileKind.Floor && !rooms.Contains(content.Layout.ZoneAt(t)))
+            .ToList();
         _service = service;
         _sense = sense;
     }
@@ -38,6 +41,12 @@ internal sealed class CreatureBehaviourSystem
         foreach (var creature in _run.Creatures)
         {
             creature.PreviousPosition = creature.Position;
+
+            // Turned creatures fight (CombatSystem); pairs going to a room walk with the companion (CompanySystem).
+            if (creature.IsTurned || creature.Activity is CreatureActivity.GoingToRoom or CreatureActivity.InRoom)
+            {
+                continue;
+            }
 
             switch (creature.Activity)
             {
@@ -57,7 +66,7 @@ internal sealed class CreatureBehaviourSystem
                     {
                         creature.UnservedSince = now;
                     }
-                    else if (creature.IsTurned || now - creature.UnservedSince >= _content.Balance.Agitation.ReseekAfterSeconds)
+                    else if (now - creature.UnservedSince >= _content.Balance.Agitation.ReseekAfterSeconds)
                     {
                         Decide(creature, now, arriving: false);
                     }
@@ -147,7 +156,7 @@ internal sealed class CreatureBehaviourSystem
     private IEnumerable<Tile> SpotsFor(Creature creature)
     {
         var candidates = new List<(Tile Tile, double Score)>();
-        var staff = _run.StaffOnTheFloor.ToList();
+        var staff = _run.AvailableStaff.ToList();
 
         foreach (var appetite in creature.Def.Appetites)
         {
@@ -176,7 +185,8 @@ internal sealed class CreatureBehaviourSystem
             {
                 foreach (var technique in unit.Techniques.Where(t => !t.NeedsFixture && t.Answers.Contains(appetite.Appetite)))
                 {
-                    if (appetite.Appetite == Appetite.Company && !(creature.Def.Sapient && creature.Def.Adult))
+                    if (technique.Technique == Technique.Company
+                        && (!(creature.Def.Sapient && creature.Def.Adult) || ServiceSystem.Refuses(unit, creature.Def)))
                     {
                         continue;
                     }

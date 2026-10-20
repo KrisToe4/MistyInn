@@ -5,15 +5,15 @@ inn up at Dusk; the Mist phase then plays out automatically until Dawn. Godot 4.
 hobby prototype. It is built one step at a time from the design document.
 
 ## Read first
-- `docs/SDD.md`: the design document (SDD v1.7, approved). Before any work, read sections 0, 2, 17 and 22 and
+- `docs/SDD.md`: the design document (SDD v1.8, approved). Before any work, read sections 0, 2, 17 and 22 and
   Appendix A, plus the sections the requested step lists. Appendix D indexes every requirement ID; Appendix E is the
   glossary. Earlier versions are kept as `docs/SDD_v<version>.md`.
 - `docs/PROGRESS.md`: step status, build, test and smoke-run results, toolchain and package versions.
-- `docs/DECISIONS.md`: recorded decisions, with an index table at the top (D-001 to D-068 so far; continue numbering).
+- `docs/DECISIONS.md`: recorded decisions, with an index table at the top (D-001 to D-076 so far; continue numbering).
 - `docs/ASSETS.md`: third-party assets and their licences (created when the first asset is added).
 
 ## Current state
-- SDD v1.7 is approved. Steps 0 to 4 are complete.
+- SDD v1.8 is approved. Steps 0 to 5 are complete.
 - Step 1 built the solution structure and the Core skeleton: `src/MistyInn.Core` (GameSession, SeededRandom, event
   buffer, cycle log, entity IDs), `tests/MistyInn.Core.Tests` (49/49 pass in the .NET SDK container), shared build
   settings (D-037), the classic `.sln` with export build types mapped by hand (D-035), and the Windows export preset
@@ -28,7 +28,12 @@ hobby prototype. It is built one step at a time from the design document.
 - Step 4 (agitation, techniques and the bestiary) is complete: build, 238/238 tests, smoke run and
   play-through passed. It adds `AgitationSystem`, `ServiceSystem`, `CreatureBehaviourSystem`, `InnSense`, fixtures with shapes and
   seats, the build menu, silver and supplies, tributes, `CreatureBestiary` and the forecast. Decisions D-001 to
-  D-068 are Accepted. The next step is step 5 (escalation, combat, Company and content filters).
+  D-068 are Accepted.
+- Step 5 (escalation, combat, Company and content filters) is complete: build, 281/281 tests, smoke run and
+  play-through passed. It adds `CombatSystem`, `CompanySystem`, `InnDamage`, back rooms as their own zones with `RoomDoor` tiles,
+  integrity and Dawn repairs, the Dawn wound-or-die roll, `ContentFilters` and `FlavourPicker`, and the debug dev
+  panel (`DevAddStaff`, `DevSetConvergingPlanes`). Older cycle tests use `TestGame.Sturdy` content (D-076). Decisions
+  D-001 to D-076 are Accepted. The next step is step 6 (shop, ranks, items and synergies).
 - Godot is at `C:\Godot_v4.7.2`. If Smart App Control blocks `dotnet test`, the tests run in the .NET SDK Linux
   container.
 

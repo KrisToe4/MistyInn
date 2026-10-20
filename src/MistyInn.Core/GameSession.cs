@@ -40,6 +40,9 @@ public sealed class GameSession : IEventSink
     private readonly CreatureBehaviourSystem _behaviour;
     private readonly AgitationSystem _agitation;
     private readonly ArrivalSystem _arrivals;
+    private readonly InnDamage _damage;
+    private readonly CompanySystem _company;
+    private readonly CombatSystem _combat;
 
     // Real time owed to the simulation, in TimeSpan ticks × StepsPerSecond, so whole steps are exact integers.
     private long _owed;
@@ -69,7 +72,10 @@ public sealed class GameSession : IEventSink
         _bestiary = new BestiaryRecorder(Content, Bestiary, this);
         _service = new ServiceSystem(Content, _run, this, _sense);
         _behaviour = new CreatureBehaviourSystem(Content, _run, random, wanderTiles, _service, _sense);
-        _agitation = new AgitationSystem(Content, _run, this, _sense, _bestiary, _behaviour);
+        _damage = new InnDamage(Content, _run, this);
+        _company = new CompanySystem(Content, _run, this, _sense, _service, _behaviour);
+        _agitation = new AgitationSystem(Content, _run, this, _sense, _bestiary, _behaviour, _damage);
+        _combat = new CombatSystem(Content, _run, this, _damage, _bestiary, _behaviour, _company);
         _arrivals = new ArrivalSystem(Content, _run, random, Ids, this, _behaviour, _bestiary);
 
         // The first Dusk is the starting state; views read it through the queries, so no events are raised for it.
@@ -95,6 +101,20 @@ public sealed class GameSession : IEventSink
 
     /// <summary>Supplies in stock (FIX-06).</summary>
     public IReadOnlyDictionary<Supply, int> Supplies => _run.Supplies;
+
+    /// <summary>The inn's integrity (BRD-06); the run is lost if it is 0 at the end of a mist (RUN-03).</summary>
+    public double Integrity => _run.Integrity;
+
+    public double MaxIntegrity => Content.Balance.Integrity;
+
+    /// <summary>Why the run ended, or null while it goes on (RUN-03).</summary>
+    public RunEndReason? EndReason => _run.EndReason;
+
+    /// <summary>The content filters in force (SET-04). They change what is shown, never what happens (CMP-06).</summary>
+    public ContentFilters Filters { get; private set; } = ContentFilters.None;
+
+    /// <summary>The back rooms and who is in them (CMP-04).</summary>
+    public IReadOnlyList<RoomSnapshot> Rooms => _run.Rooms.Select(r => r.Snapshot()).ToArray();
 
     /// <summary>Game time since the mist began (SIM-01); zero at Dusk.</summary>
     public TimeSpan Time => TimeSpan.FromTicks(_steps * TimeSpan.TicksPerSecond / StepsPerSecond);
@@ -156,6 +176,20 @@ public sealed class GameSession : IEventSink
                     level >= BestiaryLevel.Understood ? def.Triggers : null);
             }).ToList());
         }).ToList();
+
+    /// <summary>A technique's name as shown: Company becomes Hosting with the suggestive filter on (CMP-06).</summary>
+    public string TechniqueName(string techniqueId)
+    {
+        var technique = Content.Technique(techniqueId);
+        return technique.Technique == Technique.Company && Filters.NoSuggestive ? "Hosting" : technique.Name;
+    }
+
+    /// <summary>The flavour line for a log entry, picked with the filters in force now (RAT-09, DAT-06), or null.</summary>
+    public string? FlavourText(CycleLogEntry entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        return entry.Flavour is { } context ? FlavourPicker.Pick(Content.Flavour, context, Filters, entry.Sequence)?.Text : null;
+    }
 
     /// <summary>The run's random source, for the systems that need it (ARC-04).</summary>
     internal IRandomSource Random { get; }
@@ -226,7 +260,12 @@ public sealed class GameSession : IEventSink
             return HandleSetSpeed(setSpeed);
         }
 
-        if (Phase == Phase.Mist)
+        if (command is SetContentFilters filters)
+        {
+            return HandleSetContentFilters(filters);
+        }
+
+        if (Phase is Phase.Mist or Phase.RunOver)
         {
             return CommandResult.Fail(CommandFailure.WrongPhase);
         }
@@ -242,6 +281,9 @@ public sealed class GameSession : IEventSink
             StoreFixture store => HandleStoreFixture(store),
             SellFixture sell => HandleSellFixture(sell),
             BuySupplies buy => HandleBuySupplies(buy),
+            RepairIntegrity repair => HandleRepairIntegrity(repair),
+            DevAddStaff add => HandleDevAddStaff(add),
+            DevSetConvergingPlanes planes => HandleDevSetConvergingPlanes(planes),
             _ => CommandResult.Fail(CommandFailure.NotSupported),
         };
     }
@@ -340,7 +382,7 @@ public sealed class GameSession : IEventSink
     {
         var h = new StateHasher()
             .Add((int)Phase).Add(Cycle).Add(_steps).Add(_owed).Add(_run.Speed).Add(_run.Silver)
-            .Add(_arrivals.NextArrivalSeconds);
+            .Add(_arrivals.NextArrivalSeconds).Add(_run.Integrity).Add(_run.Attacks.Count).Add(_run.BloodMarks.Count);
 
         foreach (var supply in Enum.GetValues<Supply>())
         {
@@ -361,7 +403,9 @@ public sealed class GameSession : IEventSink
         foreach (var unit in _run.Units)
         {
             h.Add(unit.Id.Value).Add(unit.Tile?.X ?? -1).Add(unit.Tile?.Y ?? -1)
-                .Add(unit.Session?.Technique.Id ?? "").Add(unit.Session?.EndsAt ?? -1);
+                .Add(unit.Session?.Technique.Id ?? "").Add(unit.Session?.EndsAt ?? -1)
+                .Add(unit.Position.X).Add(unit.Position.Y).Add(unit.Health).Add((int)unit.Activity).Add(unit.Shaken)
+                .Add(unit.Engaging?.Value ?? -1).Add(unit.NextAttackAt).Add(unit.RestUntil).Add(unit.Path.Count);
             foreach (var target in unit.Session?.Targets ?? [])
             {
                 h.Add(target.Value);
@@ -379,7 +423,9 @@ public sealed class GameSession : IEventSink
                 .Add(c.Position.X).Add(c.Position.Y).Add(c.PreviousPosition.X).Add(c.PreviousPosition.Y)
                 .Add(c.Agitation).Add((int)c.State).Add(c.Spot?.X ?? -1).Add(c.Spot?.Y ?? -1).Add(c.ServedBy ?? "")
                 .Add(c.UnservedSince).Add(c.NextBreakAt).Add(c.WasServed).Add(c.Frightened)
-                .Add(c.Path.Count);
+                .Add(c.Path.Count).Add(c.Health).Add((int)c.Stage).Add(c.StageSince).Add(c.EngagedBy?.Value ?? -1)
+                .Add(c.GrappledBy?.Value ?? -1).Add(c.NextAttackAt).Add(c.CompanyWith?.Value ?? -1).Add(c.CompanySince)
+                .Add(c.HadRoom);
             foreach (var tile in c.Path)
             {
                 h.Add(tile.X).Add(tile.Y);
@@ -389,6 +435,12 @@ public sealed class GameSession : IEventSink
             {
                 h.Add((int)trigger);
             }
+        }
+
+        foreach (var room in _run.Rooms)
+        {
+            h.Add(room.Zone).Add(room.DoorHealth).Add(room.Companion?.Value ?? -1).Add(room.Guest?.Value ?? -1)
+                .Add(room.EndsAt ?? -1);
         }
 
         foreach (var (id, seen, study, triggers, banish) in Bestiary.State())
@@ -431,15 +483,37 @@ public sealed class GameSession : IEventSink
     /// <summary>For tests: the live fixture.</summary>
     internal Fixture FixtureForTests(FixtureId id) => _run.FindFixture(id) ?? throw new KeyNotFoundException(id.ToString());
 
+    /// <summary>For tests: the live unit.</summary>
+    internal Unit UnitForTests(UnitId id) => _run.FindUnit(id) ?? throw new KeyNotFoundException(id.ToString());
+
+    /// <summary>For tests: the run's state, to set integrity or look at rooms.</summary>
+    internal RunState RunForTests => _run;
+
     internal void Raise(DomainEvent domainEvent) => _events.Add(domainEvent);
 
-    internal void Log(string kind, string cause, EntityRef? subject = null, EntityRef? source = null) =>
-        _cycleLog.Record(Time, kind, cause, subject, source);
+    internal void Log(string kind, string cause, EntityRef? subject = null, EntityRef? source = null, string? flavour = null) =>
+        _cycleLog.Record(Time, kind, cause, subject, source, flavour);
 
     void IEventSink.Raise(DomainEvent domainEvent) => Raise(domainEvent);
 
-    void IEventSink.Log(string kind, string cause, EntityRef? subject, EntityRef? source) =>
-        Log(kind, cause, subject, source);
+    void IEventSink.Log(string kind, string cause, EntityRef? subject, EntityRef? source, string? flavour) =>
+        Log(kind, cause, subject, source, flavour);
+
+    void IEventSink.EndRun(RunEndReason reason) => EndRun(reason);
+
+    /// <summary>The run is lost (RUN-03): nothing more happens in this session.</summary>
+    private void EndRun(RunEndReason reason)
+    {
+        if (_run.Phase == Phase.RunOver)
+        {
+            return;
+        }
+
+        _run.Phase = Phase.RunOver;
+        _run.EndReason = reason;
+        Raise(new RunEnded(Time, reason));
+        Log("run.lost", reason == RunEndReason.InnkeeperFell ? "innkeeper.fell" : "integrity.zero");
+    }
 
     private double MistSeconds => _steps / (double)StepsPerSecond;
 
@@ -447,11 +521,22 @@ public sealed class GameSession : IEventSink
     {
         _steps++;
         var now = MistSeconds;
+        foreach (var unit in _run.Units)
+        {
+            unit.PreviousPosition = unit.Position;
+        }
 
         _arrivals.Update(now);
         _behaviour.Step(StepSeconds, now);
         _service.Step(now);
+        _company.Step(StepSeconds, now);
         _agitation.Step(StepSeconds, now, _service.Rates);
+        _combat.Step(StepSeconds, now);
+
+        if (Phase != Phase.Mist)
+        {
+            return;
+        }
 
         if (now >= Content.Balance.MistDurationSeconds)
         {
@@ -466,8 +551,8 @@ public sealed class GameSession : IEventSink
         _steps = 0;
         _owed = 0;
 
-        var count = PlaneDraw.CountFor(cycle, Content.Balance, Content.UnlockedPlanes.Count);
-        var planeIds = PlaneDraw.Draw(Random, Content.UnlockedPlanes, count, _run.PreviousPlaneSet);
+        var count = PlaneDraw.CountFor(cycle, Content.Balance, _run.UnlockedPlanes.Count);
+        var planeIds = PlaneDraw.Draw(Random, _run.UnlockedPlanes, count, _run.PreviousPlaneSet);
         _run.PreviousPlaneSet = planeIds;
         _run.ConvergingPlanes.Clear();
         _run.ConvergingPlanes.AddRange(planeIds.Select(Content.Plane));
@@ -480,11 +565,14 @@ public sealed class GameSession : IEventSink
     }
 
     /// <summary>
-    /// Dawn (CYC-03, CRE-05): creatures that stayed calm leave their tribute, served ones add to the bestiary (BST-02),
-    /// the cycle's income arrives, and every creature dissolves.
+    /// Dawn (CYC-03, CRE-05, CYC-04): creatures that stayed calm leave their tribute, served ones add to the bestiary
+    /// (BST-02), the cycle's income arrives and every creature dissolves. Fallen staff are wounded or dead (ESC-09);
+    /// everyone else recovers (STF-12); fixtures are repaired for free (D-072). With no integrity left, the run is lost
+    /// (RUN-03).
     /// </summary>
     private void BreakDawn()
     {
+        _company.EndAll();
         var studied = new HashSet<string>();
         foreach (var creature in _run.Creatures.Where(c => !c.IsTurned))
         {
@@ -511,9 +599,53 @@ public sealed class GameSession : IEventSink
 
         _run.Creatures.Clear();
         _run.Reservations.Clear();
+        _run.Attacks.Clear();
+        _run.BloodMarks.Clear();
+        _combat.Reset();
+
+        foreach (var unit in _run.Units.Where(u => u.FellThisCycle && !u.Def.IsInnkeeper).OrderBy(u => u.Id.Value).ToList())
+        {
+            if (Random.NextDouble() < Content.Balance.Combat.WoundChance)
+            {
+                Raise(new StaffWounded(Time, unit.Id));
+                Log("staff.wounded", "dawn.roll", unit.Id.ToRef());
+                continue;
+            }
+
+            if (unit.Tile is { } post)
+            {
+                _run.Board.RemoveUnit(post);
+            }
+
+            _run.Units.Remove(unit);
+            Raise(new StaffDied(Time, unit.Id, unit.Def.Id, unit.Def.Name));
+            Log("staff.died", "dawn.roll", unit.Id.ToRef());
+        }
+
         foreach (var unit in _run.Units)
         {
-            unit.Session = null;
+            unit.Shaken = unit.FellThisCycle;
+            unit.FellThisCycle = false;
+            unit.Health = unit.MaxHealth;
+            unit.ResetToPost();
+        }
+
+        foreach (var fixture in _run.PlacedFixtures.Where(f => f.Health < f.Def.Health))
+        {
+            fixture.Health = fixture.Def.Health;
+            Raise(new FixtureRepaired(Time, fixture.Id));
+            Log("fixture.repaired", "dawn.free", fixture.Id.ToRef());
+        }
+
+        foreach (var room in _run.Rooms)
+        {
+            room.DoorHealth = room.MaxDoorHealth;
+        }
+
+        if (_run.Integrity <= 0)
+        {
+            EndRun(RunEndReason.InnDestroyed);
+            return;
         }
 
         _run.Phase = Phase.Dawn;
@@ -565,6 +697,7 @@ public sealed class GameSession : IEventSink
         }
 
         unit.Tile = command.Tile;
+        unit.ResetToPost();
         _run.Board.PutUnit(unit.Id, command.Tile);
         Raise(new UnitPlaced(Time, unit.Id, command.Tile));
         return CommandResult.Ok;
@@ -615,6 +748,11 @@ public sealed class GameSession : IEventSink
         _steps = 0;
         _owed = 0;
         _run.Phase = Phase.Mist;
+        foreach (var unit in _run.Units)
+        {
+            unit.ResetToPost();
+        }
+
         RefreshSeats();
         _arrivals.StartMist();
         Raise(new PhaseChanged(Time, Cycle, Phase.Mist));
@@ -718,6 +856,105 @@ public sealed class GameSession : IEventSink
         _run.Silver += refund;
         Raise(new FixtureSold(Time, fixture.Id, refund));
         Raise(new SilverChanged(Time, _run.Silver));
+        return CommandResult.Ok;
+    }
+
+    private CommandResult HandleSetContentFilters(SetContentFilters command)
+    {
+        ArgumentNullException.ThrowIfNull(command.Filters);
+        if (Filters != command.Filters)
+        {
+            Filters = command.Filters;
+            Raise(new ContentFiltersChanged(Time, Filters));
+        }
+
+        return CommandResult.Ok;
+    }
+
+    /// <summary>Integrity costs 1 silver per 5 points at Dawn; only what is missing is charged (BRD-07, D-072).</summary>
+    private CommandResult HandleRepairIntegrity(RepairIntegrity command)
+    {
+        if (Phase != Phase.Dawn)
+        {
+            return CommandResult.Fail(CommandFailure.WrongPhase);
+        }
+
+        if (command.Silver < 1)
+        {
+            return CommandResult.Fail(CommandFailure.InvalidValue);
+        }
+
+        var missing = MaxIntegrity - _run.Integrity;
+        if (missing <= 0)
+        {
+            return CommandResult.Fail(CommandFailure.NothingToRepair);
+        }
+
+        var perSilver = Content.Balance.Combat.IntegrityPerSilver;
+        var spend = Math.Min(command.Silver, (int)Math.Ceiling(missing / perSilver));
+        if (_run.Silver < spend)
+        {
+            return CommandResult.Fail(CommandFailure.NotEnoughSilver);
+        }
+
+        _run.Silver -= spend;
+        _run.Integrity = Math.Min(MaxIntegrity, _run.Integrity + spend * perSilver);
+        Raise(new IntegrityRepaired(Time, _run.Integrity, spend));
+        Raise(new SilverChanged(Time, _run.Silver));
+        return CommandResult.Ok;
+    }
+
+    private CommandResult HandleDevAddStaff(DevAddStaff command)
+    {
+        if (Phase != Phase.Dusk)
+        {
+            return CommandResult.Fail(CommandFailure.WrongPhase);
+        }
+
+        if (Content.Characters.All(c => c.Id != command.CharacterId))
+        {
+            return CommandResult.Fail(CommandFailure.InvalidValue);
+        }
+
+        if (_run.Units.Any(u => u.Def.Id == command.CharacterId))
+        {
+            return CommandResult.Fail(CommandFailure.AlreadyOwned);
+        }
+
+        if (_run.Units.Count(u => !u.Def.IsInnkeeper && u.Tile is null) >= Content.Balance.BenchSize)
+        {
+            return CommandResult.Fail(CommandFailure.BenchFull);
+        }
+
+        var unit = RunState.NewUnit(Content, Ids, Content.TemplateFor(command.CharacterId));
+        _run.Units.Add(unit);
+        Raise(new UnitJoined(Time, unit.Id));
+        return CommandResult.Ok;
+    }
+
+    private CommandResult HandleDevSetConvergingPlanes(DevSetConvergingPlanes command)
+    {
+        if (Phase != Phase.Dusk)
+        {
+            return CommandResult.Fail(CommandFailure.WrongPhase);
+        }
+
+        var ids = command.PlaneIds;
+        if (ids is null || ids.Count == 0 || ids.Distinct().Count() != ids.Count || ids.Any(id => Content.Planes.All(p => p.Id != id)))
+        {
+            return CommandResult.Fail(CommandFailure.InvalidValue);
+        }
+
+        foreach (var id in ids.Where(id => !_run.UnlockedPlanes.Contains(id)))
+        {
+            _run.UnlockedPlanes.Add(id);
+        }
+
+        var ordered = Content.Planes.Where(p => ids.Contains(p.Id)).ToList();
+        _run.ConvergingPlanes.Clear();
+        _run.ConvergingPlanes.AddRange(ordered);
+        _run.PreviousPlaneSet = ordered.Select(p => p.Id).ToList();
+        Raise(new ConvergingPlanesDrawn(Time, Cycle, _run.PreviousPlaneSet));
         return CommandResult.Ok;
     }
 

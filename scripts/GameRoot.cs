@@ -24,7 +24,8 @@ namespace MistyInn;
 /// Owns the only <see cref="GameSession"/> (ARC-02). Each frame it ticks the session (SIM-02), drains its events into
 /// the views (ARC-12) and places the views from Core's positions (SIM-03). Player input becomes commands (ARC-10):
 /// dragging staff and fixtures onto tiles at Dusk (CAM-13), the build menu (FIX-05), selection in the mist (CAM-12),
-/// speed and the pause menu (SCP-13, CYC-10).
+/// speed and the pause menu (SCP-13, CYC-10), integrity repairs at Dawn (BRD-07) and the debug dev panel (D-074).
+/// Hits flash, and fallen units leave a blood mark unless the Blood filter is on (RAT-05, RAT-09).
 /// </summary>
 public partial class GameRoot : Node3D
 {
@@ -54,11 +55,17 @@ public partial class GameRoot : Node3D
     private readonly Dictionary<UnitId, UnitView> _units = new();
     private readonly Dictionary<CreatureId, CreatureView> _creatures = new();
     private readonly Dictionary<FixtureId, FixtureView> _fixtures = new();
-    private readonly CreatureBestiary _bestiary = new();
+    private readonly List<Node3D> _bloodMarks = new();
+    private readonly List<string> _fellTonight = new();
+    private readonly List<string> _diedTonight = new();
+
+    // The bestiary outlives the run and the scene (BST-04, D-066); step 8 saves it in the profile.
+    private static readonly CreatureBestiary Bestiary = new();
     private GameSession _session = null!;
     private UnitId? _dragging;
     private FixtureId? _draggingFixture;
     private int _rotation;
+    private string _dragName = "";
     private Node3D? _selected;
     private bool _paused;
     private long _droppedEvents;
@@ -85,7 +92,7 @@ public partial class GameRoot : Node3D
         }
 
         var seed = Seed != 0 ? (ulong)Seed : (ulong)System.Random.Shared.NextInt64(1, long.MaxValue);
-        _session = new GameSession(new SeededRandom(seed), content: content, bestiary: _bestiary);
+        _session = new GameSession(new SeededRandom(seed), content: content, bestiary: Bestiary);
 
         Inn.Build(_session.Content);
         Inn.ShowGates(_session.ConvergingPlanes.Select(p => p.Id));
@@ -94,11 +101,7 @@ public partial class GameRoot : Node3D
 
         foreach (var unit in _session.Units)
         {
-            var view = (unit.IsInnkeeper ? InnkeeperScene : StaffScene).Instantiate<UnitView>();
-            UnitsRoot.AddChild(view);
-            view.Setup(unit.Id, unit.Name);
-            ShowUnit(view, unit.Tile);
-            _units[unit.Id] = view;
+            AddUnitView(unit);
         }
 
         RefreshFixtures();
@@ -114,6 +117,11 @@ public partial class GameRoot : Node3D
         Hud.BuySupplyPressed += OnBuySupply;
         Hud.ResumePressed += OnResume;
         Hud.QuitPressed += OnQuit;
+        Hud.RepairPressed += OnRepair;
+        Hud.NewRunPressed += OnNewRun;
+        Hud.DevAddStaffPressed += OnDevAddStaff;
+        Hud.DevPlanePressed += OnDevPlane;
+        Hud.FiltersChanged += OnFiltersChanged;
         Hud.Refresh(_session);
         Hud.ShowMessage(Tr("Place the innkeeper, your staff and your fixtures, then begin the mist."), 8);
     }
@@ -147,6 +155,11 @@ public partial class GameRoot : Node3D
         Hud.BuySupplyPressed -= OnBuySupply;
         Hud.ResumePressed -= OnResume;
         Hud.QuitPressed -= OnQuit;
+        Hud.RepairPressed -= OnRepair;
+        Hud.NewRunPressed -= OnNewRun;
+        Hud.DevAddStaffPressed -= OnDevAddStaff;
+        Hud.DevPlanePressed -= OnDevPlane;
+        Hud.FiltersChanged -= OnFiltersChanged;
     }
 
     public override void _Process(double delta)
@@ -172,8 +185,9 @@ public partial class GameRoot : Node3D
         {
             if (_creatures.TryGetValue(creature.Id, out var view))
             {
+                view.Visible = creature.IsVisible;
                 view.Position = Inn.PositionToWorld(creature.PreviousPosition.Lerp(creature.Position, alpha));
-                view.SetStatus(creature.Agitation, creature.State, creature.ServedBy is not null);
+                view.SetStatus(creature);
             }
         }
 
@@ -181,7 +195,13 @@ public partial class GameRoot : Node3D
         {
             if (_units.TryGetValue(unit.Id, out var view))
             {
-                view.SetActivity(unit.Serving is { } technique ? $"{technique} ×{unit.ServingCreatures.Count}" : null);
+                view.Visible = unit.IsVisible;
+                if (unit.IsVisible)
+                {
+                    view.Position = Inn.PositionToWorld(unit.PreviousPosition.Lerp(unit.Position, alpha));
+                }
+
+                view.SetStatus(Activity(unit), unit.Health, unit.MaxHealth, unit.Activity == UnitActivity.Fallen);
             }
         }
 
@@ -301,6 +321,47 @@ public partial class GameRoot : Node3D
             case UnitBenched benched when _units.TryGetValue(benched.Unit, out var view):
                 ShowUnit(view, null);
                 break;
+            case UnitJoined joined when _session.Units.FirstOrDefault(u => u.Id == joined.Unit) is { } unit:
+                AddUnitView(unit);
+                Hud.ShowMessage($"{unit.Name} {Tr("joins the bench.")}");
+                break;
+            case StaffDied died when _units.Remove(died.Unit, out var view):
+                if (_selected == view)
+                {
+                    ClearSelection();
+                }
+
+                view.QueueFree();
+                _diedTonight.Add(died.Name);
+                break;
+            case UnitFell fell when _units.TryGetValue(fell.Unit, out var fallen):
+                BloodMarkAt(fallen.Position);
+                _fellTonight.Add(fallen.DisplayName);
+                Hud.ShowMessage($"{fallen.DisplayName} {Tr("has fallen!")}");
+                break;
+            case CreatureFell creatureFell when _creatures.TryGetValue(creatureFell.Creature, out var view):
+                BloodMarkAt(view.Position);
+                break;
+            case AttackLanded hit:
+                FlashHit(hit.Target);
+                break;
+            case CreatureBanished banished when _creatures.TryGetValue(banished.Creature, out var view):
+                Hud.ShowMessage($"{view.DisplayName} {Tr("is banished into the mist.")}");
+                break;
+            case RoomSessionStarted room:
+                ShowRoomStarted(room);
+                break;
+            case RoomSessionEnded { Interrupted: true }:
+                Hud.ShowMessage(Tr("The door is attacked! Both come out at once."));
+                break;
+            case RunEnded ended:
+                Hud.ShowRunOver(ended.Reason == RunEndReason.InnkeeperFell
+                    ? Tr("The innkeeper has fallen. The mist takes the inn.")
+                    : Tr("The inn is too broken to stand another night."));
+                break;
+            case ContentFiltersChanged:
+                ShowBloodMarks();
+                break;
             case CreatureArrived arrived:
                 SpawnCreature(arrived);
                 break;
@@ -312,7 +373,7 @@ public partial class GameRoot : Node3D
 
                 view.QueueFree();
                 break;
-            case FixtureBuilt or FixturePlaced or FixtureStored or FixtureSold or FixtureBroken:
+            case FixtureBuilt or FixturePlaced or FixtureStored or FixtureSold or FixtureBroken or FixtureRepaired:
                 RefreshFixtures();
                 break;
             case CreatureTurned turned when _creatures.TryGetValue(turned.Creature, out var view):
@@ -329,9 +390,12 @@ public partial class GameRoot : Node3D
                 break;
             case PhaseChanged { Phase: Phase.Mist }:
                 _tributesTonight = 0;
+                _fellTonight.Clear();
+                _diedTonight.Clear();
                 break;
             case PhaseChanged { Phase: Phase.Dawn }:
-                Hud.ShowMessage($"{Tr("Dawn breaks. The creatures that stayed calm left")} {_tributesTonight} {Tr("silver in tribute.")}", 8);
+                ClearBloodMarks();
+                Hud.ShowMessage(DawnSummary(), 10);
                 break;
         }
     }
@@ -376,6 +440,104 @@ public partial class GameRoot : Node3D
         _creatures[arrived.Creature] = view;
     }
 
+    private void AddUnitView(UnitSnapshot unit)
+    {
+        var view = (unit.IsInnkeeper ? InnkeeperScene : StaffScene).Instantiate<UnitView>();
+        UnitsRoot.AddChild(view);
+        view.Setup(unit.Id, unit.Name);
+        ShowUnit(view, unit.Tile);
+        _units[unit.Id] = view;
+    }
+
+    /// <summary>What a unit's label says it is doing; Company shows as Hosting with the filter on (CMP-06).</summary>
+    private string? Activity(UnitSnapshot unit) => unit.Activity switch
+    {
+        UnitActivity.Serving when unit.Serving is { } technique => $"{_session.TechniqueName(technique)} ×{unit.ServingCreatures.Count}",
+        UnitActivity.Fighting => Tr("Fighting"),
+        UnitActivity.Returning => Tr("Returning"),
+        UnitActivity.GoingToRoom => _session.Filters.NoSuggestive ? Tr("To a private audience") : Tr("To a back room"),
+        UnitActivity.Resting => Tr("Resting"),
+        UnitActivity.Fallen => Tr("Fallen"),
+        _ => unit.Shaken ? Tr("Shaken") : null,
+    };
+
+    private string DawnSummary()
+    {
+        var text = $"{Tr("Dawn breaks. The creatures that stayed calm left")} {_tributesTonight} {Tr("silver in tribute.")}";
+        if (_diedTonight.Count > 0)
+        {
+            text += $"\n{Tr("Lost tonight")}: {string.Join(", ", _diedTonight)}.";
+        }
+
+        var wounded = _fellTonight.Except(_diedTonight).ToList();
+        if (wounded.Count > 0)
+        {
+            text += $"\n{Tr("Wounded, and shaken for a night")}: {string.Join(", ", wounded)}.";
+        }
+
+        return text;
+    }
+
+    private void ShowRoomStarted(RoomSessionStarted room)
+    {
+        var companion = _units.TryGetValue(room.Companion, out var c) ? c.DisplayName : "";
+        var guest = _creatures.TryGetValue(room.Guest, out var g) ? g.DisplayName : "";
+        var text = _session.Filters.NoSuggestive
+            ? $"{companion} {Tr("receives")} {guest} {Tr("for a private audience.")}"
+            : $"{companion} {Tr("and")} {guest} {Tr("retire to a back room.")}";
+        if (_session.CycleLogEntries.LastOrDefault(e => e.Kind == "company.room") is { } entry && _session.FlavourText(entry) is { } line)
+        {
+            text += $"\n{line}";
+        }
+
+        Hud.ShowMessage(text, 6);
+    }
+
+    private void FlashHit(EntityRef? target)
+    {
+        var color = _session.Filters.ReducedBlood ? Colors.White : new Color(1f, 0.25f, 0.2f);
+        if (target is { Kind: EntityKind.Unit } u && _units.TryGetValue(new UnitId(u.Id), out var unit))
+        {
+            unit.Flash(color);
+        }
+        else if (target is { Kind: EntityKind.Creature } k && _creatures.TryGetValue(new CreatureId(k.Id), out var creature))
+        {
+            creature.Flash(color);
+        }
+    }
+
+    /// <summary>A placeholder blood mark where someone fell, until dawn (RAT-05); hidden with the Blood filter on.</summary>
+    private void BloodMarkAt(Vector3 position)
+    {
+        var mark = new MeshInstance3D
+        {
+            Mesh = new CylinderMesh { TopRadius = 0.35f, BottomRadius = 0.35f, Height = 0.02f },
+            MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.35f, 0.02f, 0.03f) },
+        };
+        AddChild(mark);
+        mark.Position = new Vector3(position.X, 0.06f, position.Z);
+        _bloodMarks.Add(mark);
+        ShowBloodMarks();
+    }
+
+    private void ShowBloodMarks()
+    {
+        foreach (var mark in _bloodMarks)
+        {
+            mark.Visible = !_session.Filters.ReducedBlood;
+        }
+    }
+
+    private void ClearBloodMarks()
+    {
+        foreach (var mark in _bloodMarks)
+        {
+            mark.QueueFree();
+        }
+
+        _bloodMarks.Clear();
+    }
+
     private void ShowUnit(UnitView view, Tile? tile)
     {
         view.Visible = tile is not null;
@@ -407,6 +569,7 @@ public partial class GameRoot : Node3D
     {
         _dragging = unitId;
         _draggingFixture = null;
+        _dragName = name;
         Hud.SetDragLabel(name);
     }
 
@@ -415,7 +578,8 @@ public partial class GameRoot : Node3D
         _draggingFixture = fixtureId;
         _dragging = null;
         _rotation = rotation;
-        Hud.SetDragLabel($"{name}  ({Tr("R to rotate")})");
+        _dragName = $"{name}  ({Tr("R to rotate")})";
+        Hud.SetDragLabel(_dragName);
     }
 
     private void EndDrag()
@@ -430,6 +594,14 @@ public partial class GameRoot : Node3D
     {
         var mouse = GetViewport().GetMousePosition();
         var overBoard = !Hud.IsOverBench(mouse) && PickTile(mouse) is not null;
+
+        // The tile under the mouse, so the demo instructions' (x,y) can be followed.
+        var hovered = overBoard ? PickTile(mouse) : null;
+        Hud.SetHoverTile(hovered is { } h ? $"{Tr("Tile")} ({h.X},{h.Y})  ·  {ZoneName(_session.Layout.ZoneAt(h))}" : null);
+        if (_dragging is not null || _draggingFixture is not null)
+        {
+            Hud.SetDragLabel(hovered is { } at ? $"{_dragName}  →  ({at.X},{at.Y})" : _dragName);
+        }
 
         if (_dragging is { } unitId && overBoard && PickTile(mouse) is { } tile)
         {
@@ -446,6 +618,8 @@ public partial class GameRoot : Node3D
             Inn.HideCursor();
         }
     }
+
+    private string ZoneName(string zone) => zone.Length == 0 ? Tr("wall") : Tr(zone.Replace('-', ' '));
 
     private static (int X, int Y) Rotate(int x, int y, int quarterTurns) => quarterTurns switch
     {
@@ -476,6 +650,16 @@ public partial class GameRoot : Node3D
     private void OnResume() => SetPaused(false);
 
     private void OnQuit() => GetTree().Quit();
+
+    private void OnRepair(int silver) => Report(_session.Execute(new RepairIntegrity(Math.Max(1, Math.Min(silver, _session.Silver)))));
+
+    private void OnNewRun() => GetTree().ReloadCurrentScene();
+
+    private void OnDevAddStaff(string characterId) => Report(_session.Execute(new DevAddStaff(characterId)));
+
+    private void OnDevPlane(string planeId) => Report(_session.Execute(new DevSetConvergingPlanes(new[] { planeId })));
+
+    private void OnFiltersChanged(ContentFilters filters) => Report(_session.Execute(new SetContentFilters(filters)));
 
     private void SetPaused(bool paused)
     {
@@ -545,6 +729,9 @@ public partial class GameRoot : Node3D
         CommandFailure.NotEnoughSilver => Tr("Not enough silver."),
         CommandFailure.WrongZone => Tr("That fixture belongs in another room."),
         CommandFailure.WrongPhase => Tr("Not now."),
+        CommandFailure.NothingToRepair => Tr("The inn needs no repairs."),
+        CommandFailure.AlreadyOwned => Tr("They are already at the inn."),
+        CommandFailure.BenchFull => Tr("The bench is full."),
         _ => $"{Tr("Refused")}: {failure}",
     };
 

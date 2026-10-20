@@ -11,10 +11,11 @@ using MistyInn.Core.Run;
 namespace MistyInn.UI;
 
 /// <summary>
-/// Placeholder HUD: cycle, phase and time to dawn (CYC-02), silver and supplies, the forecast with what the bestiary
-/// knows (CYC-01, BST-03), the bench and the fixture storage to drag from (CAM-13), the build menu (FIX-05, FIX-06),
-/// Begin the Mist, speed controls (SCP-13), Continue at Dawn (CYC-04), the selection line (CAM-12) and the pause menu
-/// (CYC-10). Built in code; the UI pass (step 9) replaces it with designed screens.
+/// Placeholder HUD: cycle, phase and time to dawn (CYC-02), silver, supplies and integrity (BRD-06), the forecast with
+/// what the bestiary knows (CYC-01, BST-03), the bench and the fixture storage to drag from (CAM-13), the build menu
+/// (FIX-05, FIX-06), Begin the Mist, speed controls (SCP-13), Continue and integrity repairs at Dawn (CYC-04, BRD-07),
+/// the run-over panel (RUN-03), the selection line (CAM-12), the pause menu (CYC-10) and, in debug builds only, the dev
+/// panel (D-074). Built in code; the UI pass (step 9) replaces it with designed screens.
 /// </summary>
 public partial class Hud : CanvasLayer
 {
@@ -25,6 +26,7 @@ public partial class Hud : CanvasLayer
     private Label _seed = null!;
     private Label _message = null!;
     private Label _selection = null!;
+    private Label _hover = null!;
     private Label _drag = null!;
     private PanelContainer _benchPanel = null!;
     private VBoxContainer _benchList = null!;
@@ -35,6 +37,13 @@ public partial class Hud : CanvasLayer
     private Button _continue = null!;
     private HBoxContainer _speedBar = null!;
     private Control _pauseMenu = null!;
+    private HBoxContainer _repairBar = null!;
+    private Button _repairAll = null!;
+    private Control _runOver = null!;
+    private Label _runOverText = null!;
+    private PanelContainer _devPanel = null!;
+    private VBoxContainer _devList = null!;
+    private bool _devBuilt;
     private string _benchSignature = "";
     private string _storageSignature = "";
     private bool _buildMenuBuilt;
@@ -60,6 +69,17 @@ public partial class Hud : CanvasLayer
 
     public event Action? QuitPressed;
 
+    /// <summary>Spend up to this much silver on integrity (BRD-07).</summary>
+    public event Action<int>? RepairPressed;
+
+    public event Action? NewRunPressed;
+
+    public event Action<string>? DevAddStaffPressed;
+
+    public event Action<string>? DevPlanePressed;
+
+    public event Action<ContentFilters>? FiltersChanged;
+
     public bool IsPauseMenuOpen => _pauseMenu.Visible;
 
     public override void _Ready()
@@ -73,6 +93,7 @@ public partial class Hud : CanvasLayer
         _seed = AddLabel(info, 14, new Color(0.7f, 0.7f, 0.75f));
         _message = AddLabel(info, 17, new Color(1f, 0.72f, 0.45f));
         _selection = AddLabel(info, 17, new Color(0.8f, 0.9f, 1f));
+        _hover = AddLabel(info, 15, new Color(0.75f, 0.8f, 0.85f));
 
         _benchPanel = new PanelContainer();
         AddChild(_benchPanel);
@@ -111,6 +132,12 @@ public partial class Hud : CanvasLayer
             button.Pressed += () => SpeedPressed?.Invoke(speed);
         }
 
+        _repairBar = new HBoxContainer();
+        actions.AddChild(_repairBar);
+        AddButton(_repairBar, Tr("Repair 5 integrity (1 silver)")).Pressed += () => RepairPressed?.Invoke(1);
+        _repairAll = AddButton(_repairBar, Tr("Repair all"));
+        _repairAll.Pressed += () => RepairPressed?.Invoke(int.MaxValue);
+
         _beginMist = AddButton(actions, Tr("Begin the Mist"));
         _beginMist.Pressed += () => BeginMistPressed?.Invoke();
         _continue = AddButton(actions, Tr("Continue to Dusk"));
@@ -122,6 +149,17 @@ public partial class Hud : CanvasLayer
 
         _pauseMenu = BuildPauseMenu();
         AddChild(_pauseMenu);
+        _runOver = BuildRunOver();
+        AddChild(_runOver);
+
+        _devPanel = new PanelContainer { Visible = false };
+        AddChild(_devPanel);
+        _devPanel.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.CenterRight, Control.LayoutPresetMode.Minsize, 16);
+        _devPanel.GrowHorizontal = Control.GrowDirection.Begin;
+        var devScroll = new ScrollContainer { CustomMinimumSize = new Vector2(240, 360) };
+        _devPanel.AddChild(devScroll);
+        _devList = new VBoxContainer();
+        devScroll.AddChild(_devList);
     }
 
     public override void _Process(double delta)
@@ -150,7 +188,8 @@ public partial class Hud : CanvasLayer
         {
             Phase.Dusk => Tr("Dusk"),
             Phase.Mist => Tr("The Mist"),
-            _ => Tr("Dawn"),
+            Phase.Dawn => Tr("Dawn"),
+            _ => Tr("The run is over"),
         };
 
         var status = $"{Tr("Cycle")} {session.Cycle}  ·  {phase}";
@@ -161,7 +200,8 @@ public partial class Hud : CanvasLayer
         }
 
         _status.Text = status;
-        _purse.Text = $"{Tr("Silver")} {session.Silver}  ·  {Tr("Drink")} {session.Supplies[Supply.Drink]}  ·  {Tr("Food")} {session.Supplies[Supply.Food]}";
+        _purse.Text = $"{Tr("Silver")} {session.Silver}  ·  {Tr("Drink")} {session.Supplies[Supply.Drink]}  ·  {Tr("Food")} {session.Supplies[Supply.Food]}"
+                      + $"  ·  {Tr("Integrity")} {Mathf.CeilToInt(session.Integrity)}/{Mathf.CeilToInt(session.MaxIntegrity)}";
         _forecast.Text = Forecast(session);
         _slots.Text = $"{Tr("Staff on the floor")}: {session.StaffOnBoard}/{session.MaxStaffOnBoard}";
 
@@ -171,6 +211,11 @@ public partial class Hud : CanvasLayer
         _beginMist.Visible = dusk;
         _speedBar.Visible = session.Phase == Phase.Mist;
         _continue.Visible = session.Phase == Phase.Dawn;
+        var missing = session.MaxIntegrity - session.Integrity;
+        _repairBar.Visible = session.Phase == Phase.Dawn && missing > 0;
+        _repairAll.Text = $"{Tr("Repair all")} ({Mathf.CeilToInt(missing / session.Content.Balance.Combat.IntegrityPerSilver)} {Tr("silver")})";
+        _devPanel.Visible = dusk && OS.IsDebugBuild();
+        DevPanelOnce(session);
 
         RefreshBench(session.Units);
         RefreshStorage(session.Fixtures);
@@ -185,6 +230,9 @@ public partial class Hud : CanvasLayer
 
     public void SetSelection(string? text) => _selection.Text = text ?? "";
 
+    /// <summary>The tile under the mouse and its zone, or nothing off the board.</summary>
+    public void SetHoverTile(string? text) => _hover.Text = text ?? "";
+
     /// <summary>Shows what is being dragged next to the mouse, or hides it.</summary>
     public void SetDragLabel(string? text)
     {
@@ -197,6 +245,13 @@ public partial class Hud : CanvasLayer
         _benchPanel.Visible && _benchPanel.GetGlobalRect().HasPoint(screenPosition);
 
     public void ShowPauseMenu(bool open) => _pauseMenu.Visible = open;
+
+    /// <summary>The run is lost (RUN-03): says why, and offers a new run.</summary>
+    public void ShowRunOver(string text)
+    {
+        _runOverText.Text = text;
+        _runOver.Visible = true;
+    }
 
     /// <summary>Hides the game UI and shows an error that stops the game (DAT-04, debug builds).</summary>
     public void ShowFatal(string text)
@@ -334,6 +389,65 @@ public partial class Hud : CanvasLayer
             var s = supply;
             AddButton(_buildList, $"{bundle.Amount} {supply}  ({bundle.Price})").Pressed += () => BuySupplyPressed?.Invoke(s);
         }
+    }
+
+    /// <summary>
+    /// Debug builds only (D-074): add any character to the bench, choose the converging planes, and try the content
+    /// filters (SET-04) until the settings screen arrives in step 8.
+    /// </summary>
+    private void DevPanelOnce(GameSession session)
+    {
+        if (_devBuilt || !OS.IsDebugBuild())
+        {
+            return;
+        }
+
+        _devBuilt = true;
+        AddLabel(_devList, 16).Text = Tr("Dev panel (debug builds)");
+
+        var blood = new CheckButton { Text = Tr("Reduced blood") };
+        var hosting = new CheckButton { Text = Tr("No suggestive content (Hosting)") };
+        void Changed(bool _) => FiltersChanged?.Invoke(new ContentFilters(blood.ButtonPressed, hosting.ButtonPressed));
+        blood.Toggled += Changed;
+        hosting.Toggled += Changed;
+        _devList.AddChild(blood);
+        _devList.AddChild(hosting);
+
+        AddLabel(_devList, 15).Text = Tr("Converge only:");
+        foreach (var plane in session.Content.Planes)
+        {
+            var id = plane.Id;
+            AddButton(_devList, plane.Name).Pressed += () => DevPlanePressed?.Invoke(id);
+        }
+
+        AddLabel(_devList, 15).Text = Tr("Add to the bench:");
+        foreach (var character in session.Content.Characters)
+        {
+            var id = character.Id;
+            AddButton(_devList, $"{character.Name} ({session.TechniqueName(character.BaseTechnique)})").Pressed +=
+                () => DevAddStaffPressed?.Invoke(id);
+        }
+    }
+
+    private Control BuildRunOver()
+    {
+        var center = new CenterContainer { Visible = false };
+        center.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        center.MouseFilter = Control.MouseFilterEnum.Stop;
+
+        var panel = new PanelContainer();
+        center.AddChild(panel);
+        var box = new VBoxContainer();
+        panel.AddChild(box);
+        var title = AddLabel(box, 26);
+        title.Text = Tr("The inn has fallen");
+        title.HorizontalAlignment = HorizontalAlignment.Center;
+        _runOverText = AddLabel(box, 18);
+        _runOverText.HorizontalAlignment = HorizontalAlignment.Center;
+
+        AddButton(box, Tr("New run")).Pressed += () => NewRunPressed?.Invoke();
+        AddButton(box, Tr("Quit")).Pressed += () => QuitPressed?.Invoke();
+        return center;
     }
 
     private Control BuildPauseMenu()

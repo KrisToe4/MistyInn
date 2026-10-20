@@ -2,6 +2,7 @@ using MistyInn.Core.Board;
 using MistyInn.Core.Commands;
 using MistyInn.Core.Content;
 using MistyInn.Core.Entities;
+using MistyInn.Core.Events;
 using MistyInn.Core.Run;
 
 namespace MistyInn.Core.Tests;
@@ -12,13 +13,18 @@ namespace MistyInn.Core.Tests;
 /// </summary>
 internal sealed class Scenario
 {
-    public Scenario(IReadOnlyList<string>? startingStaff = null, Func<BalanceDef, BalanceDef>? balance = null, ulong seed = 1)
+    public Scenario(
+        IReadOnlyList<string>? startingStaff = null,
+        Func<BalanceDef, BalanceDef>? balance = null,
+        ulong seed = 1,
+        bool sturdy = true,
+        Func<ContentSet, ContentSet>? set = null)
     {
         Content = TestGame.ContentWith(startingStaff, b =>
         {
             var changed = balance is null ? b : balance(b);
             return changed with { BaseArrivalIntervalSeconds = 1_000_000 };
-        });
+        }, sturdy, set);
         Session = TestGame.NewSession(seed, Content);
     }
 
@@ -55,6 +61,35 @@ internal sealed class Scenario
     public CreatureId Spawn(string creatureDefId, Tile at) => Session.SpawnCreatureForTests(creatureDefId, at);
 
     public Creature Creature(CreatureId id) => Session.CreatureForTests(id);
+
+    public Unit Unit(string staffId) => Session.UnitForTests(Staff(staffId).Id);
+
+    public bool IsGone(CreatureId id) => Session.Creatures.All(c => c.Id != id);
+
+    /// <summary>Spawns a creature and turns it at once (AGI-03), as if its agitation had just reached 100.</summary>
+    public CreatureId SpawnTurned(string creatureDefId, Tile at)
+    {
+        var id = Spawn(creatureDefId, at);
+        Creature(id).Agitation = 99.99;
+        Step();
+        return id;
+    }
+
+    /// <summary>Events drained by <see cref="Collect"/>, oldest first.</summary>
+    public List<DomainEvent> Events { get; } = new();
+
+    public void Collect() => Events.AddRange(Session.DrainEvents());
+
+    /// <summary>Like <see cref="RunUntil"/>, keeping every event raised on the way in <see cref="Events"/>.</summary>
+    public void RunUntilCollecting(Func<bool> condition, double maxSeconds = 60) =>
+        RunUntil(() =>
+        {
+            Collect();
+            return condition();
+        }, maxSeconds);
+
+    /// <summary>Runs exactly one fixed step.</summary>
+    public void Step() => Session.Tick(TimeSpan.FromTicks(TimeSpan.TicksPerSecond / GameSession.StepsPerSecond + 1));
 
     /// <summary>Runs the mist for a number of whole game seconds (at speed 1).</summary>
     public void Run(double seconds)

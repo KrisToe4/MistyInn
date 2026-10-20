@@ -26,6 +26,9 @@ internal sealed class BestiaryRecorder
     public void TriggerSeen(CreatureDef creature, TriggerKind trigger) =>
         Observe(creature, () => Bestiary.SeeTrigger(creature.Id, trigger));
 
+    /// <summary>A banishing counts towards Understood (BST-02, ESC-08).</summary>
+    public void Banished(CreatureDef creature) => Observe(creature, () => Bestiary.AddBanishPoint(creature.Id));
+
     private void Observe(CreatureDef creature, Action record)
     {
         var before = Bestiary.LevelOf(creature, _content.Balance.Bestiary);

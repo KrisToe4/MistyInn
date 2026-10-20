@@ -24,6 +24,8 @@
       "mainClass": "CompanionServer",
       "secondClass": "Entertainer",
       "baseTechnique": "drink",
+      "prefers": ["creature-10"],
+      "refuses": [],
       "stats": {
         "health": 18.0,
         "attack": 2.0,
@@ -152,6 +154,8 @@
       "mainClass": "CompanionServer",
       "secondClass": "Gambler",
       "baseTechnique": "food",
+      "prefers": [],
+      "refuses": ["creature-09"],
       "stats": {
         "health": 18.0,
         "attack": 2.0,
@@ -280,6 +284,8 @@
       "mainClass": "CompanionServer",
       "secondClass": "Fighter",
       "baseTechnique": "company",
+      "prefers": ["creature-09"],
+      "refuses": ["creature-10"],
       "stats": {
         "health": 19.8,
         "attack": 2.2,

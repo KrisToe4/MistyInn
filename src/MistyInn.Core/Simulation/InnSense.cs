@@ -56,6 +56,14 @@ internal sealed class InnSense
 
     public string ZoneOf(TilePosition position) => _content.Layout.ZoneAt(position.NearestTile);
 
+    /// <summary>Whether an attack landed within <paramref name="radius"/> lately (AGI-08 <c>Violence</c>, CMP-05).</summary>
+    public bool ViolenceNear(TilePosition position, double radius) =>
+        _run.Attacks.Any(a => a.At.DistanceTo(position) <= radius);
+
+    /// <summary>Whether a unit or creature fell within the blood radius this mist (AGI-08 <c>Blood</c>, ESC-04).</summary>
+    public bool BloodNear(TilePosition position) =>
+        _run.BloodMarks.Any(m => m.DistanceTo(position) <= _content.Balance.Combat.BloodRadius);
+
     /// <summary>A zone and the zones next to it, <paramref name="levels"/> steps out (the stage's reach, FIX-02).</summary>
     public IReadOnlySet<string> ZonesAround(string zone, int levels)
     {

@@ -151,6 +151,11 @@ public static partial class ContentValidator
                 return;
             }
 
+            if (_layout.Rooms.Count == 0)
+            {
+                Error("inn.json: the inn needs at least one back room with a RoomDoor (BRD-01).");
+            }
+
             var board = new InnBoard(_layout);
             var unreachable = _layout.ZoneIds.Except(board.ZonesReachableFromDoor()).ToList();
             if (unreachable.Count > 0)
@@ -306,6 +311,12 @@ public static partial class ContentValidator
         {
             var where = $"staff.json: '{s.Id}'";
             if (!s.Adult) Error($"{where} must be an adult (STF-13, RAT-01).");
+            var prefers = s.Prefers ?? [];
+            var refuses = s.Refuses ?? [];
+            foreach (var id in prefers.Concat(refuses).Where(id => !_creatureIds.Contains(id)))
+                Error($"{where}: prefers or refuses unknown creature '{id}' (CMP-01).");
+            if (prefers.Intersect(refuses).Any())
+                Error($"{where}: a creature cannot be both preferred and refused (CMP-01).");
             if (string.IsNullOrWhiteSpace(s.Name)) Error($"{where} has no name.");
             if (s.Origin != MortalRealm && !_planeIds.Contains(s.Origin ?? "")) Error($"{where}: unknown origin '{s.Origin}'.");
             if (s.Ancestry is { } a)
@@ -503,6 +514,24 @@ public static partial class ContentValidator
 
             if (b.Bestiary is null || b.Bestiary.StudiedPoints < 1)
                 Error($"{where}: bestiary.studiedPoints must be at least 1 (BST-02).");
+
+            if (_layout is not null && b.Rooms > _layout.Rooms.Count)
+                Error($"{where}: rooms is {b.Rooms}, but inn.json has {_layout.Rooms.Count} back rooms (BRD-01).");
+
+            var combat = b.Combat;
+            if (combat is null)
+                Error($"{where}: combat is required.");
+            else if (combat.GuardRadius < 0 || combat.IntegrityShare is < 0 or > 1 || combat.WallDamageMultiplier < 0 || combat.ViolenceRadius < 0
+                     || combat.ViolenceSeconds <= 0 || combat.BloodRadius < 0 || combat.WoundChance is < 0 or > 1 || combat.ShakenSoothe is < 0 or > 1
+                     || combat.GrappleSlow < 1 || combat.RepathSeconds <= 0 || combat.IntegrityPerSilver < 1 || combat.MaxMarks < 1)
+                Error($"{where}: a combat value is out of range (section 10).");
+
+            var company = b.Company;
+            if (company is null)
+                Error($"{where}: company is required.");
+            else if (company.RoomAfterSeconds < 0 || company.RoomSessionSeconds <= 0 || company.RoomRestSeconds < 0 || company.RoomSootheMultiplier < 1
+                     || company.PreferredSoothe < 1 || company.InterruptRadius < 0 || company.DoorHealth <= 0)
+                Error($"{where}: a company value is out of range (section 11.5).");
 
             var shop = b.Shop;
             if (shop is null)

@@ -38,7 +38,8 @@ public sealed class CycleLog
     /// <summary>Records that arrived after the log was full and were not stored.</summary>
     public long TruncatedCount { get; private set; }
 
-    public void Record(TimeSpan at, string kind, string cause, EntityRef? subject = null, EntityRef? source = null)
+    public void Record(
+        TimeSpan at, string kind, string cause, EntityRef? subject = null, EntityRef? source = null, string? flavour = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(kind);
         ArgumentException.ThrowIfNullOrWhiteSpace(cause);
@@ -56,7 +57,7 @@ public sealed class CycleLog
             return;
         }
 
-        _entries.Add(new CycleLogEntry(++_lastSequence, at, kind, cause, subject, source));
+        _entries.Add(new CycleLogEntry(++_lastSequence, at, kind, cause, subject, source, flavour));
     }
 
     /// <summary>Empties the log for a new cycle.</summary>

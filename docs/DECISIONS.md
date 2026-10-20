@@ -74,6 +74,14 @@ proposed details were approved with SDD v1.0 (2026-10-20). **Proposed** marks a 
 | D-066 | The bestiary lives outside the session | Accepted | 2026-10-20 | BST-04, SAV-02 |
 | D-067 | What the cycle log records | Accepted | 2026-10-20 | INV-12, UI-07 |
 | D-068 | Internal test hooks on GameSession | Accepted | 2026-10-20 | TST-01, ARC-03 |
+| D-069 | Each back room is its own zone with a RoomDoor tile | Accepted | 2026-10-20 | BRD-01, BRD-03, CMP-04, CMP-05 |
+| D-070 | Integrity takes a share of fixture damage, and walls | Accepted | 2026-10-20 | BRD-06, ESC-01 |
+| D-071 | Company room rules and tuning | Accepted | 2026-10-20 | CMP-02, CMP-04, CMP-05 |
+| D-072 | Fixtures repair for free at Dawn; integrity costs silver | Accepted | 2026-10-20 | BRD-07, ESC-10 |
+| D-073 | Combat details | Accepted | 2026-10-20 | ESC-01, ESC-03, ESC-05, ESC-06, ESC-07, ESC-09, STF-02 |
+| D-074 | A debug dev panel for staff and planes | Accepted | 2026-10-20 | ARC-11, PLN-03 |
+| D-075 | Content filters in Core change only what is shown | Accepted | 2026-10-20 | RAT-09, SET-04, CMP-06, DAT-06, INV-02 |
+| D-076 | Older tests run on sturdy content | Accepted | 2026-10-20 | TST-01, INV-08, AGT-14 |
 
 ---
 
@@ -811,3 +819,112 @@ proposed details were approved with SDD v1.0 (2026-10-20). **Proposed** marks a 
 - **Decision:** `GameSession` has internal members, visible only to the test project: spawn a creature on a tile,
   reach a live creature or fixture, and read the service rates and rules. Nothing in the game calls them.
 - **Requirement IDs affected:** TST-01, ARC-03.
+
+## D-069 Each back room is its own zone with a RoomDoor tile
+- **Status:** Accepted (the human's answer)
+- **Date / step:** 2026-10-20, step 5
+- **Context:** Both rooms shared one `rooms` zone and their doors were plain floor, so BRD-03 could not check each room
+  on its own, and CMP-05 had no door to attack.
+- **Decision:** In `inn.json` each room is its own zone (`room-1`, `room-2`), and its door is a new `RoomDoor` tile kind
+  in that zone: walkable, never placeable, closed (blocked) during a session. A room door has health
+  (`company.doorHealth`, 40); a broken door closes the room until Dawn. The layout parser rejects a room door with no
+  zone, a room with two doors, and a room with no floor. Because each room is a zone, the existing "every zone
+  reachable" check now covers every room on its own (BRD-03). `balance.json` `rooms` (2) says how many are used, and
+  the validator checks the map has that many.
+- **Alternatives considered:** A separate `rooms` list in `inn.json`.
+- **Requirement IDs affected:** BRD-01, BRD-03, CMP-04, CMP-05.
+
+## D-070 Integrity takes a share of fixture damage, and walls
+- **Status:** Accepted (the human's answer); the tuning values are proposed
+- **Date / step:** 2026-10-20, step 5
+- **Context:** BRD-06 says damage to fixtures and walls lowers integrity, but not how much.
+- **Decision:** Integrity loses 25 % (`combat.integrityShare`) of the damage fixtures and room doors take. A Wreck-stage
+  creature with no working fixture or occupied room door in reach hits the nearest inner wall, which takes integrity
+  directly (`combat.wallDamageMultiplier`, 1.0). Restless knocks and Menacing breaks count too. The other combat values
+  are in the new `combat` section of `balance.json`: guard radius 4, violence within 4 tiles for 2 s, blood within 4
+  tiles, wound chance 0.7, Shaken soothe 0.8, Grapple ×1.5 attack interval, repath every 0.5 s, 5 integrity per
+  silver, and at most 64 recent attacks and blood marks kept.
+- **Alternatives considered:** 50 % of fixture damage and no walls; a fixed 10 per broken fixture.
+- **Requirement IDs affected:** BRD-06, ESC-01, AGI-08, ESC-09, STF-12.
+
+## D-071 Company room rules and tuning
+- **Status:** Accepted (approved after step 5)
+- **Date / step:** 2026-10-20, step 5
+- **Context:** CMP-04 and CMP-05 leave some details open.
+- **Decision:**
+  - "Still craves Company" means a `Craves`-strength Company appetite. A guest has at most one room session a cycle.
+  - The pair walk to the first free, unbroken room in map order. The guest is soothed at the floor rate on the way;
+    violence within 4 tiles, the companion falling or the guest turning calls the walk off.
+  - Inside, both are off the board: no triggers, fright, contagion or attacks reach them. The guest is soothed at
+    3 × the floor rate (`company.roomSootheMultiplier`), and comes out with agitation at most 49 (Calm).
+  - A session ended by an attack on the door does not calm the guest. Either way the companion then rests 10 s,
+    out of play, and walks back to its post.
+  - Preferred guests ×1.5 (`company.preferredSoothe`) on the floor and in the room. Staff 01, 02 and 03 have
+    placeholder preferences and refusals in `staff.json` (new optional `prefers` and `refuses` lists of creature IDs).
+- **Requirement IDs affected:** CMP-01, CMP-02, CMP-04, CMP-05.
+
+## D-072 Fixtures repair for free at Dawn; integrity costs silver
+- **Status:** Accepted (the human's answer)
+- **Date / step:** 2026-10-20, step 5
+- **Context:** BRD-07 lets the player pay to repair fixtures and integrity; the price was not set.
+- **Decision:** At Dawn every damaged or broken fixture, and every room door, is repaired for free and at once (a
+  `FixtureRepaired` event and log entry each). Integrity costs 1 silver per 5 points (`combat.integrityPerSilver`),
+  bought with `RepairIntegrity(silver)`; only what is missing is charged, and partial repairs are allowed. Unrepaired
+  integrity carries over.
+- **Alternatives considered:** 1 silver per 10 missing fixture health; half the build cost per fixture.
+- **Requirement IDs affected:** BRD-07, ESC-10, BRD-04.
+
+## D-073 Combat details
+- **Status:** Accepted (approved after step 5)
+- **Date / step:** 2026-10-20, step 5
+- **Context:** Section 10 leaves some rules to the implementation.
+- **Decision:**
+  - **Targets (ESC-01):** Wreck goes for the nearest working fixture or occupied room door it can reach (then walls,
+    D-070); Prey for the nearest creature that has not turned, or staff member on the floor (not the innkeeper, who is
+    the Hunt's target); Hunt for the innkeeper. With no path to a Prey or Hunt target it attacks the nearest barricade.
+    Targets are chosen again every 0.5 s.
+  - **Turning on a fighter (ESC-03):** "out of reach" is beyond the guard radius.
+  - **Fighters (ESC-07):** a fighter uses its first Fighter technique; reach is the larger of its range stat and the
+    technique's range; a hit does `max(1, attack × rank multiplier + technique attack bonus − armour)` every attack
+    interval × the technique's interval multiplier. It walks to the creature, and back to its post when there is
+    nothing to fight. Grapple also slows the held creature's attacks ×1.5.
+  - **Innkeeper (ESC-06):** stays at its post and strikes the nearest turned creature in reach. Its blows banish too.
+  - **Falling (ESC-09):** a fallen unit stays on the floor until dawn (RAT-05) and leaves a Blood mark, as does a
+    creature struck down (ESC-04). The Dawn roll is in unit order from the run's random source.
+  - **Violence (AGI-08, CMP-05):** any landed attack counts for 2 s within 4 tiles of where it landed.
+- **Requirement IDs affected:** ESC-01, ESC-03, ESC-04, ESC-05, ESC-06, ESC-07, ESC-09, STF-02, AGI-08.
+
+## D-074 A debug dev panel for staff and planes
+- **Status:** Accepted (the human's answer)
+- **Date / step:** 2026-10-20, step 5
+- **Context:** The step 5 demo needs two fighters, a companion and Pale Court guests, but the run starts with Staff 01
+  and Staff 09, the shop comes in step 6, and the Pale Court is locked.
+- **Decision:** Two development commands in Core, sent only from a dev panel shown in debug builds at Dusk:
+  `DevAddStaff(characterId)` puts any character on the bench at ★1 (refused if owned, unknown, or the bench is full),
+  and `DevSetConvergingPlanes(planeIds)` sets this Dusk's planes and unlocks them for the run (`RunState.UnlockedPlanes`
+  now holds the run's planes). The panel also has the two content filter toggles until the settings screen (step 8).
+- **Alternatives considered:** Changing the starting staff and unlocked planes in `balance.json`.
+- **Requirement IDs affected:** ARC-11, PLN-03.
+
+## D-075 Content filters in Core change only what is shown
+- **Status:** Accepted (approved after step 5)
+- **Date / step:** 2026-10-20, step 5
+- **Context:** RAT-09 wants both filters honoured everywhere, including the cycle log; CMP-06 wants the same mechanics.
+- **Decision:** `GameSession.Filters` holds `ContentFilters(ReducedBlood, NoSuggestive)`, set with `SetContentFilters` in
+  any phase. They are not part of the state hash and no rule reads them. Log entries keep neutral keys
+  (`company.room`) and a flavour context; `FlavourText(entry)` picks the line when it is read, with the filters of that
+  moment, from the entry's sequence number (never the run's random source), so turning a filter on also changes what
+  earlier entries show. `TechniqueName("company")` is "Hosting" with the suggestive filter on. Views flash hits white
+  and hide blood marks with the Blood filter on. Settings saving the filters is step 8 (SET-01).
+- **Requirement IDs affected:** RAT-09, SET-04, CMP-06, DAT-06, INV-02.
+
+## D-076 Older tests run on sturdy content
+- **Status:** Accepted (approved after step 5)
+- **Date / step:** 2026-10-20, step 5
+- **Context:** With combat, a creature that turns in an older cycle or service test can hunt the innkeeper or wear
+  integrity to 0 and end the run, which those tests never meant to test.
+- **Decision:** `TestGame.NewSession` and `Scenario` use `TestGame.Sturdy` by default: the real content with an
+  innkeeper of 1,000,000 health and 1,000,000 integrity. Combat and run-loss tests ask for the real values
+  (`sturdy: false`). No value in `data/` changed for this (AGT-14). One step 4 tribute test now turns its creature in
+  the last 3 s, so it cannot reach anyone.
+- **Requirement IDs affected:** TST-01, INV-08, AGT-14.

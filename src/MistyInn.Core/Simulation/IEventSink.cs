@@ -11,5 +11,8 @@ internal interface IEventSink
 
     void Raise(DomainEvent domainEvent);
 
-    void Log(string kind, string cause, EntityRef? subject = null, EntityRef? source = null);
+    void Log(string kind, string cause, EntityRef? subject = null, EntityRef? source = null, string? flavour = null);
+
+    /// <summary>Ends the run at once (RUN-03): the phase becomes <see cref="Run.Phase.RunOver"/>.</summary>
+    void EndRun(Run.RunEndReason reason);
 }

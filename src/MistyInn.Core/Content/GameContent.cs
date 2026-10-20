@@ -3,10 +3,22 @@ using MistyInn.Core.Board;
 namespace MistyInn.Core.Content;
 
 /// <summary>
-/// A unit the run starts with: the innkeeper or a starting staff character at ★1 (RUN-01). The innkeeper knows no
-/// techniques (ESC-06).
+/// A unit as it joins the run: the innkeeper or a staff character at ★1 (RUN-01). The innkeeper knows no techniques
+/// (ESC-06). <paramref name="Prefers"/> and <paramref name="Refuses"/> are creature IDs (CMP-01).
 /// </summary>
-public sealed record UnitTemplate(string Id, string Name, bool IsInnkeeper, StatsDef Stats, IReadOnlyList<string> TechniqueIds);
+public sealed record UnitTemplate(
+    string Id,
+    string Name,
+    bool IsInnkeeper,
+    StatsDef Stats,
+    IReadOnlyList<string> TechniqueIds,
+    IReadOnlyList<string>? Prefers = null,
+    IReadOnlyList<string>? Refuses = null)
+{
+    public IReadOnlyList<string> PrefersOrEmpty => Prefers ?? Array.Empty<string>();
+
+    public IReadOnlyList<string> RefusesOrEmpty => Refuses ?? Array.Empty<string>();
+}
 
 /// <summary>
 /// Validated content (DAT-04), ready for the simulation: the parsed board and lookups by ID. Create it with
@@ -35,11 +47,7 @@ public sealed class GameContent
 
         var keeper = set.Staff.Innkeeper;
         StartingUnits = new[] { new UnitTemplate(keeper.Id, keeper.Name, IsInnkeeper: true, keeper.Stats, Array.Empty<string>()) }
-            .Concat(set.Balance.StartingStaff.Select(id =>
-            {
-                var c = _characters[id];
-                return new UnitTemplate(id, c.Name, IsInnkeeper: false, c.Stats, new[] { c.BaseTechnique });
-            }))
+            .Concat(set.Balance.StartingStaff.Select(TemplateFor))
             .ToList()
             .AsReadOnly();
     }
@@ -93,6 +101,13 @@ public sealed class GameContent
 
     public PlaneDef Plane(string id) =>
         _planes.TryGetValue(id, out var plane) ? plane : throw new KeyNotFoundException($"Unknown plane '{id}'.");
+
+    /// <summary>A character as a unit at ★1, with its base technique only (D-065).</summary>
+    public UnitTemplate TemplateFor(string characterId)
+    {
+        var c = Character(characterId);
+        return new UnitTemplate(c.Id, c.Name, IsInnkeeper: false, c.Stats, new[] { c.BaseTechnique }, c.Prefers, c.Refuses);
+    }
 
     public CreatureDef Creature(string id) =>
         _creatures.TryGetValue(id, out var creature) ? creature : throw new KeyNotFoundException($"Unknown creature '{id}'.");

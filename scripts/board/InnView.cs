@@ -29,11 +29,13 @@ public partial class InnView : Node3D
         ["kitchen"] = new Color("#575041"),
         ["stage"] = new Color("#4e3f56"),
         ["lounge"] = new Color("#5a3a47"),
-        ["rooms"] = new Color("#4a4039"),
+        ["room-1"] = new Color("#4a4039"),
+        ["room-2"] = new Color("#463b3f"),
         ["cellar-door"] = new Color("#3d3a34"),
     };
 
     private static readonly Color WallColor = new("#3a2f27");
+    private static readonly Color RoomDoorColor = new("#6b4528");
     private static readonly Color ValidCursor = new(0.35f, 0.9f, 0.45f, 0.55f);
     private static readonly Color InvalidCursor = new(0.95f, 0.3f, 0.3f, 0.55f);
 
@@ -61,6 +63,10 @@ public partial class InnView : Node3D
                 view.Scale = new Vector3(1.04f, WallHeight / 0.1f, 1.04f);
                 view.Position += new Vector3(0, WallHeight / 2, 0);
                 view.MaterialOverride = Material(WallColor);
+            }
+            else if (kind == TileKind.RoomDoor)
+            {
+                view.MaterialOverride = Material(RoomDoorColor);
             }
             else
             {

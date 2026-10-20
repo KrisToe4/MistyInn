@@ -12,8 +12,8 @@
     ".....#RRRrCCCCCCLLLL#.....",
     "G....#RRR#CCCCCCLLLL#....G",
     ".....#####CCCCCCCCCX#.....",
-    ".....#RRRrCEEEEECCCC#.....",
-    ".....#RRR#CEEEEECCCC#.....",
+    ".....#QQQqCEEEEECCCC#.....",
+    ".....#QQQ#CEEEEECCCC#.....",
     ".....########D#######.....",
     "..........................",
     "..........................",
@@ -32,8 +32,10 @@
     "K": { "kind": "Floor", "zone": "kitchen" },
     "S": { "kind": "Floor", "zone": "stage" },
     "L": { "kind": "Floor", "zone": "lounge" },
-    "R": { "kind": "Floor", "zone": "rooms" },
-    "r": { "kind": "Floor", "zone": "rooms" },
+    "R": { "kind": "Floor", "zone": "room-1" },
+    "r": { "kind": "RoomDoor", "zone": "room-1" },
+    "Q": { "kind": "Floor", "zone": "room-2" },
+    "q": { "kind": "RoomDoor", "zone": "room-2" },
     "X": { "kind": "Floor", "zone": "cellar-door" }
   }
 }

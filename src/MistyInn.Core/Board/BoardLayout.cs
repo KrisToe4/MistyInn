@@ -35,6 +35,7 @@ public sealed class BoardLayout
             .Distinct()
             .ToList()
             .AsReadOnly();
+        Rooms = FindRooms();
     }
 
     public int Width { get; }
@@ -52,6 +53,9 @@ public sealed class BoardLayout
 
     /// <summary>Every zone that has at least one walkable tile, in map order.</summary>
     public IReadOnlyList<string> ZoneIds { get; }
+
+    /// <summary>The back rooms, each its own zone with one door, in map order of their doors (BRD-01, BRD-03).</summary>
+    public IReadOnlyList<RoomLayout> Rooms { get; }
 
     public bool Contains(Tile tile) => tile.X >= 0 && tile.Y >= 0 && tile.X < Width && tile.Y < Height;
 
@@ -73,7 +77,7 @@ public sealed class BoardLayout
     }
 
     public static bool IsWalkableKind(TileKind kind) =>
-        kind is TileKind.Floor or TileKind.Door or TileKind.Outside or TileKind.Gate;
+        kind is TileKind.Floor or TileKind.Door or TileKind.Outside or TileKind.Gate or TileKind.RoomDoor;
 
     public static BoardLayout Parse(IReadOnlyList<string> rows, IReadOnlyDictionary<char, LegendEntry> legend)
     {
@@ -115,6 +119,34 @@ public sealed class BoardLayout
 
     private int Index(Tile tile) => tile.Y * Width + tile.X;
 
+    private IReadOnlyList<RoomLayout> FindRooms()
+    {
+        var rooms = new List<RoomLayout>();
+        foreach (var door in AllTiles().Where(t => KindAt(t) == TileKind.RoomDoor))
+        {
+            var zone = ZoneAt(door);
+            if (zone.Length == 0)
+            {
+                throw new FormatException($"The room door at {door} has no zone.");
+            }
+
+            if (rooms.Any(r => r.Zone == zone))
+            {
+                throw new FormatException($"Room '{zone}' has more than one door.");
+            }
+
+            var tiles = AllTiles().Where(t => KindAt(t) == TileKind.Floor && ZoneAt(t) == zone).ToList();
+            if (tiles.Count == 0)
+            {
+                throw new FormatException($"Room '{zone}' has a door at {door} but no floor.");
+            }
+
+            rooms.Add(new RoomLayout(zone, door, tiles.AsReadOnly()));
+        }
+
+        return rooms.AsReadOnly();
+    }
+
     private IReadOnlyList<Tile> FindDoorApproach(Tile door)
     {
         (int Dx, int Dy)[] directions = [(0, -1), (1, 0), (0, 1), (-1, 0)];
@@ -139,3 +171,6 @@ public sealed class BoardLayout
         throw new FormatException($"The front door at {door} has no floor tile next to it.");
     }
 }
+
+/// <summary>A back room (BRD-01): its zone, its door and its floor tiles. Company sessions happen inside (CMP-04).</summary>
+public sealed record RoomLayout(string Zone, Tile Door, IReadOnlyList<Tile> Tiles);

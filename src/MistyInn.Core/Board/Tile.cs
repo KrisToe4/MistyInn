@@ -22,4 +22,10 @@ public enum TileKind
 
     /// <summary>A mist gate at the edge of the clearing (PLN-04): walkable, outside.</summary>
     Gate,
+
+    /// <summary>
+    /// The door of a back room (BRD-01, CMP-04): walkable while the room is free, closed during a session. Its zone is
+    /// the room's zone. Nothing is placed on it.
+    /// </summary>
+    RoomDoor,
 }

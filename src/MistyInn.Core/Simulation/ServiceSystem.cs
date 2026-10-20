@@ -36,11 +36,11 @@ internal sealed class ServiceSystem
         _rates.Clear();
         var inSession = new HashSet<CreatureId>();
 
-        foreach (var unit in _run.StaffOnTheFloor.OrderBy(u => u.Id.Value))
+        foreach (var unit in _run.AvailableStaff.OrderBy(u => u.Id.Value))
         {
             if (unit.Session is { } session)
             {
-                session.Targets.RemoveAll(id => _run.FindCreature(id) is not { } c || !CanServe(unit, session.Technique, c));
+                session.Targets.RemoveAll(id => _run.FindCreature(id) is not { } c || !CanServe(unit, session.Technique, c, logInterruption: true));
                 if (now >= session.EndsAt || session.Targets.Count == 0)
                 {
                     unit.Session = null;
@@ -48,6 +48,7 @@ internal sealed class ServiceSystem
             }
 
             unit.Session ??= StartSession(unit, now, inSession);
+            unit.Activity = unit.Session is null ? UnitActivity.AtPost : UnitActivity.Serving;
 
             if (unit.Session is { } active)
             {
@@ -73,8 +74,11 @@ internal sealed class ServiceSystem
 
     public double StrengthOf(AppetiteDef appetite) => appetite.Strength == AppetiteStrength.Craves ? 1 : Tuning.LikesStrength;
 
-    /// <summary>Whether this staff member could use this technique on this creature now (STF-04 step 2).</summary>
-    public bool CanServe(Unit unit, TechniqueDef technique, Creature creature)
+    /// <summary>
+    /// Whether this staff member could use this technique on this creature now (STF-04 step 2): Company only for
+    /// sapient adults the companion does not refuse (CMP-02), and never with violence close by (CMP-05).
+    /// </summary>
+    public bool CanServe(Unit unit, TechniqueDef technique, Creature creature, bool logInterruption = false)
     {
         if (creature.IsTurned || unit.Tile is not { } post
             || creature.Activity is not (CreatureActivity.Waiting or CreatureActivity.Idle)
@@ -83,13 +87,29 @@ internal sealed class ServiceSystem
             return false;
         }
 
-        if (technique.Answers.Contains(Appetite.Company) && !(creature.Def.Sapient && creature.Def.Adult))
+        if (technique.Technique == Technique.Company)
         {
-            return false;
+            if (!(creature.Def.Sapient && creature.Def.Adult) || Refuses(unit, creature.Def))
+            {
+                return false;
+            }
+
+            if (_sense.ViolenceNear(creature.Position, _content.Balance.Company.InterruptRadius))
+            {
+                if (logInterruption)
+                {
+                    _sink.Log("company.interrupted", "violence", creature.Id.ToRef(), unit.Id.ToRef());
+                }
+
+                return false;
+            }
         }
 
         return Reaches(post, technique, creature);
     }
+
+    /// <summary>A companion's refusals are always honoured (CMP-02, RAT-07).</summary>
+    public static bool Refuses(Unit unit, CreatureDef creature) => unit.Def.RefusesOrEmpty.Contains(creature.Id);
 
     /// <summary>
     /// Reach (D-064): a technique that needs a fixture serves creatures seated at a working fixture that enables it,
@@ -125,9 +145,17 @@ internal sealed class ServiceSystem
         return postPosition.DistanceTo(creature.Position) <= technique.Range;
     }
 
-    private double SootheRate(Unit unit, TechniqueDef technique, Creature creature) =>
-        unit.Stats.Soothe * _content.Balance.RankStatMultipliers[0] * technique.Soothe
-        * Strength(creature.Def, technique) * Tuning.SootheScale;
+    /// <summary>
+    /// Agitation points per second this staff member soothes with this technique (AGI-06): ×1.5 for a companion's
+    /// preferred guest (CMP-02) and ×0.8 while Shaken (STF-12).
+    /// </summary>
+    public double SootheRate(Unit unit, TechniqueDef technique, Creature creature) =>
+        unit.Stats.Soothe * unit.RankMultiplier * technique.Soothe
+        * Strength(creature.Def, technique) * Tuning.SootheScale
+        * (technique.Technique == Technique.Company && unit.Def.PrefersOrEmpty.Contains(creature.Def.Id)
+            ? _content.Balance.Company.PreferredSoothe
+            : 1)
+        * (unit.Shaken ? _content.Balance.Combat.ShakenSoothe : 1);
 
     private ServiceSession? StartSession(Unit unit, double now, HashSet<CreatureId> taken)
     {
@@ -196,7 +224,7 @@ internal sealed class ServiceSystem
                 continue;
             }
 
-            foreach (var creature in _run.Creatures.Where(c => !c.IsTurned && fixture.Seats.Contains(c.Position.NearestTile)
+            foreach (var creature in _run.CreaturesOnTheFloor.Where(c => !c.IsTurned && fixture.Seats.Contains(c.Position.NearestTile)
                          && c.Position == TilePosition.Center(c.Position.NearestTile)))
             {
                 var appetite = creature.Def.Appetites.FirstOrDefault(a => a.Appetite == effect.Appetite);
@@ -211,7 +239,8 @@ internal sealed class ServiceSystem
         }
     }
 
-    private void Offer(Creature creature, double rate, string by)
+    /// <summary>Offers a soothe rate; the strongest offer of the step wins (AGI-06).</summary>
+    public void Offer(Creature creature, double rate, string by)
     {
         if (!_rates.TryGetValue(creature.Id, out var current) || rate > current.Rate)
         {
