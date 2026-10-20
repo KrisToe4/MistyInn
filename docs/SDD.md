@@ -3,8 +3,8 @@
 
 | | |
 |---|---|
-| **Version** | 1.5 (approved) |
-| **Supersedes** | 1.4 |
+| **Version** | 1.7 (approved) |
+| **Supersedes** | 1.6 |
 | **Audience** | LLM-based coding agents and the human developer |
 | **Genre** | Dark roguelike autobattler: prepare the inn, then survive the mist |
 | **Engine** | Godot 4.7.2 (.NET build) |
@@ -76,6 +76,8 @@ step starts.
 
 | Version | Change | Reason |
 |---|---|---|
+| 1.7 | INV-12: the cycle log records causes and turning points, not every step of agitation. STF-10: until step 6 adds ranks, each unit knows only its ★1 base technique | Step 4 report (D-065 to D-068) |
+| 1.6 | FIX-02: Shadowed alcove (`Darkness`) and Ledger desk (`Order`). STF-02: Cards also answers `Order`, Tales also answers `Darkness`. AGI-08: `Cold` is the draught within 3 tiles of the front door during the mist. RUN-01: the base fixtures and supplies start in storage (`balance.json`). FIX-01: a fixture has a shape (tile offsets, rotated in 90° steps) and seats; every fixture blocks movement | Step 4 questions (D-060 to D-063) |
 | 1.5 | SIM-04 and TST-07: the board view is built from `inn.json`, so there are no scene markers to compare (until hand-built inn art arrives). STF-02: a technique says whether it needs a fixture, and fixtures' `Enables` effects say which. DAT-04: an export build falls back to the whole built-in set. Step 4: add providers for the `Order` and `Darkness` appetites | Step 3 report (D-054, D-058, D-059, D-060) |
 | 1.4 | STF-02: one more technique per class (Comfort, Bones, Grapple, Tales). STF-06, STF-07 and new STF-17: an upgrade adds a technique or masters a known one; every tree always offers an available option. DAT-03: effect kinds `RerollCost`, `RoomSlots`, `Provides`, `Enables`, `Emits` and `CountsAs` | Step 3: two classes could not fill five ranks, and sections 12.2, 13.2 and SHP-05 used effects DAT-03 did not list (D-051, D-052) |
 | 1.3 | SIM-02: `GameSession.Tick` takes real frame time and runs the due fixed steps itself (exact integer accounting, at most 120 steps per call, `InterpolationAlpha` for views); GameRoot passes frame time. ARC-10: `ContinueFromDawn` added to the commands. BRD-03: every room must stay reachable on its own, not just the Rooms zone; checked from step 5 | Step 2 report (D-042, D-047, D-050) |
@@ -207,8 +209,10 @@ These rules apply to every step and every file. Other sections refer to them by 
   in a game, and is listed in `docs/ASSETS.md` with its source and licence. Unlicensed assets, or assets of unknown
   origin, are never added.
 - **INV-11** No secrets, personal data, telemetry or network calls in the game.
-- **INV-12** Every outcome of the mist phase is explainable: Core records each agitation change, escalation, attack
-  and death with its cause in the cycle log (`UI-07`).
+- **INV-12** Every outcome of the mist phase is explainable: Core records each cause of an agitation change
+  (service starting, a trigger firing, being frightened, contagion), each state change, escalation, attack and death,
+  with its cause, in the cycle log (`UI-07`). The rise and fall between those entries follows from the recorded causes
+  and the rates in `balance.json`; the log does not record every step.
 
 ---
 
@@ -394,8 +398,9 @@ Main (Node3D, GameRoot.cs)
 ## 6.1 Run
 
 - **RUN-01** A run starts from a seed (random unless the player enters one) and the profile's unlocks. A new run
-  starts at cycle 1 with the starting silver, the innkeeper, two starting staff at ★1, the base fixtures, and no
-  items.
+  starts at cycle 1 with the starting silver, the innkeeper, two starting staff at ★1, the base fixtures and supplies
+  in storage, to be placed at the first Dusk (`balance.json`: a bar counter, two tables, a hearth and a lantern; 6
+  Drink and 4 Food), and no items.
 - **RUN-02** A run is **won** by surviving the last cycle (`RunLength`, default 10). The last cycle is the
   **Convergence**: every unlocked plane opens at once and arrivals are faster.
 - **RUN-03** A run is **lost** at once when the innkeeper falls (`ESC-06`), or at the end of a mist phase if the inn's
@@ -539,7 +544,8 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
 ## 9.3 Triggers and contagion
 
 - **AGI-08** A trigger is a condition that raises a creature's agitation at once or speeds it up while the condition
-  holds: `Light` (in a lantern's radius), `Noise` (near the stage), `Heat`, `Cold`, `Crowding` (more than N creatures
+  holds: `Light` (in a lantern's radius), `Noise` (near the stage), `Heat` (near a hearth), `Cold` (the draught
+  within 3 tiles of the front door while the mist is in), `Crowding` (more than N creatures
   in the zone), `RivalPlane` (a creature of a named plane in the same zone), `Violence` (an attack within 4 tiles),
   `Blood` (a fallen unit within 4 tiles). Closed set, `DAT-03`.
 - **AGI-09** Contagion: when a creature turns, every creature within 4 tiles that sees it gains +15 agitation (plus its
@@ -605,7 +611,7 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
   | | Food | `Food` | Needs a table; uses a Food supply |
   | | Drink | `Drink` | Needs a bar counter; uses a Drink supply |
   | | Comfort | `Quiet` | A soft voice and full attention; no supplies; one creature at a time |
-  | **Gambler** | Cards | `Gambling` (skill) | Needs a card table |
+  | **Gambler** | Cards | `Gambling` (skill); `Order` | Needs a card table; a game with strict rules also answers `Order` |
   | | Dice | `Gambling` (chance) | Needs a card table or any table |
   | | Bones | `Gambling` (chance) | Played on the floor; no table needed |
   | **Fighter** | Fists | Turned creatures; `Brawl` | Fast, light hits; sparring soothes calm creatures that crave `Brawl` |
@@ -613,7 +619,7 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
   | | Grapple | Turned creatures; `Brawl` | Holds a turned creature, slowing its attacks, instead of hurting it |
   | **Entertainer** | Song | `Music` | Reaches the whole zone; more from the stage |
   | | Dance | `Spectacle` | Needs open floor or the stage |
-  | | Tales | `Spectacle` | A small audience close by; no stage needed |
+  | | Tales | `Spectacle`; `Darkness` | A small audience close by; no stage needed; stories told in the dark also answer `Darkness` |
 
   Each technique's data gives its soothe multiplier, capacity (`AGI-07`), range, whether it needs a fixture (the
   fixtures it works at are those whose `Enables` effects name it, `DAT-03`), supplies used,
@@ -646,7 +652,7 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
   (`ITM-02`).
 - **STF-10** **Hiring** a character the player does not own gives that character at the offer's rank with its
   **preset build** for that rank (techniques predetermined in data). Later upgrades continue up the tree from that
-  build.
+  build. Until step 6 adds ranks, each unit knows only its character's ★1 base technique (D-065).
 - **STF-17** **Mastery** makes a known technique stronger by the mastery values in its data (for example ×1.5 soothe
   and +1 capacity, or +3 attack for a Fighter technique). Each technique can be mastered once. An option is
   **available** when its requirement (if any) was chosen, and its technique is not known yet (a new technique) or is
@@ -724,8 +730,10 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
 
 ## 12.2 Fixtures
 
-- **FIX-01** A fixture (`data/fixtures.json`) has an ID, a name, a footprint (tiles), the zone it may go in, health, a
-  cost, and effects with a **radius** or an **adjacency** rule (`DAT-03`).
+- **FIX-01** A fixture (`data/fixtures.json`) has an ID, a name, a **shape** (tile offsets from its origin, rotated in
+  90° steps when placed), the zone it may go in, health, a cost, and effects with a **radius** or an **adjacency**
+  rule (`DAT-03`). Every fixture blocks movement on its tiles. Its **seats** are the free floor tiles next to it (four
+  neighbours of its tiles, in map order), up to the seat count of its `Provides` or `Enables` effect.
 - **FIX-02** Prototype fixtures:
 
   | Fixture | Effect |
@@ -736,6 +744,8 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
   | Stage | Song and Dance from the stage reach the whole zone and one more; `Noise` trigger within 4 tiles |
   | Hearth | Gives `Warmth` to the 4 nearest tiles; `Heat` trigger within 3 tiles |
   | Quiet corner | Gives `Quiet` to 2 seats; any `Noise` within 3 tiles cancels it |
+  | Shadowed alcove | Gives `Darkness` to 2 seats; any `Light` within 3 tiles cancels it |
+  | Ledger desk | Gives `Order` to 2 seats; any `Noise` within 3 tiles cancels it |
   | Lantern | `Light` within 3 tiles: calms some creatures, triggers others |
   | Ward circle | Agitation rises 25 % slower within 2 tiles |
   | Barricade | Blocks a tile; absorbs damage; turned creatures attack it to pass |
@@ -1085,7 +1095,7 @@ acceptance criteria and a demo. After each step the human builds, tests, plays t
 
 **Common preamble** (put before every step prompt):
 
-> You are implementing Misty Inn from SDD v1.5. Work **only** on the step below; do not start later steps. Read
+> You are implementing Misty Inn from SDD v1.7. Work **only** on the step below; do not start later steps. Read
 > sections 0, 2, 17 and 22 and the sections the step lists first. Apply the invariants (section 2) and the agent
 > rules (section 22). If anything is ambiguous, contradictory or missing, **stop and ask** before writing code. Do not
 > run builds, tests, Godot or git: list the exact commands for the human and mark results NOT RUN. Finish with the
@@ -1407,7 +1417,7 @@ regenerate it whenever the SDD changes.
 | INV-09 | Godot node scripts are `partial` classes named after their file | 2 |
 | INV-10 | Every third-party asset (model, texture, font, sound, music, shader) has a known... | 2 |
 | INV-11 | No secrets, personal data, telemetry or network calls in the game | 2 |
-| INV-12 | Every outcome of the mist phase is explainable: Core records each agitation change,... | 2 |
+| INV-12 | Every outcome of the mist phase is explainable: Core records each cause of an... | 2 |
 | STR-01 | The Godot project lives at the repository root | 3 |
 | STR-02 | `src/MistyInn.Core` is a plain class library (`Microsoft.NET.Sdk`, `net8.0`) with no... | 3 |
 | STR-03 | `tests/MistyInn.Core.Tests` is an NUnit project that references only Core | 3 |
@@ -1506,7 +1516,7 @@ regenerate it whenever the SDD changes.
 | BRD-05 | The front door is where every creature enters | 12.1 |
 | BRD-06 | Integrity is the inn's overall health (100 at the start of a run) | 12.1 |
 | BRD-07 | At Dawn, the player may pay silver to repair fixtures and integrity | 12.1 |
-| FIX-01 | A fixture (`data/fixtures.json`) has an ID, a name, a footprint (tiles), the zone it... | 12.2 |
+| FIX-01 | A fixture (`data/fixtures.json`) has an ID, a name, a shape (tile offsets from its... | 12.2 |
 | FIX-02 | Prototype fixtures: | 12.2 |
 | FIX-03 | Adjacency effects apply to fixtures and units next to each other (8 neighbours), for... | 12.2 |
 | FIX-04 | Fixture effects are applied by Core systems reading the board's modifiers, never by... | 12.2 |

@@ -3,19 +3,23 @@ using System.Collections.Generic;
 using System.Linq;
 using Godot;
 using MistyInn.Core;
+using MistyInn.Core.Bestiary;
+using MistyInn.Core.Content;
 using MistyInn.Core.Entities;
 using MistyInn.Core.Run;
 
 namespace MistyInn.UI;
 
 /// <summary>
-/// Placeholder HUD for step 2: cycle, phase and time to dawn (CYC-02), the forecast (CYC-01), the bench to drag staff
-/// from (CAM-13), Begin the Mist, speed controls (SCP-13), Continue at Dawn (CYC-04), the selection line (CAM-12) and
-/// the pause menu (CYC-10). Built in code; the UI pass (step 9) replaces it with designed screens.
+/// Placeholder HUD: cycle, phase and time to dawn (CYC-02), silver and supplies, the forecast with what the bestiary
+/// knows (CYC-01, BST-03), the bench and the fixture storage to drag from (CAM-13), the build menu (FIX-05, FIX-06),
+/// Begin the Mist, speed controls (SCP-13), Continue at Dawn (CYC-04), the selection line (CAM-12) and the pause menu
+/// (CYC-10). Built in code; the UI pass (step 9) replaces it with designed screens.
 /// </summary>
 public partial class Hud : CanvasLayer
 {
     private Label _status = null!;
+    private Label _purse = null!;
     private Label _forecast = null!;
     private Label _slots = null!;
     private Label _seed = null!;
@@ -24,11 +28,16 @@ public partial class Hud : CanvasLayer
     private Label _drag = null!;
     private PanelContainer _benchPanel = null!;
     private VBoxContainer _benchList = null!;
+    private VBoxContainer _storageList = null!;
+    private PanelContainer _buildPanel = null!;
+    private VBoxContainer _buildList = null!;
     private Button _beginMist = null!;
     private Button _continue = null!;
     private HBoxContainer _speedBar = null!;
     private Control _pauseMenu = null!;
     private string _benchSignature = "";
+    private string _storageSignature = "";
+    private bool _buildMenuBuilt;
     private double _messageSeconds;
 
     public event Action? BeginMistPressed;
@@ -38,6 +47,14 @@ public partial class Hud : CanvasLayer
     public event Action<int>? SpeedPressed;
 
     public event Action<UnitId>? BenchDragStarted;
+
+    public event Action<FixtureId>? StorageDragStarted;
+
+    public event Action<FixtureId>? SellPressed;
+
+    public event Action<string>? BuildPressed;
+
+    public event Action<Supply>? BuySupplyPressed;
 
     public event Action? ResumePressed;
 
@@ -50,7 +67,8 @@ public partial class Hud : CanvasLayer
         var info = new VBoxContainer { Position = new Vector2(16, 12), MouseFilter = Control.MouseFilterEnum.Ignore };
         AddChild(info);
         _status = AddLabel(info, 22);
-        _forecast = AddLabel(info, 17);
+        _purse = AddLabel(info, 17, new Color(0.95f, 0.85f, 0.55f));
+        _forecast = AddLabel(info, 16);
         _slots = AddLabel(info, 16);
         _seed = AddLabel(info, 14, new Color(0.7f, 0.7f, 0.75f));
         _message = AddLabel(info, 17, new Color(1f, 0.72f, 0.45f));
@@ -65,6 +83,19 @@ public partial class Hud : CanvasLayer
         AddLabel(benchBox, 16).Text = Tr("Bench: drag onto the inn floor");
         _benchList = new VBoxContainer();
         benchBox.AddChild(_benchList);
+        AddLabel(benchBox, 16).Text = Tr("Storage: drag onto the floor (R rotates)");
+        _storageList = new VBoxContainer();
+        benchBox.AddChild(_storageList);
+
+        _buildPanel = new PanelContainer();
+        AddChild(_buildPanel);
+        _buildPanel.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.TopRight, Control.LayoutPresetMode.Minsize, 16);
+        _buildPanel.GrowHorizontal = Control.GrowDirection.Begin;
+        var buildBox = new VBoxContainer();
+        _buildPanel.AddChild(buildBox);
+        AddLabel(buildBox, 16).Text = Tr("Build menu");
+        _buildList = new VBoxContainer();
+        buildBox.AddChild(_buildList);
 
         var actions = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
         AddChild(actions);
@@ -130,15 +161,20 @@ public partial class Hud : CanvasLayer
         }
 
         _status.Text = status;
-        _forecast.Text = $"{Tr("The mist parts toward")}: {string.Join(", ", session.ConvergingPlanes.Select(p => p.Name))}";
+        _purse.Text = $"{Tr("Silver")} {session.Silver}  ·  {Tr("Drink")} {session.Supplies[Supply.Drink]}  ·  {Tr("Food")} {session.Supplies[Supply.Food]}";
+        _forecast.Text = Forecast(session);
         _slots.Text = $"{Tr("Staff on the floor")}: {session.StaffOnBoard}/{session.MaxStaffOnBoard}";
 
-        _benchPanel.Visible = session.Phase == Phase.Dusk;
-        _beginMist.Visible = session.Phase == Phase.Dusk;
+        var dusk = session.Phase == Phase.Dusk;
+        _benchPanel.Visible = dusk;
+        _buildPanel.Visible = dusk;
+        _beginMist.Visible = dusk;
         _speedBar.Visible = session.Phase == Phase.Mist;
         _continue.Visible = session.Phase == Phase.Dawn;
 
         RefreshBench(session.Units);
+        RefreshStorage(session.Fixtures);
+        BuildMenuOnce(session);
     }
 
     public void ShowMessage(string text, double seconds = 4)
@@ -156,6 +192,7 @@ public partial class Hud : CanvasLayer
         _drag.Visible = text is not null;
     }
 
+    /// <summary>The bench and storage panel: dropping a unit there benches it, a fixture stores it.</summary>
     public bool IsOverBench(Vector2 screenPosition) =>
         _benchPanel.Visible && _benchPanel.GetGlobalRect().HasPoint(screenPosition);
 
@@ -186,6 +223,38 @@ public partial class Hud : CanvasLayer
         panel.AddChild(label);
     }
 
+    /// <summary>The forecast (BST-03): each converging plane and what is known of the creatures it may send.</summary>
+    private string Forecast(GameSession session)
+    {
+        var lines = new List<string> { Tr("The mist parts toward:") };
+        foreach (var plane in session.Forecast)
+        {
+            var creatures = plane.Creatures.Select(c =>
+            {
+                if (c.Level == BestiaryLevel.Unknown)
+                {
+                    return "?";
+                }
+
+                var text = c.Name!;
+                if (c.Appetites is { } appetites)
+                {
+                    text += $" (wants {string.Join(", ", appetites.Select(a => a.Strength == AppetiteStrength.Craves ? a.Appetite.ToString() : $"{a.Appetite}?"))})";
+                }
+
+                if (c.Triggers is { } triggers)
+                {
+                    text += $" [hates {string.Join(", ", triggers.Select(t => t.Trigger))}]";
+                }
+
+                return text;
+            });
+            lines.Add($"  {plane.Plane.Name}: {string.Join("; ", creatures)}");
+        }
+
+        return string.Join("\n", lines);
+    }
+
     private void RefreshBench(IReadOnlyList<UnitSnapshot> units)
     {
         var benched = units.Where(u => u.IsOnBench).ToList();
@@ -211,6 +280,59 @@ public partial class Hud : CanvasLayer
         if (benched.Count == 0)
         {
             AddLabel(_benchList, 15).Text = Tr("(everyone is on the floor)");
+        }
+    }
+
+    private void RefreshStorage(IReadOnlyList<FixtureSnapshot> fixtures)
+    {
+        var stored = fixtures.Where(f => f.IsInStorage).ToList();
+        var signature = string.Join(",", stored.Select(f => f.Id.Value));
+        if (signature == _storageSignature)
+        {
+            return;
+        }
+
+        _storageSignature = signature;
+        foreach (var child in _storageList.GetChildren())
+        {
+            child.QueueFree();
+        }
+
+        foreach (var fixture in stored)
+        {
+            var row = new HBoxContainer();
+            _storageList.AddChild(row);
+            var id = fixture.Id;
+            var drag = AddButton(row, fixture.Name);
+            drag.ButtonDown += () => StorageDragStarted?.Invoke(id);
+            var sell = AddButton(row, Tr("Sell"));
+            sell.Pressed += () => SellPressed?.Invoke(id);
+        }
+
+        if (stored.Count == 0)
+        {
+            AddLabel(_storageList, 15).Text = Tr("(nothing in storage)");
+        }
+    }
+
+    private void BuildMenuOnce(GameSession session)
+    {
+        if (_buildMenuBuilt)
+        {
+            return;
+        }
+
+        _buildMenuBuilt = true;
+        foreach (var fixture in session.Content.Fixtures)
+        {
+            var id = fixture.Id;
+            AddButton(_buildList, $"{fixture.Name}  ({fixture.Cost})").Pressed += () => BuildPressed?.Invoke(id);
+        }
+
+        foreach (var (supply, bundle) in session.Content.Balance.Supplies)
+        {
+            var s = supply;
+            AddButton(_buildList, $"{bundle.Amount} {supply}  ({bundle.Price})").Pressed += () => BuySupplyPressed?.Invoke(s);
         }
     }
 
@@ -252,8 +374,8 @@ public partial class Hud : CanvasLayer
 
     private static Button AddButton(Control parent, string text)
     {
-        var button = new Button { Text = text, CustomMinimumSize = new Vector2(0, 36) };
-        button.AddThemeFontSizeOverride("font_size", 18);
+        var button = new Button { Text = text, CustomMinimumSize = new Vector2(0, 32) };
+        button.AddThemeFontSizeOverride("font_size", 16);
         parent.AddChild(button);
         return button;
     }

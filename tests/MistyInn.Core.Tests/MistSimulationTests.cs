@@ -147,7 +147,7 @@ public class MistSimulationTests
 
         StepThroughMist(session, () =>
         {
-            foreach (var creature in session.Creatures.Where(c => c.Activity == CreatureActivity.Idle))
+            foreach (var creature in session.Creatures.Where(c => c.Activity == CreatureActivity.Idle && c.State == CreatureState.Calm))
             {
                 idleZones.Add(session.Layout.ZoneAt(creature.Position.NearestTile));
             }

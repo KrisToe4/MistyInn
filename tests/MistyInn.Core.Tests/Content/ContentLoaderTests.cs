@@ -26,7 +26,7 @@ public class ContentLoaderTests
         Assert.That(set.Techniques, Has.Count.EqualTo(13));
         Assert.That(set.Staff.Characters, Has.Count.EqualTo(16));
         Assert.That(set.Items, Has.Count.EqualTo(11));
-        Assert.That(set.Fixtures, Has.Count.EqualTo(10));
+        Assert.That(set.Fixtures, Has.Count.EqualTo(12));
     }
 
     [Test]

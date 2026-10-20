@@ -1,0 +1,17 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/fixtures/FixtureView.cs" id="1_fixture"]
+[ext_resource type="PackedScene" path="res://scenes/fixtures/FixturePart.tscn" id="2_part"]
+
+[node name="Fixture" type="Node3D" node_paths=PackedStringArray("Label")]
+script = ExtResource("1_fixture")
+PartScene = ExtResource("2_part")
+Label = NodePath("Label")
+
+[node name="Label" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1, 0)
+billboard = 1
+pixel_size = 0.004
+font_size = 30
+outline_size = 8
+text = "Fixture"

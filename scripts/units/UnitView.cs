@@ -3,10 +3,12 @@ using MistyInn.Core.Entities;
 
 namespace MistyInn.Units;
 
-/// <summary>A staff member or the innkeeper on the board. Placeholder art (ART-16).</summary>
+/// <summary>A staff member or the innkeeper on the board, with what they are doing. Placeholder art (ART-16).</summary>
 public partial class UnitView : Node3D
 {
     [Export] public Label3D Label { get; set; } = null!;
+
+    private string _activity = "";
 
     public UnitId Id { get; private set; }
 
@@ -17,5 +19,18 @@ public partial class UnitView : Node3D
         Id = id;
         DisplayName = name;
         Label.Text = name;
+    }
+
+    /// <summary>Shows the technique being given, if any (UI-05, until the UI pass).</summary>
+    public void SetActivity(string? activity)
+    {
+        var text = activity ?? "";
+        if (text == _activity)
+        {
+            return;
+        }
+
+        _activity = text;
+        Label.Text = text.Length == 0 ? DisplayName : $"{DisplayName}\n{text}";
     }
 }

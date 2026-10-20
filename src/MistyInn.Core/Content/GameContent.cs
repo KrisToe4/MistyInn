@@ -2,8 +2,11 @@ using MistyInn.Core.Board;
 
 namespace MistyInn.Core.Content;
 
-/// <summary>A unit the run starts with: the innkeeper or a starting staff character (RUN-01).</summary>
-public sealed record UnitTemplate(string Id, string Name, bool IsInnkeeper);
+/// <summary>
+/// A unit the run starts with: the innkeeper or a starting staff character at ★1 (RUN-01). The innkeeper knows no
+/// techniques (ESC-06).
+/// </summary>
+public sealed record UnitTemplate(string Id, string Name, bool IsInnkeeper, StatsDef Stats, IReadOnlyList<string> TechniqueIds);
 
 /// <summary>
 /// Validated content (DAT-04), ready for the simulation: the parsed board and lookups by ID. Create it with
@@ -17,6 +20,8 @@ public sealed class GameContent
     private readonly Dictionary<string, PlaneDef> _planes;
     private readonly Dictionary<string, CreatureDef> _creatures;
     private readonly Dictionary<string, StaffDef> _characters;
+    private readonly Dictionary<string, TechniqueDef> _techniques;
+    private readonly Dictionary<string, FixtureDef> _fixtures;
 
     private GameContent(ContentSet set, BoardLayout layout)
     {
@@ -25,10 +30,16 @@ public sealed class GameContent
         _planes = set.Planes.ToDictionary(p => p.Id);
         _creatures = set.Creatures.ToDictionary(c => c.Id);
         _characters = set.Staff.Characters.ToDictionary(c => c.Id);
+        _techniques = set.Techniques.ToDictionary(t => t.Id);
+        _fixtures = set.Fixtures.ToDictionary(f => f.Id);
 
         var keeper = set.Staff.Innkeeper;
-        StartingUnits = new[] { new UnitTemplate(keeper.Id, keeper.Name, IsInnkeeper: true) }
-            .Concat(set.Balance.StartingStaff.Select(id => new UnitTemplate(id, _characters[id].Name, IsInnkeeper: false)))
+        StartingUnits = new[] { new UnitTemplate(keeper.Id, keeper.Name, IsInnkeeper: true, keeper.Stats, Array.Empty<string>()) }
+            .Concat(set.Balance.StartingStaff.Select(id =>
+            {
+                var c = _characters[id];
+                return new UnitTemplate(id, c.Name, IsInnkeeper: false, c.Stats, new[] { c.BaseTechnique });
+            }))
             .ToList()
             .AsReadOnly();
     }
@@ -88,6 +99,12 @@ public sealed class GameContent
 
     public StaffDef Character(string id) =>
         _characters.TryGetValue(id, out var character) ? character : throw new KeyNotFoundException($"Unknown character '{id}'.");
+
+    public TechniqueDef Technique(string id) =>
+        _techniques.TryGetValue(id, out var technique) ? technique : throw new KeyNotFoundException($"Unknown technique '{id}'.");
+
+    public FixtureDef Fixture(string id) =>
+        _fixtures.TryGetValue(id, out var fixture) ? fixture : throw new KeyNotFoundException($"Unknown fixture '{id}'.");
 
     /// <summary>The gate a plane's creatures walk out of: planes take the gates in map order (PLN-04).</summary>
     public Tile GateFor(string planeId)

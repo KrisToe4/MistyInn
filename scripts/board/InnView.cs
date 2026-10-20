@@ -39,8 +39,8 @@ public partial class InnView : Node3D
 
     private readonly Dictionary<Color, StandardMaterial3D> _materials = new();
     private readonly Dictionary<string, MistGateView> _gates = new();
+    private readonly List<MeshInstance3D> _cursors = new();
     private BoardLayout _layout = null!;
-    private MeshInstance3D _cursor = null!;
     private StandardMaterial3D _validCursorMaterial = null!;
     private StandardMaterial3D _invalidCursorMaterial = null!;
 
@@ -78,11 +78,8 @@ public partial class InnView : Node3D
             _gates[plane.Id] = gate;
         }
 
-        _cursor = CursorScene.Instantiate<MeshInstance3D>();
-        AddChild(_cursor);
         _validCursorMaterial = TransparentMaterial(ValidCursor);
         _invalidCursorMaterial = TransparentMaterial(InvalidCursor);
-        _cursor.Visible = false;
     }
 
     /// <summary>The ground rectangle (x, z) the camera may look at.</summary>
@@ -99,14 +96,37 @@ public partial class InnView : Node3D
         }
     }
 
-    public void ShowCursor(Tile tile, bool valid)
+    public void ShowCursor(Tile tile, bool valid) => ShowCursor(new[] { tile }, valid);
+
+    /// <summary>Shows the placement cursor over every tile a drop would cover, green or red (CAM-13).</summary>
+    public void ShowCursor(IReadOnlyList<Tile> tiles, bool valid)
     {
-        _cursor.Visible = true;
-        _cursor.Position = TileToWorld(tile);
-        _cursor.MaterialOverride = valid ? _validCursorMaterial : _invalidCursorMaterial;
+        while (_cursors.Count < tiles.Count)
+        {
+            var cursor = CursorScene.Instantiate<MeshInstance3D>();
+            AddChild(cursor);
+            _cursors.Add(cursor);
+        }
+
+        for (var i = 0; i < _cursors.Count; i++)
+        {
+            var cursor = _cursors[i];
+            cursor.Visible = i < tiles.Count;
+            if (cursor.Visible)
+            {
+                cursor.Position = TileToWorld(tiles[i]);
+                cursor.MaterialOverride = valid ? _validCursorMaterial : _invalidCursorMaterial;
+            }
+        }
     }
 
-    public void HideCursor() => _cursor.Visible = false;
+    public void HideCursor()
+    {
+        foreach (var cursor in _cursors)
+        {
+            cursor.Visible = false;
+        }
+    }
 
     public Vector3 TileToWorld(Tile tile) => PositionToWorld(TilePosition.Center(tile));
 

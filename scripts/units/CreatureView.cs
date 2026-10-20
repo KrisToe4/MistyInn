@@ -1,14 +1,24 @@
 using Godot;
 using MistyInn.Core.Entities;
+using MistyInn.Core.Run;
 
 namespace MistyInn.Units;
 
-/// <summary>A creature on the board, tinted by its plane. Its position comes from Core every frame (SIM-03).</summary>
+/// <summary>
+/// A creature on the board, tinted by its plane. Its position comes from Core every frame (SIM-03); its label shows
+/// agitation and state (UI-05, until the UI pass).
+/// </summary>
 public partial class CreatureView : Node3D
 {
     [Export] public MeshInstance3D Body { get; set; } = null!;
 
     [Export] public Label3D Label { get; set; } = null!;
+
+    private StandardMaterial3D _material = null!;
+    private Color _planeColor;
+    private int _shownAgitation = -1;
+    private CreatureState _shownState;
+    private bool _shownServed;
 
     public CreatureId Id { get; private set; }
 
@@ -18,13 +28,47 @@ public partial class CreatureView : Node3D
     {
         Id = id;
         DisplayName = name;
+        _planeColor = planeColor;
         Label.Text = name;
-        Body.MaterialOverride = new StandardMaterial3D
+        _material = new StandardMaterial3D
         {
             AlbedoColor = planeColor.Darkened(0.2f),
             EmissionEnabled = true,
             Emission = planeColor,
             EmissionEnergyMultiplier = 0.6f,
         };
+        Body.MaterialOverride = _material;
+    }
+
+    public void SetStatus(double agitation, CreatureState state, bool served)
+    {
+        var rounded = (int)agitation;
+        if (rounded == _shownAgitation && state == _shownState && served == _shownServed)
+        {
+            return;
+        }
+
+        _shownAgitation = rounded;
+        _shownState = state;
+        _shownServed = served;
+
+        var stateColor = state switch
+        {
+            CreatureState.Calm => new Color(0.6f, 0.9f, 0.6f),
+            CreatureState.Restless => new Color(0.95f, 0.85f, 0.4f),
+            CreatureState.Menacing => new Color(1f, 0.55f, 0.25f),
+            _ => new Color(1f, 0.2f, 0.2f),
+        };
+
+        Label.Text = $"{DisplayName}\n{state} {rounded}{(served ? "  (served)" : "")}";
+        Label.Modulate = stateColor;
+        _material.EmissionEnergyMultiplier = state switch
+        {
+            CreatureState.Calm => 0.6f,
+            CreatureState.Restless => 1.0f,
+            CreatureState.Menacing => 1.6f,
+            _ => 2.4f,
+        };
+        _material.Emission = state == CreatureState.Turned ? new Color(1f, 0.15f, 0.1f) : _planeColor;
     }
 }

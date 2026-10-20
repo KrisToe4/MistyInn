@@ -48,7 +48,41 @@ public sealed record BalanceDef(
     int StaffItemSlots,
     int ItemStorage,
     int MaxInnItemsShown,
+    IReadOnlyList<string> StartingFixtures,
+    IReadOnlyDictionary<Supply, int> StartingSupplies,
+    IReadOnlyDictionary<Supply, SupplyBundleDef> Supplies,
+    double ServiceSessionSeconds,
+    double FixtureSoothe,
+    AgitationBalanceDef Agitation,
+    BestiaryBalanceDef Bestiary,
     ShopDef Shop);
+
+/// <summary>A bundle of supplies in the build menu (FIX-06).</summary>
+public sealed record SupplyBundleDef(int Amount, int Price);
+
+/// <summary>The agitation tuning of section 9 (AGI-01 to AGI-09).</summary>
+/// <param name="SootheScale">Agitation points per second for a soothe of 1.0 (AGI-06).</param>
+/// <param name="ColdRadius">Tiles from the front door that count as <c>Cold</c> during the mist (AGI-08).</param>
+/// <param name="ReseekAfterSeconds">A creature waiting at a spot this long without being served looks again (CRE-04).</param>
+public sealed record AgitationBalanceDef(
+    double RestlessAt = 50,
+    double MenacingAt = 75,
+    double RestlessRateMultiplier = 1.5,
+    double MenacingBreakSeconds = 8,
+    double FrightenRadius = 3,
+    double FrightenRateMultiplier = 1.2,
+    double RestlessDamagePerSecond = 0.5,
+    double ContagionRadius = 4,
+    double ContagionAgitation = 15,
+    double SootheScale = 2,
+    double PreferredBonus = 1.25,
+    double LikesStrength = 0.5,
+    double ColdRadius = 3,
+    double ReseekAfterSeconds = 8);
+
+/// <summary>The bestiary's reveal thresholds (BST-02).</summary>
+/// <param name="StudiedPoints">Cycles of being served and staying calm until dawn before a creature is Studied.</param>
+public sealed record BestiaryBalanceDef(int StudiedPoints = 3);
 
 /// <summary>The shop's tuning (section 13.1).</summary>
 public sealed record ShopDef(
@@ -186,15 +220,26 @@ public sealed record ItemDef(
     string? DisplayModel = null,
     string? DisplaySpot = null);
 
-/// <summary><c>fixtures.json</c> (FIX-01). <paramref name="Zone"/> limits where it may go; null means anywhere.</summary>
+/// <summary>
+/// <c>fixtures.json</c> (FIX-01). <paramref name="Shape"/> is a list of [x, y] tile offsets from the origin, rotated in
+/// 90° steps when placed. <paramref name="Zone"/> limits where it may go; null means anywhere.
+/// </summary>
 public sealed record FixtureDef(
     string Id,
     string Name,
-    int Footprint,
+    IReadOnlyList<IReadOnlyList<int>> Shape,
     double Health,
     int Cost,
     IReadOnlyList<EffectDef> Effects,
-    string? Zone = null);
+    string? Zone = null)
+{
+    /// <summary>How many seats its <c>Provides</c> or <c>Enables</c> effects offer (the largest of them), or 0.</summary>
+    public int Seats => Effects?
+        .Where(e => e.Kind is EffectKind.Provides or EffectKind.Enables)
+        .Select(e => e.Seats ?? 0)
+        .DefaultIfEmpty(0)
+        .Max() ?? 0;
+}
 
 /// <summary>
 /// An effect (DAT-03): a kind and the parameters that kind needs. Plane and fixture values are IDs; technique values

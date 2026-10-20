@@ -23,7 +23,8 @@ Content: Mature. Moderate blood and suggestive themes; both can be reduced in Se
 
 Built one step at a time from the SDD (section 21). Steps 0 and 1 are done; step 2 adds the first playable loop with
 placeholder art: place the innkeeper and staff at Dusk, watch creatures walk in out of the mist, and see them dissolve
-at Dawn. Step 3 moves all content into `data/*.json`, checked by a validator when the game starts.
+at Dawn. Step 3 moves all content into `data/*.json`, checked by a validator when the game starts. Step 4 brings the inn to
+life: creatures get agitated, seek what they want, and are soothed by your staff and fixtures, or turn.
 
 ## Design documents
 
@@ -62,6 +63,9 @@ dotnet test MistyInn.sln
 | Drag a name from the bench onto the floor | Place a staff member (Dusk) |
 | Drag a placed unit | Move it; drop it on the bench to bench it (Dusk) |
 | Right-click a placed unit | Bench it (Dusk) |
+| Build menu (top right) | Buy fixtures into storage, and supplies (Dusk) |
+| Drag a fixture from storage or the floor; R while dragging | Place or move it; rotate it (Dusk) |
+| Right-click a placed fixture; Sell in storage | Put it back in storage; sell it for half (Dusk) |
 | WASD / arrow keys, middle mouse drag, screen edges | Pan the camera |
 | Mouse wheel | Zoom |
 | Q / E | Rotate the camera 90° |

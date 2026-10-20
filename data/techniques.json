@@ -21,7 +21,7 @@
   },
   {
     "id": "cards", "technique": "Cards", "name": "Cards", "class": "Gambler",
-    "answers": ["Gambling"], "soothe": 1.0, "capacity": 4, "range": 1.5, "needsFixture": true,
+    "answers": ["Gambling", "Order"], "soothe": 1.0, "capacity": 4, "range": 1.5, "needsFixture": true,
     "mastery": { "sootheMultiplier": 1.4, "capacityBonus": 1 }
   },
   {
@@ -64,7 +64,7 @@
   },
   {
     "id": "tales", "technique": "Tales", "name": "Tales", "class": "Entertainer",
-    "answers": ["Spectacle"], "soothe": 0.8, "capacity": 3, "range": 2,
+    "answers": ["Spectacle", "Darkness"], "soothe": 0.8, "capacity": 3, "range": 2,
     "mastery": { "sootheMultiplier": 1.5, "capacityBonus": 1 }
   }
 ]

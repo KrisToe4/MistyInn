@@ -4,13 +4,14 @@ namespace MistyInn.Core.Board;
 
 /// <summary>
 /// The live board: the layout plus what stands on it. Staff stand on floor tiles, one per tile, and do not block
-/// movement (D-043). Blocking placements (barricades, from step 4) must leave a path from the door to every zone
-/// (BRD-03).
+/// movement (D-043). Fixtures cover their tiles and block movement (FIX-01), so a fixture placement must leave a path
+/// from the door to every zone (BRD-03).
 /// </summary>
 public sealed class InnBoard
 {
     private readonly HashSet<Tile> _blocked = new();
     private readonly Dictionary<Tile, UnitId> _units = new();
+    private readonly Dictionary<Tile, FixtureId> _fixtures = new();
 
     public InnBoard(BoardLayout layout)
     {
@@ -42,28 +43,40 @@ public sealed class InnBoard
             return false;
         }
 
-        if (tile == Layout.FrontDoor)
+        return WouldBlockPath(new[] { tile });
+    }
+
+    /// <summary>True if blocking all of <paramref name="tiles"/> would cut some zone off from the front door (BRD-03).</summary>
+    public bool WouldBlockPath(IReadOnlyCollection<Tile> tiles)
+    {
+        var blocking = tiles.Where(IsWalkable).ToList();
+        if (blocking.Count == 0)
+        {
+            return false;
+        }
+
+        if (blocking.Contains(Layout.FrontDoor))
         {
             return true;
         }
 
-        var reachedZones = ZonesReachableFromDoor(tile);
+        var reachedZones = ZonesReachableFromDoor(blocking);
         return Layout.ZoneIds.Any(zone => !reachedZones.Contains(zone));
     }
 
-    /// <summary>The zones a creature could reach from the front door, optionally with one more tile blocked.</summary>
-    public IReadOnlySet<string> ZonesReachableFromDoor(Tile? alsoBlocked = null)
+    /// <summary>The zones a creature could reach from the front door, optionally with more tiles blocked.</summary>
+    public IReadOnlySet<string> ZonesReachableFromDoor(IReadOnlyCollection<Tile>? alsoBlocked = null)
     {
         var reachedZones = new HashSet<string>();
-        if (!IsWalkable(Layout.FrontDoor) || Layout.FrontDoor == alsoBlocked)
+        if (!IsWalkable(Layout.FrontDoor) || alsoBlocked?.Contains(Layout.FrontDoor) == true)
         {
             return reachedZones;
         }
 
         var seen = new HashSet<Tile> { Layout.FrontDoor };
-        if (alsoBlocked is { } blocked)
+        if (alsoBlocked is not null)
         {
-            seen.Add(blocked);
+            seen.UnionWith(alsoBlocked);
         }
 
         var queue = new Queue<Tile>();
@@ -92,6 +105,41 @@ public sealed class InnBoard
 
     public IReadOnlyList<Tile>? FindPath(Tile from, Tile to) =>
         Pathfinder.FindPath(Layout.Width, Layout.Height, IsWalkable, from, to);
+
+    public FixtureId? FixtureAt(Tile tile) => _fixtures.TryGetValue(tile, out var id) ? id : null;
+
+    /// <summary>
+    /// The free floor tiles next to a fixture's tiles (four neighbours, in map order), up to <paramref name="count"/>:
+    /// its seats (FIX-01).
+    /// </summary>
+    public IReadOnlyList<Tile> SeatsAround(IReadOnlyList<Tile> fixtureTiles, int count) =>
+        fixtureTiles
+            .SelectMany(Neighbours4)
+            .Distinct()
+            .Where(t => IsPlaceableFloor(t) && !fixtureTiles.Contains(t))
+            .OrderBy(t => t.Y)
+            .ThenBy(t => t.X)
+            .Take(count)
+            .ToList()
+            .AsReadOnly();
+
+    internal void PutFixture(FixtureId fixture, IEnumerable<Tile> tiles)
+    {
+        foreach (var tile in tiles)
+        {
+            _fixtures[tile] = fixture;
+            _blocked.Add(tile);
+        }
+    }
+
+    internal void RemoveFixture(IEnumerable<Tile> tiles)
+    {
+        foreach (var tile in tiles)
+        {
+            _fixtures.Remove(tile);
+            _blocked.Remove(tile);
+        }
+    }
 
     internal void PutUnit(UnitId unit, Tile tile) => _units[tile] = unit;
 

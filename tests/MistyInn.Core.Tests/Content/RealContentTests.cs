@@ -97,7 +97,7 @@ public class RealContentTests
         Assert.That(Content.Fixtures.Select(f => f.Id), Is.EquivalentTo(new[]
         {
             "bar-counter", "table", "card-table", "stage", "hearth", "quiet-corner", "lantern", "ward-circle",
-            "barricade", "salt-line",
+            "shadowed-alcove", "ledger-desk", "barricade", "salt-line",
         }));
     }
 

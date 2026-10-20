@@ -4,8 +4,8 @@ using System.Linq;
 using Godot;
 using MistyInn.Board;
 using MistyInn.Camera;
-using MistyInn.Data;
 using MistyInn.Core;
+using MistyInn.Core.Bestiary;
 using MistyInn.Core.Board;
 using MistyInn.Core.Commands;
 using MistyInn.Core.Content;
@@ -13,6 +13,8 @@ using MistyInn.Core.Entities;
 using MistyInn.Core.Events;
 using MistyInn.Core.Randomness;
 using MistyInn.Core.Run;
+using MistyInn.Data;
+using MistyInn.Fixtures;
 using MistyInn.UI;
 using MistyInn.Units;
 
@@ -21,8 +23,8 @@ namespace MistyInn;
 /// <summary>
 /// Owns the only <see cref="GameSession"/> (ARC-02). Each frame it ticks the session (SIM-02), drains its events into
 /// the views (ARC-12) and places the views from Core's positions (SIM-03). Player input becomes commands (ARC-10):
-/// dragging staff from the bench or the board onto tiles at Dusk (CAM-13), selection in the mist (CAM-12), speed and
-/// the pause menu (SCP-13, CYC-10).
+/// dragging staff and fixtures onto tiles at Dusk (CAM-13), the build menu (FIX-05), selection in the mist (CAM-12),
+/// speed and the pause menu (SCP-13, CYC-10).
 /// </summary>
 public partial class GameRoot : Node3D
 {
@@ -35,6 +37,8 @@ public partial class GameRoot : Node3D
 
     [Export] public Node3D CreaturesRoot { get; set; } = null!;
 
+    [Export] public Node3D FixturesRoot { get; set; } = null!;
+
     [Export] public IsoCameraRig CameraRig { get; set; } = null!;
 
     [Export] public Hud Hud { get; set; } = null!;
@@ -45,13 +49,20 @@ public partial class GameRoot : Node3D
 
     [Export] public PackedScene CreatureScene { get; set; } = null!;
 
+    [Export] public PackedScene FixtureScene { get; set; } = null!;
+
     private readonly Dictionary<UnitId, UnitView> _units = new();
     private readonly Dictionary<CreatureId, CreatureView> _creatures = new();
+    private readonly Dictionary<FixtureId, FixtureView> _fixtures = new();
+    private readonly CreatureBestiary _bestiary = new();
     private GameSession _session = null!;
     private UnitId? _dragging;
+    private FixtureId? _draggingFixture;
+    private int _rotation;
     private Node3D? _selected;
     private bool _paused;
     private long _droppedEvents;
+    private int _tributesTonight;
 
     public override void _EnterTree() => InputActions.EnsureDefaults();
 
@@ -74,7 +85,7 @@ public partial class GameRoot : Node3D
         }
 
         var seed = Seed != 0 ? (ulong)Seed : (ulong)System.Random.Shared.NextInt64(1, long.MaxValue);
-        _session = new GameSession(new SeededRandom(seed), content: content);
+        _session = new GameSession(new SeededRandom(seed), content: content, bestiary: _bestiary);
 
         Inn.Build(_session.Content);
         Inn.ShowGates(_session.ConvergingPlanes.Select(p => p.Id));
@@ -90,15 +101,21 @@ public partial class GameRoot : Node3D
             _units[unit.Id] = view;
         }
 
+        RefreshFixtures();
+
         Hud.SetSeed(seed);
         Hud.BeginMistPressed += OnBeginMist;
         Hud.ContinuePressed += OnContinue;
         Hud.SpeedPressed += OnSpeed;
         Hud.BenchDragStarted += OnBenchDragStarted;
+        Hud.StorageDragStarted += OnStorageDragStarted;
+        Hud.SellPressed += OnSell;
+        Hud.BuildPressed += OnBuild;
+        Hud.BuySupplyPressed += OnBuySupply;
         Hud.ResumePressed += OnResume;
         Hud.QuitPressed += OnQuit;
         Hud.Refresh(_session);
-        Hud.ShowMessage(Tr("Drag the innkeeper and your staff onto the inn floor, then begin the mist."), 8);
+        Hud.ShowMessage(Tr("Place the innkeeper, your staff and your fixtures, then begin the mist."), 8);
     }
 
     /// <summary>
@@ -124,6 +141,10 @@ public partial class GameRoot : Node3D
         Hud.ContinuePressed -= OnContinue;
         Hud.SpeedPressed -= OnSpeed;
         Hud.BenchDragStarted -= OnBenchDragStarted;
+        Hud.StorageDragStarted -= OnStorageDragStarted;
+        Hud.SellPressed -= OnSell;
+        Hud.BuildPressed -= OnBuild;
+        Hud.BuySupplyPressed -= OnBuySupply;
         Hud.ResumePressed -= OnResume;
         Hud.QuitPressed -= OnQuit;
     }
@@ -152,6 +173,15 @@ public partial class GameRoot : Node3D
             if (_creatures.TryGetValue(creature.Id, out var view))
             {
                 view.Position = Inn.PositionToWorld(creature.PreviousPosition.Lerp(creature.Position, alpha));
+                view.SetStatus(creature.Agitation, creature.State, creature.ServedBy is not null);
+            }
+        }
+
+        foreach (var unit in _session.Units)
+        {
+            if (_units.TryGetValue(unit.Id, out var view))
+            {
+                view.SetActivity(unit.Serving is { } technique ? $"{technique} ×{unit.ServingCreatures.Count}" : null);
             }
         }
 
@@ -173,6 +203,12 @@ public partial class GameRoot : Node3D
             return;
         }
 
+        if (@event.IsActionPressed(InputActions.RotateFixture) && _draggingFixture is not null)
+        {
+            _rotation = (_rotation + 1) % 4;
+            return;
+        }
+
         if (@event.IsActionPressed(InputActions.Follow) && _selected is not null)
         {
             CameraRig.FollowTarget = _selected;
@@ -186,19 +222,32 @@ public partial class GameRoot : Node3D
 
         if (_session.Phase == Phase.Dusk)
         {
-            var unit = PickTile(click.Position) is { } tile ? UnitAtTile(tile) : null;
-            if (unit is null)
+            if (PickTile(click.Position) is not { } tile)
             {
                 return;
             }
 
-            if (click.ButtonIndex == MouseButton.Left)
+            if (UnitAtTile(tile) is { } unit)
             {
-                StartDrag(unit.Id, unit.Name);
+                if (click.ButtonIndex == MouseButton.Left)
+                {
+                    StartDrag(unit.Id, unit.Name);
+                }
+                else if (click.ButtonIndex == MouseButton.Right)
+                {
+                    Report(_session.Execute(new BenchUnit(unit.Id)));
+                }
             }
-            else if (click.ButtonIndex == MouseButton.Right)
+            else if (FixtureAtTile(tile) is { } fixture)
             {
-                Report(_session.Execute(new BenchUnit(unit.Id)));
+                if (click.ButtonIndex == MouseButton.Left)
+                {
+                    StartFixtureDrag(fixture.Id, fixture.Name, fixture.Rotation);
+                }
+                else if (click.ButtonIndex == MouseButton.Right)
+                {
+                    Report(_session.Execute(new StoreFixture(fixture.Id)));
+                }
             }
         }
         else if (click.ButtonIndex == MouseButton.Left)
@@ -209,23 +258,36 @@ public partial class GameRoot : Node3D
 
     public override void _Input(InputEvent @event)
     {
-        // The drop is read here, before the GUI, so a drag that started on a bench button still ends on the board.
-        if (_dragging is not { } unitId || @event is not InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: false } release)
+        // The drop is read here, before the GUI, so a drag that started on a panel button still ends on the board.
+        if (@event is not InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: false } release)
         {
             return;
         }
 
-        _dragging = null;
-        Hud.SetDragLabel(null);
-        Inn.HideCursor();
-
-        if (Hud.IsOverBench(release.Position))
+        if (_dragging is { } unitId)
         {
-            Report(_session.Execute(new BenchUnit(unitId)));
+            EndDrag();
+            if (Hud.IsOverBench(release.Position))
+            {
+                Report(_session.Execute(new BenchUnit(unitId)));
+            }
+            else if (PickTile(release.Position) is { } tile)
+            {
+                Report(_session.Execute(new PlaceUnit(unitId, tile)));
+            }
         }
-        else if (PickTile(release.Position) is { } tile)
+        else if (_draggingFixture is { } fixtureId)
         {
-            Report(_session.Execute(new PlaceUnit(unitId, tile)));
+            var rotation = _rotation;
+            EndDrag();
+            if (Hud.IsOverBench(release.Position))
+            {
+                Report(_session.Execute(new StoreFixture(fixtureId)));
+            }
+            else if (PickTile(release.Position) is { } tile)
+            {
+                Report(_session.Execute(new PlaceFixture(fixtureId, tile, rotation)));
+            }
         }
     }
 
@@ -250,12 +312,52 @@ public partial class GameRoot : Node3D
 
                 view.QueueFree();
                 break;
+            case FixtureBuilt or FixturePlaced or FixtureStored or FixtureSold or FixtureBroken:
+                RefreshFixtures();
+                break;
+            case CreatureTurned turned when _creatures.TryGetValue(turned.Creature, out var view):
+                Hud.ShowMessage($"{view.DisplayName} {Tr("has turned!")}");
+                break;
+            case TributeLeft tribute:
+                _tributesTonight += tribute.Silver;
+                break;
+            case BestiaryRevealed revealed when revealed.Level > BestiaryLevel.Seen:
+                Hud.ShowMessage($"{Tr("The bestiary learns more about")} {_session.Content.Creature(revealed.CreatureDefId).Name}.");
+                break;
             case ConvergingPlanesDrawn drawn:
                 Inn.ShowGates(drawn.PlaneIds);
                 break;
-            case PhaseChanged { Phase: Phase.Dawn }:
-                Hud.ShowMessage(Tr("Dawn breaks. The mist pulls back, and the creatures with it."), 6);
+            case PhaseChanged { Phase: Phase.Mist }:
+                _tributesTonight = 0;
                 break;
+            case PhaseChanged { Phase: Phase.Dawn }:
+                Hud.ShowMessage($"{Tr("Dawn breaks. The creatures that stayed calm left")} {_tributesTonight} {Tr("silver in tribute.")}", 8);
+                break;
+        }
+    }
+
+    private void RefreshFixtures()
+    {
+        var snapshots = _session.Fixtures;
+        foreach (var gone in _fixtures.Keys.Where(id => snapshots.All(f => f.Id != id)).ToList())
+        {
+            _fixtures[gone].QueueFree();
+            _fixtures.Remove(gone);
+        }
+
+        foreach (var fixture in snapshots)
+        {
+            if (!_fixtures.TryGetValue(fixture.Id, out var view))
+            {
+                view = FixtureScene.Instantiate<FixtureView>();
+                FixturesRoot.AddChild(view);
+                view.Setup(fixture, Inn.TileToWorld);
+                _fixtures[fixture.Id] = view;
+            }
+            else
+            {
+                view.Refresh(fixture, Inn.TileToWorld);
+            }
         }
     }
 
@@ -292,29 +394,66 @@ public partial class GameRoot : Node3D
         }
     }
 
+    private void OnStorageDragStarted(FixtureId fixtureId)
+    {
+        var fixture = _session.Fixtures.FirstOrDefault(f => f.Id == fixtureId);
+        if (fixture is not null && _session.Phase == Phase.Dusk && !_paused)
+        {
+            StartFixtureDrag(fixture.Id, fixture.Name, 0);
+        }
+    }
+
     private void StartDrag(UnitId unitId, string name)
     {
         _dragging = unitId;
+        _draggingFixture = null;
         Hud.SetDragLabel(name);
+    }
+
+    private void StartFixtureDrag(FixtureId fixtureId, string name, int rotation)
+    {
+        _draggingFixture = fixtureId;
+        _dragging = null;
+        _rotation = rotation;
+        Hud.SetDragLabel($"{name}  ({Tr("R to rotate")})");
+    }
+
+    private void EndDrag()
+    {
+        _dragging = null;
+        _draggingFixture = null;
+        Hud.SetDragLabel(null);
+        Inn.HideCursor();
     }
 
     private void UpdateDragCursor()
     {
-        if (_dragging is not { } unitId)
-        {
-            return;
-        }
-
         var mouse = GetViewport().GetMousePosition();
-        if (!Hud.IsOverBench(mouse) && PickTile(mouse) is { } tile)
+        var overBoard = !Hud.IsOverBench(mouse) && PickTile(mouse) is not null;
+
+        if (_dragging is { } unitId && overBoard && PickTile(mouse) is { } tile)
         {
             Inn.ShowCursor(tile, _session.CheckPlaceUnit(unitId, tile) == CommandFailure.None);
+        }
+        else if (_draggingFixture is { } fixtureId && overBoard && PickTile(mouse) is { } origin)
+        {
+            var def = _session.Content.Fixture(_session.Fixtures.First(f => f.Id == fixtureId).FixtureDefId);
+            var tiles = def.Shape.Select(o => Rotate(o[0], o[1], _rotation)).Select(o => new Tile(origin.X + o.X, origin.Y + o.Y)).ToList();
+            Inn.ShowCursor(tiles, _session.CheckPlaceFixture(fixtureId, origin, _rotation) == CommandFailure.None);
         }
         else
         {
             Inn.HideCursor();
         }
     }
+
+    private static (int X, int Y) Rotate(int x, int y, int quarterTurns) => quarterTurns switch
+    {
+        1 => (-y, x),
+        2 => (-x, -y),
+        3 => (y, -x),
+        _ => (x, y),
+    };
 
     private void OnBeginMist()
     {
@@ -328,6 +467,12 @@ public partial class GameRoot : Node3D
 
     private void OnSpeed(int speed) => Report(_session.Execute(new SetSpeed(speed)));
 
+    private void OnBuild(string fixtureDefId) => Report(_session.Execute(new BuildFixture(fixtureDefId)));
+
+    private void OnBuySupply(Supply supply) => Report(_session.Execute(new BuySupplies(supply, 1)));
+
+    private void OnSell(FixtureId fixtureId) => Report(_session.Execute(new SellFixture(fixtureId)));
+
     private void OnResume() => SetPaused(false);
 
     private void OnQuit() => GetTree().Quit();
@@ -335,9 +480,7 @@ public partial class GameRoot : Node3D
     private void SetPaused(bool paused)
     {
         _paused = paused;
-        _dragging = null;
-        Hud.SetDragLabel(null);
-        Inn.HideCursor();
+        EndDrag();
         Hud.ShowPauseMenu(paused);
     }
 
@@ -394,16 +537,20 @@ public partial class GameRoot : Node3D
 
     private string Describe(CommandFailure failure) => failure switch
     {
-        CommandFailure.TileBlocked => Tr("Staff can only stand on the inn's floor."),
-        CommandFailure.TileOccupied => Tr("Someone is already standing there."),
+        CommandFailure.TileBlocked => Tr("That spot is not free inn floor, or it would block the way in."),
+        CommandFailure.TileOccupied => Tr("Something is already there."),
         CommandFailure.BoardFull => $"{Tr("No more staff fit on the floor this cycle")} ({_session.StaffOnBoard}/{_session.MaxStaffOnBoard}).",
         CommandFailure.CannotBench => Tr("The innkeeper never leaves the floor."),
         CommandFailure.InnkeeperNotPlaced => Tr("Place the innkeeper before the mist rolls in."),
+        CommandFailure.NotEnoughSilver => Tr("Not enough silver."),
+        CommandFailure.WrongZone => Tr("That fixture belongs in another room."),
         CommandFailure.WrongPhase => Tr("Not now."),
         _ => $"{Tr("Refused")}: {failure}",
     };
 
     private UnitSnapshot? UnitAtTile(Tile tile) => _session.Units.FirstOrDefault(u => u.Tile == tile);
+
+    private FixtureSnapshot? FixtureAtTile(Tile tile) => _session.Fixtures.FirstOrDefault(f => f.Tiles.Contains(tile));
 
     private Vector3? PickGround(Vector2 screen)
     {

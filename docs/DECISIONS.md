@@ -66,6 +66,14 @@ proposed details were approved with SDD v1.0 (2026-10-20). **Proposed** marks a 
 | D-058 | Techniques say whether they need a fixture; fixtures name the techniques they enable | Accepted | 2026-10-20 | STF-02, FIX-02, DAT-03 |
 | D-059 | No scene markers: the board view is built from inn.json | Accepted | 2026-10-20 | SIM-04, TST-07 |
 | D-060 | Step 4 adds providers for Order and Darkness | Accepted | 2026-10-20 | AGI-05, AGI-06 |
+| D-061 | Order and Darkness: two fixtures, and Cards and Tales | Accepted | 2026-10-20 | FIX-02, STF-02, AGI-05 |
+| D-062 | Cold is the draught at the front door | Accepted | 2026-10-20 | AGI-08 |
+| D-063 | The starting kit is in storage | Accepted | 2026-10-20 | RUN-01, FIX-05, FIX-06 |
+| D-064 | Service, seeking, fixtures and bestiary rules | Accepted | 2026-10-20 | STF-04, CRE-04, AGI-03, AGI-06, AGI-07, FIX-01, BST-02 |
+| D-065 | Staff know only their base technique until step 6 | Accepted | 2026-10-20 | STF-06, STF-10 |
+| D-066 | The bestiary lives outside the session | Accepted | 2026-10-20 | BST-04, SAV-02 |
+| D-067 | What the cycle log records | Accepted | 2026-10-20 | INV-12, UI-07 |
+| D-068 | Internal test hooks on GameSession | Accepted | 2026-10-20 | TST-01, ARC-03 |
 
 ---
 
@@ -709,3 +717,97 @@ proposed details were approved with SDD v1.0 (2026-10-20). **Proposed** marks a 
   step 4 agent proposes them at the start of the step and waits for the human's answer before writing them (AGT-03).
 - **Alternatives considered:** Removing the two appetites from the closed set.
 - **Requirement IDs affected:** AGI-05, AGI-06, step 4.
+
+## D-061 Order and Darkness: two fixtures, and Cards and Tales
+- **Status:** Accepted
+- **Date / step:** 2026-10-20, step 4 (SDD v1.6)
+- **Context:** Nothing answered `Order` or `Darkness` (D-060).
+- **Decision:** Both: a **Shadowed alcove** (gives `Darkness` to 2 seats; `Light` within 3 tiles cancels it) and a
+  **Ledger desk** (gives `Order` to 2 seats; `Noise` within 3 tiles cancels it), and the Cards and Tales techniques also
+  answer `Order` and `Darkness`.
+- **Alternatives considered:** Fixtures only; techniques only.
+- **Requirement IDs affected:** FIX-02, STF-02, AGI-05.
+
+## D-062 Cold is the draught at the front door
+- **Status:** Accepted
+- **Date / step:** 2026-10-20, step 4 (SDD v1.6)
+- **Context:** Nothing gave off `Cold`, so Creature 03's trigger could never fire.
+- **Decision:** While the mist is in, the tiles within 3 of the front door count as `Cold` (`balance.json`,
+  `agitation.coldRadius`).
+- **Alternatives considered:** A cold-giving fixture; dropping the trigger.
+- **Requirement IDs affected:** AGI-08.
+
+## D-063 The starting kit is in storage
+- **Status:** Accepted
+- **Date / step:** 2026-10-20, step 4 (SDD v1.6)
+- **Context:** RUN-01's "base fixtures" were not defined.
+- **Decision:** A run starts with a bar counter, two tables, a hearth and a lantern in storage, and 6 Drink and 4 Food;
+  the player places them at the first Dusk. The list is in `balance.json`.
+- **Alternatives considered:** Pre-placed in a default layout; nothing.
+- **Requirement IDs affected:** RUN-01, FIX-05, FIX-06.
+
+## D-064 Service, seeking, fixtures and bestiary rules
+- **Status:** Accepted (the human approved the proposed defaults)
+- **Date / step:** 2026-10-20, step 4 (SDD v1.6)
+- **Context:** The SDD gives the outline of service and agitation but not how they play out.
+- **Decision:**
+  - **Service (STF-04):** staff serve from where they are placed. A technique that needs a fixture serves creatures
+    seated at a working fixture that enables it, within the technique's range of the staff member (+0.5 tile).
+    Beside the stage, Song and Dance reach the stage's zone and the zones next to it; otherwise a technique reaches its
+    range. Service comes in sessions of `serviceSessionSeconds` (6); a session serves up to the technique's capacity
+    and uses one supply per creature when it starts; then the staff member chooses again. Only waiting or idle
+    creatures are served, and each by one staff member at a time.
+  - **Soothe (AGI-06):** staff soothe × the rank multiplier × technique soothe × appetite strength (craves 1, likes 0.5)
+    × 1.25 for the preferred technique × `sootheScale` (2), in agitation points per second. A fixture that gives an
+    appetite soothes its seated creatures at `fixtureSoothe` × strength × `sootheScale`. The strongest offer wins.
+  - **Seeking (CRE-04):** a creature walks to the best reachable spot: strongest appetite (with the preferred bonus),
+    then nearest, then map order. Spots are free seats of fixtures that give the appetite or enable a technique a
+    placed staff member can give there, and free tiles within range of staff with a technique that needs no fixture.
+    Spots are reserved. A creature that waits unserved for `reseekAfterSeconds` (8) looks again; with nothing to seek
+    it wanders. Restless and turned creatures wander the whole inn.
+  - **Agitation (AGI-02, AGI-03):** unserved, agitation rises at the base rate × 1.5 when Restless × the rate
+    multipliers of holding triggers × ward circles in range × 1.2 when a Menacing creature is within 3 tiles. A trigger
+    spikes once when its condition starts. Restless creatures damage the first fixture next to them at 0.5 health per
+    second; Menacing ones break it every 8 s. Integrity and repairs stay in step 5.
+  - **Fixtures (FIX-01):** a fixture has a shape (tile offsets rotated in 90° steps), every fixture blocks movement, and
+    its seats are the free floor tiles next to it, in map order, up to its seat count.
+  - **Bestiary (BST-02):** Seen on arrival; one study point per creature type per cycle in which a served one stayed
+    calm until dawn, Studied at 3 (`bestiary.studiedPoints`); Understood once every trigger has been seen firing,
+    banishings (step 5) counting for missing ones.
+- **Alternatives considered:** Continuous service without sessions; creatures choosing at random.
+- **Requirement IDs affected:** STF-04, CRE-04, AGI-02, AGI-03, AGI-06, AGI-07, FIX-01, BST-02.
+
+## D-065 Staff know only their base technique until step 6
+- **Status:** Accepted
+- **Date / step:** 2026-10-20, step 4
+- **Context:** Ranks and upgrades arrive in step 6, but service needs staff techniques now.
+- **Decision:** A unit knows its character's ★1 base technique (the innkeeper knows none) and uses the ★1 stat
+  multiplier. Step 6 adds ranks, preset builds and upgrades on top of the same `Techniques` list.
+- **Requirement IDs affected:** STF-06, STF-10.
+
+## D-066 The bestiary lives outside the session
+- **Status:** Accepted
+- **Date / step:** 2026-10-20, step 4
+- **Context:** BST-04 keeps the bestiary across runs; a run is one session (D-045); saving is step 8.
+- **Decision:** `CreatureBestiary` is passed into each `GameSession`; GameRoot keeps one in memory for the whole game
+  session. Step 8 saves it in the profile (SAV-02).
+- **Requirement IDs affected:** BST-04, SAV-02.
+
+## D-067 What the cycle log records
+- **Status:** Accepted
+- **Date / step:** 2026-10-20, step 4
+- **Context:** INV-12 wants every agitation change explained; agitation changes every step.
+- **Decision:** The log records causes and turning points, not every step: arrivals, service starting (who, with
+  what), triggers firing, being frightened, contagion (with its source), state changes, turning, broken fixtures,
+  tributes, income and bestiary reveals. The rise and fall between them follows from those causes and the rates in
+  `balance.json`.
+- **Alternatives considered:** A log entry per step per creature (would fill the 20,000-entry log in minutes).
+- **Requirement IDs affected:** INV-12, UI-07.
+
+## D-068 Internal test hooks on GameSession
+- **Status:** Accepted
+- **Date / step:** 2026-10-20, step 4
+- **Context:** Agitation and service tests need a known creature on a known tile, not a random arrival.
+- **Decision:** `GameSession` has internal members, visible only to the test project: spawn a creature on a tile,
+  reach a live creature or fixture, and read the service rates and rules. Nothing in the game calls them.
+- **Requirement IDs affected:** TST-01, ARC-03.

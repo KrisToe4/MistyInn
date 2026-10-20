@@ -33,6 +33,12 @@ public enum CommandFailure
 
     /// <summary>A value outside what the command allows (for example a speed of 3).</summary>
     InvalidValue,
+
+    /// <summary>The command names a fixture the player does not own, or a fixture type that does not exist.</summary>
+    UnknownFixture,
+
+    /// <summary>The fixture may only go in another zone (FIX-01).</summary>
+    WrongZone,
 }
 
 /// <summary>The outcome of <see cref="GameSession.Execute"/>.</summary>

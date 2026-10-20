@@ -16,6 +16,7 @@ public static class InputActions
     public const string RotateRight = "camera_rotate_right";
     public const string Follow = "camera_follow";
     public const string PauseMenu = "pause_menu";
+    public const string RotateFixture = "rotate_fixture";
 
     public static void EnsureDefaults()
     {
@@ -27,6 +28,7 @@ public static class InputActions
         Add(RotateRight, Key.E);
         Add(Follow, Key.F);
         Add(PauseMenu, Key.Escape);
+        Add(RotateFixture, Key.R);
     }
 
     private static void Add(string action, params Key[] keys)

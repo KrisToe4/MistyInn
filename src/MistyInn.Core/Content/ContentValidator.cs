@@ -414,7 +414,11 @@ public static partial class ContentValidator
             {
                 var where = $"fixtures.json: fixture '{f.Id}'";
                 if (string.IsNullOrWhiteSpace(f.Name)) Error($"{where} has no name.");
-                if (f.Footprint < 1 || f.Health <= 0 || f.Cost < 0) Error($"{where}: footprint, health or cost is out of range.");
+                if (f.Health <= 0 || f.Cost < 0) Error($"{where}: health or cost is out of range.");
+                if (f.Shape is null || f.Shape.Count == 0 || f.Shape.Any(o => o is null || o.Count != 2))
+                    Error($"{where}: the shape must be a non-empty list of [x, y] offsets (FIX-01).");
+                else if (!f.Shape.Any(o => o[0] == 0 && o[1] == 0) || f.Shape.Select(o => (o[0], o[1])).Distinct().Count() != f.Shape.Count)
+                    Error($"{where}: the shape must include [0, 0] and list each offset once (FIX-01).");
                 if (f.Zone is { } zone && _layout is not null && !_layout.ZoneIds.Contains(zone)) Error($"{where}: unknown zone '{zone}'.");
                 foreach (var effect in f.Effects ?? []) Effect(where, effect);
             }
@@ -476,6 +480,29 @@ public static partial class ContentValidator
                 Error($"{where}: startingStaff must list distinct known characters (RUN-01).");
             else if (b.StartingStaff.Count > b.BenchSize)
                 Error($"{where}: the starting staff do not fit on the bench.");
+
+            if (b.StartingFixtures is null || b.StartingFixtures.Any(id => !_fixtureIds.Contains(id)))
+                Error($"{where}: startingFixtures must list known fixtures (RUN-01).");
+            if (b.Supplies is null || Enum.GetValues<Supply>().Any(s => !b.Supplies.ContainsKey(s))
+                || b.Supplies.Values.Any(s => s is null || s.Amount < 1 || s.Price < 0))
+                Error($"{where}: supplies needs a bundle (amount ≥ 1, price ≥ 0) for every supply (FIX-06).");
+            if (b.StartingSupplies is null || b.StartingSupplies.Values.Any(n => n < 0))
+                Error($"{where}: startingSupplies cannot be negative.");
+            if (b.ServiceSessionSeconds <= 0 || b.FixtureSoothe < 0)
+                Error($"{where}: serviceSessionSeconds must be above 0 and fixtureSoothe not negative.");
+
+            var a = b.Agitation;
+            if (a is null)
+                Error($"{where}: agitation is required.");
+            else if (!(0 < a.RestlessAt && a.RestlessAt < a.MenacingAt && a.MenacingAt < 100)
+                     || a.RestlessRateMultiplier < 1 || a.MenacingBreakSeconds <= 0 || a.FrightenRadius < 0
+                     || a.FrightenRateMultiplier < 1 || a.RestlessDamagePerSecond < 0 || a.ContagionRadius < 0
+                     || a.ContagionAgitation < 0 || a.SootheScale <= 0 || a.PreferredBonus < 1
+                     || a.LikesStrength is <= 0 or > 1 || a.ColdRadius < 0 || a.ReseekAfterSeconds <= 0)
+                Error($"{where}: an agitation value is out of range (section 9).");
+
+            if (b.Bestiary is null || b.Bestiary.StudiedPoints < 1)
+                Error($"{where}: bestiary.studiedPoints must be at least 1 (BST-02).");
 
             var shop = b.Shop;
             if (shop is null)

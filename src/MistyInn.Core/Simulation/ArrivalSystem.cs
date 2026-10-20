@@ -9,7 +9,7 @@ namespace MistyInn.Core.Simulation;
 
 /// <summary>
 /// Brings creatures out of the mist (CRE-01, CRE-02, CYC-03). Each one walks from its plane's gate, through the front
-/// door, to a spot in the common room (CRE-04).
+/// door, to the best spot for its appetites, or into the common room (CRE-04).
 /// </summary>
 internal sealed class ArrivalSystem
 {
@@ -18,23 +18,21 @@ internal sealed class ArrivalSystem
     private readonly IRandomSource _random;
     private readonly IdAllocator _ids;
     private readonly IEventSink _sink;
+    private readonly CreatureBehaviourSystem _behaviour;
+    private readonly BestiaryRecorder _bestiary;
 
-    public ArrivalSystem(GameContent content, RunState run, IRandomSource random, IdAllocator ids, IEventSink sink)
+    public ArrivalSystem(
+        GameContent content, RunState run, IRandomSource random, IdAllocator ids, IEventSink sink,
+        CreatureBehaviourSystem behaviour, BestiaryRecorder bestiary)
     {
         _content = content;
         _run = run;
         _random = random;
         _ids = ids;
         _sink = sink;
-        WanderTiles = run.Board.WalkableTilesIn(content.WanderZones);
-        if (WanderTiles.Count == 0)
-        {
-            throw new ArgumentException("The wander zones have no walkable tiles.", nameof(content));
-        }
+        _behaviour = behaviour;
+        _bestiary = bestiary;
     }
-
-    /// <summary>Where creatures go when nothing calls to them, in map order.</summary>
-    public IReadOnlyList<Tile> WanderTiles { get; }
 
     /// <summary>Game seconds of the next arrival attempt.</summary>
     public double NextArrivalSeconds { get; private set; }
@@ -88,23 +86,12 @@ internal sealed class ArrivalSystem
 
         var plane = _run.ConvergingPlanes[_random.NextInt(0, _run.ConvergingPlanes.Count)];
         var def = _content.Creature(PickWeighted(plane.Creatures).Creature);
-        var gate = _content.GateFor(plane.Id);
-        var target = WanderTiles[_random.NextInt(0, WanderTiles.Count)];
-
-        var creature = new Creature(_ids.NextCreature(), def, gate);
-        var path = _run.Board.FindPath(gate, target);
-        if (path is null)
-        {
-            creature.Activity = CreatureActivity.Idle;
-            creature.IdleUntil = now + _content.Balance.IdleMaxSeconds;
-        }
-        else
-        {
-            creature.SetPath(path);
-        }
+        var creature = new Creature(_ids.NextCreature(), def, _content.GateFor(plane.Id));
 
         _run.Creatures.Add(creature);
         _sink.Raise(new CreatureArrived(_sink.Time, creature.Id, def.Id, plane.Id));
         _sink.Log("creature.arrived", $"gate.{plane.Id}", creature.Id.ToRef());
+        _bestiary.Seen(def);
+        _behaviour.Decide(creature, now, arriving: true);
     }
 }

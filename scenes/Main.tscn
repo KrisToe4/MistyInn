@@ -7,6 +7,7 @@
 [ext_resource type="PackedScene" path="res://scenes/units/Creature.tscn" id="5_creature"]
 [ext_resource type="Script" path="res://scripts/camera/IsoCameraRig.cs" id="6_rig"]
 [ext_resource type="PackedScene" path="res://scenes/ui/Hud.tscn" id="7_hud"]
+[ext_resource type="PackedScene" path="res://scenes/fixtures/Fixture.tscn" id="8_fixture"]
 
 [sub_resource type="Environment" id="Environment_night"]
 background_mode = 1
@@ -19,16 +20,18 @@ fog_enabled = true
 fog_light_color = Color(0.3, 0.33, 0.42, 1)
 fog_density = 0.008
 
-[node name="Main" type="Node3D" node_paths=PackedStringArray("Inn", "UnitsRoot", "CreaturesRoot", "CameraRig", "Hud")]
+[node name="Main" type="Node3D" node_paths=PackedStringArray("Inn", "UnitsRoot", "CreaturesRoot", "FixturesRoot", "CameraRig", "Hud")]
 script = ExtResource("1_root")
 Inn = NodePath("Inn")
 UnitsRoot = NodePath("Units")
 CreaturesRoot = NodePath("Creatures")
+FixturesRoot = NodePath("Fixtures")
 CameraRig = NodePath("CameraRig")
 Hud = NodePath("UI")
 StaffScene = ExtResource("3_staff")
 InnkeeperScene = ExtResource("4_keeper")
 CreatureScene = ExtResource("5_creature")
+FixtureScene = ExtResource("8_fixture")
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_night")
@@ -40,6 +43,8 @@ light_energy = 0.7
 shadow_enabled = true
 
 [node name="Inn" parent="." instance=ExtResource("2_inn")]
+
+[node name="Fixtures" type="Node3D" parent="."]
 
 [node name="Units" type="Node3D" parent="."]
 
