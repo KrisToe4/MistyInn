@@ -40,6 +40,8 @@ proposed details were approved with SDD v1.0 (2026-10-20). **Proposed** marks a 
 | D-032 | Three staff offers and a home-plane draw weight | Accepted | 2026-10-20 | SHP-02, SHP-04 |
 | D-033 | Sixteen characters, Mortal-weighted, with hidden ancestry | Accepted | 2026-10-20 | STF-14..16, SYN-01, MET-01, SAV-02 |
 | D-034 | SDD v1.0 approved; pre-SDD prototype code removed | Accepted | 2026-10-20 | AGT-01, step 0 |
+| D-035 | Keep a classic `.sln` with explicit configuration mapping | Accepted | 2026-10-20 | STR-01 |
+| D-036 | Create the Windows export preset in step 1 | Accepted | 2026-10-20 | STR-08, DAT-02, step 1 |
 
 ---
 
@@ -385,3 +387,25 @@ proposed details were approved with SDD v1.0 (2026-10-20). **Proposed** marks a 
   (`project.godot`, `MistyInn.csproj`, `MistyInn.sln`, `icon.svg`, `icon.svg.import`), `.gitignore`,
   `.gitattributes`, the documents and `tools/`. From now on the agent rules apply in full (AGT-05).
 - **Requirement IDs affected:** AGT-01, AGT-05, steps 0 to 2.
+
+## D-035 Keep a classic `.sln` with explicit configuration mapping
+- **Status:** Accepted
+- **Date / step:** 2026-10-20, step 0 report (SDD v1.1)
+- **Context:** Godot expects `MistyInn.sln` with its Debug, ExportDebug and ExportRelease configurations. The .NET 10 SDK
+  creates `.slnx` by default, and plain projects (Core, tests) have only Debug and Release.
+- **Decision:** Keep the classic `.sln` and never run `dotnet new sln`. Core and the tests map ExportDebug to Debug and
+  ExportRelease to Release, written into the `.sln` explicitly rather than left to `dotnet sln add`.
+- **Alternatives considered:** Switching to `.slnx` (briefly adopted, then reverted by the human the same day:
+  Godot does not support `.slnx`).
+- **Requirement IDs affected:** STR-01.
+
+## D-036 Create the Windows export preset in step 1
+- **Status:** Accepted
+- **Date / step:** 2026-10-20, step 0 report (SDD v1.1)
+- **Context:** `export_presets.cfg` is ignored by git today, while STR-08 says to commit it. It is normally created in
+  the Godot editor.
+- **Decision:** In step 1 the agent stops ignoring it (and ignores `builds/`), and gives the human the editor steps to
+  create the Windows Desktop preset (export path `builds/windows/MistyInn.exe`, `data/*.json` in the non-resource
+  files filter). The human creates it, and it is committed.
+- **Alternatives considered:** Waiting until step 11; writing the file by hand.
+- **Requirement IDs affected:** STR-08, STR-11, DAT-02.

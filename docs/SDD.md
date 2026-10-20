@@ -3,8 +3,8 @@
 
 | | |
 |---|---|
-| **Version** | 1.0 (approved) |
-| **Supersedes** | 0.2 |
+| **Version** | 1.1 (approved) |
+| **Supersedes** | 1.0 |
 | **Audience** | LLM-based coding agents and the human developer |
 | **Genre** | Dark roguelike autobattler: prepare the inn, then survive the mist |
 | **Engine** | Godot 4.7.2 (.NET build) |
@@ -76,6 +76,7 @@ step starts.
 
 | Version | Change | Reason |
 |---|---|---|
+| 1.1 | STR-01: the solution stays a classic `.sln` (Godot expects it; never `dotnet new sln`, which makes `.slnx` on .NET 10), and Core and the tests map the solution's ExportDebug and ExportRelease configurations to their Debug and Release. TST-12: the Godot path on this machine is recorded in `docs/PROGRESS.md`. Step 1: the human creates the Windows export preset in the editor (`export_presets.cfg`, committed), with the agent giving the steps | Step 0 report (D-035, D-036) |
 | 1.0 | Approved. Final review changes: 3 staff offers per Dusk (`SHP-02`); a home-plane draw weight (`SHP-04`); the 16-character roster, 4 per main class, weighted towards the Mortal Realm (`STF-14`); hidden ancestry, revealed by observation and kept across runs (`STF-15`, `STF-16`, `SYN-01`, `MET-01`, `SAV-02`, `UI-06`); the Company section renumbered 11.5. Steps 0 to 2 updated because the pre-SDD prototype code was removed. Every Proposed decision is Accepted | The human approved the SDD as the initial version (D-032 to D-034) |
 | 0.2 | Review point 2: staff are unique named characters with **classes** (Companion/Server, Gambler, Fighter, Entertainer) and **techniques**; five **ranks**, with an upgrade tree of at most two classes and one technique chosen per upgrade; upgrades come from buying the same character again in a random **shop** of ranked staff and items (in-run silver only, never real money); **staff items** and **inn items**, which replace relics; a fixed **build menu** for fixtures and supplies; Company on the floor or in a **room**; new appetites `Spectacle` and `Brawl`. Removed: `REL-*`, the Guard, Warden and Fixer roles, three-copy merging, the Dawn relic choice, lounge booths | Review point 2: staff classes and upgrades (D-025 to D-031) |
 | 0.2 | The game becomes a dark roguelike autobattler. New sections 6 to 17: cycles of Dusk (setup), Mist (automatic) and Dawn; hostile creatures with agitation; escalation (wreck, prey, hunt); staff units with a shop, merging and synergies; the inn board with fixtures and adjacency; omens, relics and the bestiary; an isometric camera; dark stylised art; moderate blood. Content filters replace Cozy mode. Removed v0.1 IDs: `DAY-*`, `GST-*`, `SVC-*`, `ECO-*`, `UPG-*`, `REP-*`, `EVT-*`, `BON-*`, `PLR-*`, `CAM-01..03`, the v0.1 `UI-*` and `ART-*` and `AUD-*` (replaced by renumbered IDs), `SCP-11`. Kept with changes: `INV-*`, `STR-*`, `ARC-*`, `SIM-*`, `RUN-*`, `PLN-*`, `CMP-*`, `MET-*`, `RAT-*`, `DAT-*`, `SAV-*`, `SET-*`, `TST-*`, `AGT-*` | Review point 1: a darker, more mature tone; the planes are hostile and each cycle is about surviving by keeping the guests occupied; an autobattler (D-017 to D-024) |
@@ -243,7 +244,10 @@ MistyInn/                            (repository root, also the Godot project ro
 
 - **STR-01** The Godot project lives at the repository root. `MistyInn.csproj` uses
   `Godot.NET.Sdk/<editor version>`, and that version shall equal the Godot editor version in use (currently 4.7.2).
-  Upgrading Godot is a recorded decision that changes both together.
+  Upgrading Godot is a recorded decision that changes both together. The solution is a classic `MistyInn.sln`, which
+  Godot expects; it is never replaced by `.slnx` (the .NET 10 default for `dotnet new sln`, which is not used).
+  Projects without Godot's configurations (Core and the tests) map the solution's `ExportDebug` to `Debug` and
+  `ExportRelease` to `Release`, written into the `.sln` explicitly.
 - **STR-02** `src/MistyInn.Core` is a plain class library (`Microsoft.NET.Sdk`, `net8.0`) with no Godot reference
   (`INV-01`). The game project references it with a `ProjectReference`.
 - **STR-03** `tests/MistyInn.Core.Tests` is an NUnit project that references only Core. It does not reference the Godot
@@ -1041,7 +1045,8 @@ This section is the only place that sets what content is allowed. Agents shall n
 - **TST-11** Presentation (Godot nodes) has no automated tests in the prototype. Each step's demo script (section 21) is
   the manual check, and the human runs it in the editor.
 - **TST-12** A headless smoke run is part of every step's commands for the human:
-  `Godot_v4.7.2-stable_mono_win64_console.exe --headless --path . --quit-after 600`. It shall print no errors.
+  `<Godot folder>\Godot_v4.7.2-stable_mono_win64_console.exe --headless --path . --quit-after 600`. It shall print no
+  errors. The Godot folder on the development machine is recorded in `docs/PROGRESS.md` (toolchain table).
 
 ---
 
@@ -1052,7 +1057,7 @@ acceptance criteria and a demo. After each step the human builds, tests, plays t
 
 **Common preamble** (put before every step prompt):
 
-> You are implementing Misty Inn from SDD v1.0. Work **only** on the step below; do not start later steps. Read
+> You are implementing Misty Inn from SDD v1.1. Work **only** on the step below; do not start later steps. Read
 > sections 0, 2, 17 and 22 and the sections the step lists first. Apply the invariants (section 2) and the agent
 > rules (section 22). If anything is ambiguous, contradictory or missing, **stop and ask** before writing code. Do not
 > run builds, tests, Godot or git: list the exact commands for the human and mark results NOT RUN. Finish with the
@@ -1075,12 +1080,16 @@ you need from the human. Change nothing.
 **Read:** 3, 4, 5.1, 5.2, 20.
 **Prompt:** Create `src/MistyInn.Core` and `tests/MistyInn.Core.Tests` with `.gdignore` files, `Directory.Build.props`,
 `.editorconfig`, the `Compile Remove` lines and the `ProjectReference` (`STR-01`..`STR-07`), and add both projects to
-`MistyInn.sln`. Move `export_presets.cfg` from ignored to committed (`STR-08`). In Core, add `GameSession`,
+`MistyInn.sln` with the configuration mapping (`STR-01`). Stop ignoring `export_presets.cfg` and ignore `builds/`
+(`STR-08`, `STR-11`), and give the human the editor steps to create the Windows export preset: Project → Export →
+Add → Windows Desktop, export path `builds/windows/MistyInn.exe`, and `data/*.json` in the non-resource files filter
+(`DAT-02`). In Core, add `GameSession`,
 `IRandomSource` with a seeded implementation, `GameCommand`, `CommandResult`, the domain event base type and its
 bounded buffer, the cycle log, and entity IDs. Add tests for the RNG's determinism and the buffers' bounds. No scenes
 yet.
 **Covers:** STR-*, ARC-01, ARC-03, ARC-04, ARC-10..13, INV-01, INV-02, INV-05, TST-01..03.
-**Acceptance:** The solution builds; the tests pass; the Godot editor opens the project without errors.
+**Acceptance:** The solution builds; the tests pass; the Godot editor opens the project without errors;
+`export_presets.cfg` exists and is tracked by git.
 **Demo:** `dotnet test`; open the project in Godot.
 
 ## Step 2: Board, cycle loop, isometric view
@@ -1567,7 +1576,7 @@ regenerate it whenever the SDD changes.
 | TST-09 | Shop, staff and roguelike: rank odds per cycle, pity and home-plane weights (including... | 20 |
 | TST-10 | Company: refusals always honoured, preferences, sapient-only Company, floor company,... | 20 |
 | TST-11 | Presentation (Godot nodes) has no automated tests in the prototype | 20 |
-| TST-12 | A headless smoke run is part of every step's commands for the human:... | 20 |
+| TST-12 | A headless smoke run is part of every step's commands for the human: `<Godot... | 20 |
 | AGT-01 | Inspect the repository before changing it | 22 |
 | AGT-02 | Work only on the requested step | 22 |
 | AGT-03 | If the SDD is ambiguous, contradictory or silent on a material decision, stop and ask | 22 |

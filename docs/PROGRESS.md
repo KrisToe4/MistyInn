@@ -5,29 +5,43 @@
 | Skeleton | none | 2026-10-19 | Removed (D-034) | Passed (agent, before AGT-05 existed) | none | Passed (agent, before AGT-05 existed) | Pre-SDD third-person prototype; removed before step 0 |
 | SDD | 0.1 | 2026-10-19 | Superseded | n/a | n/a | n/a | First draft (cute inn management); kept as `docs/SDD_v0.1.md` |
 | SDD | 0.2 | 2026-10-20 | Superseded | n/a | n/a | n/a | Review points 1 and 2; kept as `docs/SDD_v0.2.md` |
-| SDD | 1.0 | 2026-10-20 | Approved | n/a | n/a | n/a | Initial version: 248 requirements, decisions D-001 to D-034 |
-| 0 | 1.0 | | Not started | | | | Repository inspection |
-| 1 | 1.0 | | Not started | | | | Solution structure and Core skeleton |
-| 2 | 1.0 | | Not started | | | | Board, cycle loop, isometric view |
-| 3 | 1.0 | | Not started | | | | Content data and validation |
-| 4 | 1.0 | | Not started | | | | Agitation, techniques and the bestiary |
-| 5 | 1.0 | | Not started | | | | Escalation, combat, Company and content filters |
-| 6 | 1.0 | | Not started | | | | Shop, ranks, items and synergies |
-| 7 | 1.0 | | Not started | | | | Roguelike layer |
-| 8 | 1.0 | | Not started | | | | Saves, profile and settings |
-| 9 | 1.0 | | Not started | | | | UI pass |
-| 10 | 1.0 | | Not started | | | | Art and audio pass |
-| 11 | 1.0 | | Not started | | | | Audit, export and traceability |
+| SDD | 1.0 | 2026-10-20 | Superseded | n/a | n/a | n/a | Initial version: 248 requirements, decisions D-001 to D-034; kept as `docs/SDD_v1.0.md` |
+| SDD | 1.1 | 2026-10-20 | Approved | n/a | n/a | n/a | Step 0 recommendations: `.sln` kept with configuration mapping (STR-01), Godot path in PROGRESS (TST-12), export preset created in step 1 (D-035, D-036) |
+| 0 | 1.0 | 2026-10-20 | Complete | NOT RUN (read-only step) | NOT RUN | NOT RUN | Read-only inspection: repository matches the v1.0 shell; gaps are step 1 work (STR-02..08, STR-11); risks: solution configuration mapping, `.sln` vs `.slnx`, Smart App Control may block test DLLs |
+| 1 | 1.1 | | Not started | | | | Solution structure and Core skeleton |
+| 2 | 1.1 | | Not started | | | | Board, cycle loop, isometric view |
+| 3 | 1.1 | | Not started | | | | Content data and validation |
+| 4 | 1.1 | | Not started | | | | Agitation, techniques and the bestiary |
+| 5 | 1.1 | | Not started | | | | Escalation, combat, Company and content filters |
+| 6 | 1.1 | | Not started | | | | Shop, ranks, items and synergies |
+| 7 | 1.1 | | Not started | | | | Roguelike layer |
+| 8 | 1.1 | | Not started | | | | Saves, profile and settings |
+| 9 | 1.1 | | Not started | | | | UI pass |
+| 10 | 1.1 | | Not started | | | | Art and audio pass |
+| 11 | 1.1 | | Not started | | | | Audit, export and traceability |
 
 ## Toolchain
 
 | Tool | Version | Source |
 |---|---|---|
-| Godot | 4.7.2 stable, .NET (`Godot_v4.7.2-stable_mono_win64`) | Downloaded by the human |
+| Godot | 4.7.2 stable, .NET, at `C:\Godot_v4.7.2` (`Godot_v4.7.2-stable_mono_win64.exe`, `Godot_v4.7.2-stable_mono_win64_console.exe`) | Installed by the human; folder confirmed in step 0 |
 | Godot.NET.Sdk | 4.7.2 | `MistyInn.csproj` Sdk attribute; must equal the editor version (STR-01) |
-| .NET SDK | 10.0.400, 10.0.402 installed | `dotnet --list-sdks` |
-| Target framework | `net8.0` | Godot default |
+| .NET SDK | 10.0.400, 10.0.402 | SDK folders, step 0 (confirm with `dotnet --list-sdks`) |
+| .NET runtimes | 8.0.22, 8.0.25, 9.0.7, 10.0.11, 10.0.13 | Runtime folders, step 0 (confirm with `dotnet --list-runtimes`) |
+| Python | On the PATH (Microsoft Store install) | Used by `tools/gen-requirement-index.py` |
+| Target framework | `net8.0` (game, Core and tests) | Godot default; .NET 8 runtime installed |
 
 ## Packages
 
 None yet. Test packages are added in step 1 with `dotnet add` (STR-09), and their resolved versions are recorded here.
+
+## Smoke-run command (TST-12)
+
+```
+C:\Godot_v4.7.2\Godot_v4.7.2-stable_mono_win64_console.exe --headless --path . --quit-after 600
+```
+
+## Known machine risk
+
+Windows Smart App Control blocked newly built test DLLs in the human's other project on this machine. If
+`dotnet test` is blocked, run the tests in the .NET SDK Linux container instead.
