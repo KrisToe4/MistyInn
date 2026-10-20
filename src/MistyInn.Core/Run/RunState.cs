@@ -10,7 +10,7 @@ internal sealed class RunState
     public RunState(GameContent content, IdAllocator ids)
     {
         Board = new InnBoard(content.Layout);
-        Units = content.StartingStaff.Select(def => new Unit(ids.NextUnit(), def)).ToList();
+        Units = content.StartingUnits.Select(def => new Unit(ids.NextUnit(), def)).ToList();
     }
 
     public int Cycle { get; set; }

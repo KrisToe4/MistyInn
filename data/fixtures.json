@@ -1,0 +1,55 @@
+[
+  {
+    "id": "bar-counter", "name": "Bar counter", "zone": "bar", "footprint": 3, "health": 60, "cost": 4,
+    "effects": [ { "kind": "Enables", "technique": "drink", "seats": 3 } ]
+  },
+  {
+    "id": "table", "name": "Table", "footprint": 1, "health": 30, "cost": 2,
+    "effects": [
+      { "kind": "Enables", "technique": "food", "seats": 2 },
+      { "kind": "Enables", "technique": "dice", "seats": 2 }
+    ]
+  },
+  {
+    "id": "card-table", "name": "Card table", "footprint": 1, "health": 30, "cost": 3,
+    "effects": [
+      { "kind": "Enables", "technique": "cards", "seats": 4 },
+      { "kind": "Enables", "technique": "dice", "seats": 4 }
+    ]
+  },
+  {
+    "id": "stage", "name": "Stage", "zone": "stage", "footprint": 4, "health": 50, "cost": 5,
+    "effects": [
+      { "kind": "Enables", "technique": "song", "zones": 1 },
+      { "kind": "Enables", "technique": "dance", "zones": 1 },
+      { "kind": "Emits", "trigger": "Noise", "radius": 4 }
+    ]
+  },
+  {
+    "id": "hearth", "name": "Hearth", "footprint": 2, "health": 80, "cost": 4,
+    "effects": [
+      { "kind": "Provides", "appetite": "Warmth", "seats": 4 },
+      { "kind": "Emits", "trigger": "Heat", "radius": 3 }
+    ]
+  },
+  {
+    "id": "quiet-corner", "name": "Quiet corner", "footprint": 1, "health": 20, "cost": 2,
+    "effects": [ { "kind": "Provides", "appetite": "Quiet", "seats": 2, "cancelledBy": "Noise", "radius": 3 } ]
+  },
+  {
+    "id": "lantern", "name": "Lantern", "footprint": 1, "health": 10, "cost": 1,
+    "effects": [ { "kind": "Emits", "trigger": "Light", "radius": 3 } ]
+  },
+  {
+    "id": "ward-circle", "name": "Ward circle", "footprint": 1, "health": 40, "cost": 4,
+    "effects": [ { "kind": "AgitationRate", "radius": 2, "multiplier": 0.75 } ]
+  },
+  {
+    "id": "barricade", "name": "Barricade", "footprint": 1, "health": 60, "cost": 2,
+    "effects": [ { "kind": "Blocks" } ]
+  },
+  {
+    "id": "salt-line", "name": "Salt line", "footprint": 1, "health": 20, "cost": 3,
+    "effects": [ { "kind": "PlaneBarrier" } ]
+  }
+]

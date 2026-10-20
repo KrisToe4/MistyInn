@@ -47,8 +47,25 @@ public sealed class InnBoard
             return true;
         }
 
+        var reachedZones = ZonesReachableFromDoor(tile);
+        return Layout.ZoneIds.Any(zone => !reachedZones.Contains(zone));
+    }
+
+    /// <summary>The zones a creature could reach from the front door, optionally with one more tile blocked.</summary>
+    public IReadOnlySet<string> ZonesReachableFromDoor(Tile? alsoBlocked = null)
+    {
         var reachedZones = new HashSet<string>();
-        var seen = new HashSet<Tile> { Layout.FrontDoor, tile };
+        if (!IsWalkable(Layout.FrontDoor) || Layout.FrontDoor == alsoBlocked)
+        {
+            return reachedZones;
+        }
+
+        var seen = new HashSet<Tile> { Layout.FrontDoor };
+        if (alsoBlocked is { } blocked)
+        {
+            seen.Add(blocked);
+        }
+
         var queue = new Queue<Tile>();
         queue.Enqueue(Layout.FrontDoor);
 
@@ -66,7 +83,7 @@ public sealed class InnBoard
             }
         }
 
-        return Layout.ZoneIds.Any(zone => !reachedZones.Contains(zone));
+        return reachedZones;
     }
 
     /// <summary>Walkable tiles in the given zones, in map order (deterministic for random picks).</summary>

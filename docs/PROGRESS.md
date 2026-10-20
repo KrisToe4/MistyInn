@@ -8,19 +8,21 @@
 | SDD | 1.0 | 2026-10-20 | Superseded | n/a | n/a | n/a | Initial version: 248 requirements, decisions D-001 to D-034; kept as `docs/SDD_v1.0.md` |
 | SDD | 1.1 | 2026-10-20 | Superseded | n/a | n/a | n/a | Step 0 recommendations: `.sln` kept with configuration mapping (STR-01), Godot path in PROGRESS (TST-12), export preset created in step 1 (D-035, D-036); kept as `docs/SDD_v1.1.md` |
 | SDD | 1.2 | 2026-10-20 | Superseded | n/a | n/a | n/a | Step 1 recommendation: smoke run starts at step 2 (TST-12); D-037 to D-041 accepted; kept as `docs/SDD_v1.2.md` |
-| SDD | 1.3 | 2026-10-20 | Approved | n/a | n/a | n/a | Step 2 recommendations: SIM-02 (Core's `Tick` runs the fixed steps), ARC-10 (`ContinueFromDawn`), BRD-03 (every room reachable, D-050); D-042 to D-049 accepted |
+| SDD | 1.3 | 2026-10-20 | Superseded | n/a | n/a | n/a | Step 2 recommendations: SIM-02 (Core's `Tick` runs the fixed steps), ARC-10 (`ContinueFromDawn`), BRD-03 (every room reachable, D-050); D-042 to D-049 accepted; kept as `docs/SDD_v1.3.md` |
+| SDD | 1.4 | 2026-10-20 | Superseded | n/a | n/a | n/a | Step 3 questions: one more technique per class and masteries (STF-02, STF-06, STF-07, STF-17), six effect kinds (DAT-03) (D-051, D-052); kept as `docs/SDD_v1.4.md` |
+| SDD | 1.5 | 2026-10-20 | Approved | n/a | n/a | n/a | Step 3 recommendations: SIM-04 and TST-07 (no scene markers), STF-02 (`needsFixture`), DAT-04 (whole-set fallback), step 4 providers for Order and Darkness; D-054 to D-060 accepted |
 | 0 | 1.0 | 2026-10-20 | Complete | NOT RUN (read-only step) | NOT RUN | NOT RUN | Read-only inspection: repository matches the v1.0 shell; gaps are step 1 work (STR-02..08, STR-11); risks: solution configuration mapping, `.sln` vs `.slnx`, Smart App Control may block test DLLs |
 | 1 | 1.1 | 2026-10-20 | Complete | Passed: Core and tests (human, .NET SDK 10 container); Godot project (human, Godot 4.7.2 editor) | 49/49 passed (human, container, 72 ms) | n/a (no main scene until step 2; TST-12 as of v1.2) | Core library and NUnit project, shared build settings, `.sln` with build type mapping, `.gitignore` fixed; Windows Desktop export preset created by the human (path `builds/windows/MistyInn.exe`, includes `data/*.json`); decisions D-037 to D-041 accepted |
 | 2 | 1.2 | 2026-10-20 | Complete (play-through passed, human) | Passed (human): `dotnet build` after fixing nullable errors in two tests, and the Godot editor build | 145/145 passed (human, container, 467 ms) after one test fix (NUnit 5 `Is.SubsetOf` counts duplicates) | Not reported separately | Board, A*, Dusk/Mist/Dawn loop, arrivals, wandering, dawn, determinism; isometric camera, board and unit views, drag-and-drop placement, speed, pause menu; decisions D-042 to D-049 |
-| 3 | 1.3 | | Not started | | | | Content data and validation |
-| 4 | 1.3 | | Not started | | | | Agitation, techniques and the bestiary |
-| 5 | 1.3 | | Not started | | | | Escalation, combat, Company and content filters |
-| 6 | 1.3 | | Not started | | | | Shop, ranks, items and synergies |
-| 7 | 1.3 | | Not started | | | | Roguelike layer |
-| 8 | 1.3 | | Not started | | | | Saves, profile and settings |
-| 9 | 1.3 | | Not started | | | | UI pass |
-| 10 | 1.3 | | Not started | | | | Art and audio pass |
-| 11 | 1.3 | | Not started | | | | Audit, export and traceability |
+| 3 | 1.4 | 2026-10-20 | Complete (demo passed, human) | Passed (Core and tests, human, container) | 197/197 passed (human, container, 710 ms; 59 new, the 7 step 2 content tests replaced) | Passed (human, `--headless --quit-after 600`) | `data/*.json` (nine files, placeholder roster and creatures), loader, validator, upgrade-tree rules, built-in copy in Core, Godot content source with debug stop and export fallback; decisions D-051 to D-059 |
+| 4 | 1.5 | | Not started | | | | Agitation, techniques and the bestiary |
+| 5 | 1.5 | | Not started | | | | Escalation, combat, Company and content filters |
+| 6 | 1.5 | | Not started | | | | Shop, ranks, items and synergies |
+| 7 | 1.5 | | Not started | | | | Roguelike layer |
+| 8 | 1.5 | | Not started | | | | Saves, profile and settings |
+| 9 | 1.5 | | Not started | | | | UI pass |
+| 10 | 1.5 | | Not started | | | | Art and audio pass |
+| 11 | 1.5 | | Not started | | | | Audit, export and traceability |
 
 ## Toolchain
 

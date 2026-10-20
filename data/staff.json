@@ -1,0 +1,2072 @@
+{
+  "innkeeper": {
+    "id": "innkeeper",
+    "name": "The Innkeeper",
+    "adult": true,
+    "stats": {
+      "health": 40,
+      "attack": 3,
+      "attackInterval": 1.5,
+      "range": 1,
+      "armour": 1,
+      "speed": 2.0,
+      "soothe": 0.5
+    }
+  },
+  "characters": [
+    {
+      "id": "staff-01",
+      "name": "Staff 01",
+      "adult": true,
+      "origin": "mortal-realm",
+      "ancestry": "pale-court",
+      "baseCost": 1,
+      "mainClass": "CompanionServer",
+      "secondClass": "Entertainer",
+      "baseTechnique": "drink",
+      "stats": {
+        "health": 18.0,
+        "attack": 2.0,
+        "attackInterval": 1.6,
+        "range": 1,
+        "armour": 0,
+        "speed": 2.2,
+        "soothe": 1.0
+      },
+      "tree": [
+        {
+          "rank": 2,
+          "options": [
+            {
+              "id": "r2-food",
+              "technique": "food"
+            },
+            {
+              "id": "r2-song",
+              "technique": "song"
+            },
+            {
+              "id": "r2-master-drink",
+              "technique": "drink",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 3,
+          "options": [
+            {
+              "id": "r3-company",
+              "technique": "company"
+            },
+            {
+              "id": "r3-dance",
+              "technique": "dance"
+            },
+            {
+              "id": "r3-master-drink",
+              "technique": "drink",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 4,
+          "options": [
+            {
+              "id": "r4-comfort",
+              "technique": "comfort"
+            },
+            {
+              "id": "r4-master-drink",
+              "technique": "drink",
+              "mastery": true
+            },
+            {
+              "id": "r4-master-food",
+              "technique": "food",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 5,
+          "options": [
+            {
+              "id": "r5-tales",
+              "technique": "tales"
+            },
+            {
+              "id": "r5-master-drink",
+              "technique": "drink",
+              "mastery": true
+            },
+            {
+              "id": "r5-master-food",
+              "technique": "food",
+              "mastery": true
+            }
+          ]
+        }
+      ],
+      "presets": [
+        {
+          "rank": 2,
+          "choices": [
+            "r2-food"
+          ]
+        },
+        {
+          "rank": 3,
+          "choices": [
+            "r2-food",
+            "r3-company"
+          ]
+        },
+        {
+          "rank": 4,
+          "choices": [
+            "r2-food",
+            "r3-company",
+            "r4-comfort"
+          ]
+        },
+        {
+          "rank": 5,
+          "choices": [
+            "r2-food",
+            "r3-company",
+            "r4-comfort",
+            "r5-tales"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "staff-02",
+      "name": "Staff 02",
+      "adult": true,
+      "origin": "mortal-realm",
+      "ancestry": null,
+      "baseCost": 1,
+      "mainClass": "CompanionServer",
+      "secondClass": "Gambler",
+      "baseTechnique": "food",
+      "stats": {
+        "health": 18.0,
+        "attack": 2.0,
+        "attackInterval": 1.6,
+        "range": 1,
+        "armour": 0,
+        "speed": 2.2,
+        "soothe": 1.0
+      },
+      "tree": [
+        {
+          "rank": 2,
+          "options": [
+            {
+              "id": "r2-company",
+              "technique": "company"
+            },
+            {
+              "id": "r2-cards",
+              "technique": "cards"
+            },
+            {
+              "id": "r2-master-food",
+              "technique": "food",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 3,
+          "options": [
+            {
+              "id": "r3-comfort",
+              "technique": "comfort"
+            },
+            {
+              "id": "r3-dice",
+              "technique": "dice"
+            },
+            {
+              "id": "r3-master-food",
+              "technique": "food",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 4,
+          "options": [
+            {
+              "id": "r4-drink",
+              "technique": "drink"
+            },
+            {
+              "id": "r4-master-food",
+              "technique": "food",
+              "mastery": true
+            },
+            {
+              "id": "r4-master-company",
+              "technique": "company",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 5,
+          "options": [
+            {
+              "id": "r5-bones",
+              "technique": "bones"
+            },
+            {
+              "id": "r5-master-food",
+              "technique": "food",
+              "mastery": true
+            },
+            {
+              "id": "r5-master-company",
+              "technique": "company",
+              "mastery": true
+            }
+          ]
+        }
+      ],
+      "presets": [
+        {
+          "rank": 2,
+          "choices": [
+            "r2-company"
+          ]
+        },
+        {
+          "rank": 3,
+          "choices": [
+            "r2-company",
+            "r3-comfort"
+          ]
+        },
+        {
+          "rank": 4,
+          "choices": [
+            "r2-company",
+            "r3-comfort",
+            "r4-drink"
+          ]
+        },
+        {
+          "rank": 5,
+          "choices": [
+            "r2-company",
+            "r3-comfort",
+            "r4-drink",
+            "r5-bones"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "staff-03",
+      "name": "Staff 03",
+      "adult": true,
+      "origin": "drowned-deep",
+      "ancestry": null,
+      "baseCost": 2,
+      "mainClass": "CompanionServer",
+      "secondClass": "Fighter",
+      "baseTechnique": "company",
+      "stats": {
+        "health": 19.8,
+        "attack": 2.2,
+        "attackInterval": 1.6,
+        "range": 1,
+        "armour": 0,
+        "speed": 2.2,
+        "soothe": 1.1
+      },
+      "tree": [
+        {
+          "rank": 2,
+          "options": [
+            {
+              "id": "r2-comfort",
+              "technique": "comfort"
+            },
+            {
+              "id": "r2-fists",
+              "technique": "fists"
+            },
+            {
+              "id": "r2-master-company",
+              "technique": "company",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 3,
+          "options": [
+            {
+              "id": "r3-drink",
+              "technique": "drink"
+            },
+            {
+              "id": "r3-weapons",
+              "technique": "weapons"
+            },
+            {
+              "id": "r3-master-company",
+              "technique": "company",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 4,
+          "options": [
+            {
+              "id": "r4-food",
+              "technique": "food"
+            },
+            {
+              "id": "r4-master-company",
+              "technique": "company",
+              "mastery": true
+            },
+            {
+              "id": "r4-master-comfort",
+              "technique": "comfort",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 5,
+          "options": [
+            {
+              "id": "r5-grapple",
+              "technique": "grapple"
+            },
+            {
+              "id": "r5-master-company",
+              "technique": "company",
+              "mastery": true
+            },
+            {
+              "id": "r5-master-comfort",
+              "technique": "comfort",
+              "mastery": true
+            }
+          ]
+        }
+      ],
+      "presets": [
+        {
+          "rank": 2,
+          "choices": [
+            "r2-comfort"
+          ]
+        },
+        {
+          "rank": 3,
+          "choices": [
+            "r2-comfort",
+            "r3-drink"
+          ]
+        },
+        {
+          "rank": 4,
+          "choices": [
+            "r2-comfort",
+            "r3-drink",
+            "r4-food"
+          ]
+        },
+        {
+          "rank": 5,
+          "choices": [
+            "r2-comfort",
+            "r3-drink",
+            "r4-food",
+            "r5-grapple"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "staff-04",
+      "name": "Staff 04",
+      "adult": true,
+      "origin": "mortal-realm",
+      "ancestry": "gearbound-ruin",
+      "baseCost": 3,
+      "mainClass": "CompanionServer",
+      "secondClass": "Entertainer",
+      "baseTechnique": "comfort",
+      "stats": {
+        "health": 21.6,
+        "attack": 2.4,
+        "attackInterval": 1.6,
+        "range": 1,
+        "armour": 0,
+        "speed": 2.2,
+        "soothe": 1.2
+      },
+      "tree": [
+        {
+          "rank": 2,
+          "options": [
+            {
+              "id": "r2-drink",
+              "technique": "drink"
+            },
+            {
+              "id": "r2-song",
+              "technique": "song"
+            },
+            {
+              "id": "r2-master-comfort",
+              "technique": "comfort",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 3,
+          "options": [
+            {
+              "id": "r3-food",
+              "technique": "food"
+            },
+            {
+              "id": "r3-dance",
+              "technique": "dance"
+            },
+            {
+              "id": "r3-master-comfort",
+              "technique": "comfort",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 4,
+          "options": [
+            {
+              "id": "r4-company",
+              "technique": "company"
+            },
+            {
+              "id": "r4-master-comfort",
+              "technique": "comfort",
+              "mastery": true
+            },
+            {
+              "id": "r4-master-drink",
+              "technique": "drink",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 5,
+          "options": [
+            {
+              "id": "r5-tales",
+              "technique": "tales"
+            },
+            {
+              "id": "r5-master-comfort",
+              "technique": "comfort",
+              "mastery": true
+            },
+            {
+              "id": "r5-master-drink",
+              "technique": "drink",
+              "mastery": true
+            }
+          ]
+        }
+      ],
+      "presets": [
+        {
+          "rank": 2,
+          "choices": [
+            "r2-drink"
+          ]
+        },
+        {
+          "rank": 3,
+          "choices": [
+            "r2-drink",
+            "r3-food"
+          ]
+        },
+        {
+          "rank": 4,
+          "choices": [
+            "r2-drink",
+            "r3-food",
+            "r4-company"
+          ]
+        },
+        {
+          "rank": 5,
+          "choices": [
+            "r2-drink",
+            "r3-food",
+            "r4-company",
+            "r5-tales"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "staff-05",
+      "name": "Staff 05",
+      "adult": true,
+      "origin": "mortal-realm",
+      "ancestry": null,
+      "baseCost": 1,
+      "mainClass": "Gambler",
+      "secondClass": "CompanionServer",
+      "baseTechnique": "cards",
+      "stats": {
+        "health": 16.0,
+        "attack": 2.0,
+        "attackInterval": 1.6,
+        "range": 1,
+        "armour": 0,
+        "speed": 2.0,
+        "soothe": 1.0
+      },
+      "tree": [
+        {
+          "rank": 2,
+          "options": [
+            {
+              "id": "r2-dice",
+              "technique": "dice"
+            },
+            {
+              "id": "r2-drink",
+              "technique": "drink"
+            },
+            {
+              "id": "r2-master-cards",
+              "technique": "cards",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 3,
+          "options": [
+            {
+              "id": "r3-bones",
+              "technique": "bones"
+            },
+            {
+              "id": "r3-food",
+              "technique": "food"
+            },
+            {
+              "id": "r3-master-cards",
+              "technique": "cards",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 4,
+          "options": [
+            {
+              "id": "r4-company",
+              "technique": "company"
+            },
+            {
+              "id": "r4-master-cards",
+              "technique": "cards",
+              "mastery": true
+            },
+            {
+              "id": "r4-master-dice",
+              "technique": "dice",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 5,
+          "options": [
+            {
+              "id": "r5-comfort",
+              "technique": "comfort"
+            },
+            {
+              "id": "r5-master-cards",
+              "technique": "cards",
+              "mastery": true
+            },
+            {
+              "id": "r5-master-dice",
+              "technique": "dice",
+              "mastery": true
+            }
+          ]
+        }
+      ],
+      "presets": [
+        {
+          "rank": 2,
+          "choices": [
+            "r2-dice"
+          ]
+        },
+        {
+          "rank": 3,
+          "choices": [
+            "r2-dice",
+            "r3-bones"
+          ]
+        },
+        {
+          "rank": 4,
+          "choices": [
+            "r2-dice",
+            "r3-bones",
+            "r4-company"
+          ]
+        },
+        {
+          "rank": 5,
+          "choices": [
+            "r2-dice",
+            "r3-bones",
+            "r4-company",
+            "r5-comfort"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "staff-06",
+      "name": "Staff 06",
+      "adult": true,
+      "origin": "ashen-waste",
+      "ancestry": null,
+      "baseCost": 1,
+      "mainClass": "Gambler",
+      "secondClass": "Fighter",
+      "baseTechnique": "dice",
+      "stats": {
+        "health": 16.0,
+        "attack": 2.0,
+        "attackInterval": 1.6,
+        "range": 1,
+        "armour": 0,
+        "speed": 2.0,
+        "soothe": 1.0
+      },
+      "tree": [
+        {
+          "rank": 2,
+          "options": [
+            {
+              "id": "r2-bones",
+              "technique": "bones"
+            },
+            {
+              "id": "r2-fists",
+              "technique": "fists"
+            },
+            {
+              "id": "r2-master-dice",
+              "technique": "dice",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 3,
+          "options": [
+            {
+              "id": "r3-cards",
+              "technique": "cards"
+            },
+            {
+              "id": "r3-master-dice",
+              "technique": "dice",
+              "mastery": true
+            },
+            {
+              "id": "r3-master-bones",
+              "technique": "bones",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 4,
+          "options": [
+            {
+              "id": "r4-weapons",
+              "technique": "weapons"
+            },
+            {
+              "id": "r4-master-dice",
+              "technique": "dice",
+              "mastery": true
+            },
+            {
+              "id": "r4-master-bones",
+              "technique": "bones",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 5,
+          "options": [
+            {
+              "id": "r5-grapple",
+              "technique": "grapple"
+            },
+            {
+              "id": "r5-master-dice",
+              "technique": "dice",
+              "mastery": true
+            },
+            {
+              "id": "r5-master-bones",
+              "technique": "bones",
+              "mastery": true
+            }
+          ]
+        }
+      ],
+      "presets": [
+        {
+          "rank": 2,
+          "choices": [
+            "r2-bones"
+          ]
+        },
+        {
+          "rank": 3,
+          "choices": [
+            "r2-bones",
+            "r3-cards"
+          ]
+        },
+        {
+          "rank": 4,
+          "choices": [
+            "r2-bones",
+            "r3-cards",
+            "r4-weapons"
+          ]
+        },
+        {
+          "rank": 5,
+          "choices": [
+            "r2-bones",
+            "r3-cards",
+            "r4-weapons",
+            "r5-grapple"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "staff-07",
+      "name": "Staff 07",
+      "adult": true,
+      "origin": "mortal-realm",
+      "ancestry": "drowned-deep",
+      "baseCost": 2,
+      "mainClass": "Gambler",
+      "secondClass": "Entertainer",
+      "baseTechnique": "bones",
+      "stats": {
+        "health": 17.6,
+        "attack": 2.2,
+        "attackInterval": 1.6,
+        "range": 1,
+        "armour": 0,
+        "speed": 2.0,
+        "soothe": 1.1
+      },
+      "tree": [
+        {
+          "rank": 2,
+          "options": [
+            {
+              "id": "r2-cards",
+              "technique": "cards"
+            },
+            {
+              "id": "r2-song",
+              "technique": "song"
+            },
+            {
+              "id": "r2-master-bones",
+              "technique": "bones",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 3,
+          "options": [
+            {
+              "id": "r3-dice",
+              "technique": "dice"
+            },
+            {
+              "id": "r3-master-bones",
+              "technique": "bones",
+              "mastery": true
+            },
+            {
+              "id": "r3-master-cards",
+              "technique": "cards",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 4,
+          "options": [
+            {
+              "id": "r4-dance",
+              "technique": "dance"
+            },
+            {
+              "id": "r4-master-bones",
+              "technique": "bones",
+              "mastery": true
+            },
+            {
+              "id": "r4-master-cards",
+              "technique": "cards",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 5,
+          "options": [
+            {
+              "id": "r5-tales",
+              "technique": "tales"
+            },
+            {
+              "id": "r5-master-bones",
+              "technique": "bones",
+              "mastery": true
+            },
+            {
+              "id": "r5-master-cards",
+              "technique": "cards",
+              "mastery": true
+            }
+          ]
+        }
+      ],
+      "presets": [
+        {
+          "rank": 2,
+          "choices": [
+            "r2-cards"
+          ]
+        },
+        {
+          "rank": 3,
+          "choices": [
+            "r2-cards",
+            "r3-dice"
+          ]
+        },
+        {
+          "rank": 4,
+          "choices": [
+            "r2-cards",
+            "r3-dice",
+            "r4-dance"
+          ]
+        },
+        {
+          "rank": 5,
+          "choices": [
+            "r2-cards",
+            "r3-dice",
+            "r4-dance",
+            "r5-tales"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "staff-08",
+      "name": "Staff 08",
+      "adult": true,
+      "origin": "mortal-realm",
+      "ancestry": null,
+      "baseCost": 3,
+      "mainClass": "Gambler",
+      "secondClass": "CompanionServer",
+      "baseTechnique": "cards",
+      "stats": {
+        "health": 19.2,
+        "attack": 2.4,
+        "attackInterval": 1.6,
+        "range": 1,
+        "armour": 0,
+        "speed": 2.0,
+        "soothe": 1.2
+      },
+      "tree": [
+        {
+          "rank": 2,
+          "options": [
+            {
+              "id": "r2-dice",
+              "technique": "dice"
+            },
+            {
+              "id": "r2-drink",
+              "technique": "drink"
+            },
+            {
+              "id": "r2-master-cards",
+              "technique": "cards",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 3,
+          "options": [
+            {
+              "id": "r3-bones",
+              "technique": "bones"
+            },
+            {
+              "id": "r3-food",
+              "technique": "food"
+            },
+            {
+              "id": "r3-master-cards",
+              "technique": "cards",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 4,
+          "options": [
+            {
+              "id": "r4-company",
+              "technique": "company"
+            },
+            {
+              "id": "r4-master-cards",
+              "technique": "cards",
+              "mastery": true
+            },
+            {
+              "id": "r4-master-dice",
+              "technique": "dice",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 5,
+          "options": [
+            {
+              "id": "r5-comfort",
+              "technique": "comfort"
+            },
+            {
+              "id": "r5-master-cards",
+              "technique": "cards",
+              "mastery": true
+            },
+            {
+              "id": "r5-master-dice",
+              "technique": "dice",
+              "mastery": true
+            }
+          ]
+        }
+      ],
+      "presets": [
+        {
+          "rank": 2,
+          "choices": [
+            "r2-dice"
+          ]
+        },
+        {
+          "rank": 3,
+          "choices": [
+            "r2-dice",
+            "r3-bones"
+          ]
+        },
+        {
+          "rank": 4,
+          "choices": [
+            "r2-dice",
+            "r3-bones",
+            "r4-company"
+          ]
+        },
+        {
+          "rank": 5,
+          "choices": [
+            "r2-dice",
+            "r3-bones",
+            "r4-company",
+            "r5-comfort"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "staff-09",
+      "name": "Staff 09",
+      "adult": true,
+      "origin": "hollow-wood",
+      "ancestry": null,
+      "baseCost": 1,
+      "mainClass": "Fighter",
+      "secondClass": "CompanionServer",
+      "baseTechnique": "fists",
+      "stats": {
+        "health": 30.0,
+        "attack": 6.0,
+        "attackInterval": 1.2,
+        "range": 1.2,
+        "armour": 2,
+        "speed": 2.4,
+        "soothe": 0.6
+      },
+      "tree": [
+        {
+          "rank": 2,
+          "options": [
+            {
+              "id": "r2-weapons",
+              "technique": "weapons"
+            },
+            {
+              "id": "r2-drink",
+              "technique": "drink"
+            },
+            {
+              "id": "r2-master-fists",
+              "technique": "fists",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 3,
+          "options": [
+            {
+              "id": "r3-grapple",
+              "technique": "grapple"
+            },
+            {
+              "id": "r3-food",
+              "technique": "food"
+            },
+            {
+              "id": "r3-master-fists",
+              "technique": "fists",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 4,
+          "options": [
+            {
+              "id": "r4-company",
+              "technique": "company"
+            },
+            {
+              "id": "r4-master-fists",
+              "technique": "fists",
+              "mastery": true
+            },
+            {
+              "id": "r4-master-weapons",
+              "technique": "weapons",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 5,
+          "options": [
+            {
+              "id": "r5-comfort",
+              "technique": "comfort"
+            },
+            {
+              "id": "r5-master-fists",
+              "technique": "fists",
+              "mastery": true
+            },
+            {
+              "id": "r5-master-weapons",
+              "technique": "weapons",
+              "mastery": true
+            }
+          ]
+        }
+      ],
+      "presets": [
+        {
+          "rank": 2,
+          "choices": [
+            "r2-weapons"
+          ]
+        },
+        {
+          "rank": 3,
+          "choices": [
+            "r2-weapons",
+            "r3-grapple"
+          ]
+        },
+        {
+          "rank": 4,
+          "choices": [
+            "r2-weapons",
+            "r3-grapple",
+            "r4-company"
+          ]
+        },
+        {
+          "rank": 5,
+          "choices": [
+            "r2-weapons",
+            "r3-grapple",
+            "r4-company",
+            "r5-comfort"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "staff-10",
+      "name": "Staff 10",
+      "adult": true,
+      "origin": "mortal-realm",
+      "ancestry": "ashen-waste",
+      "baseCost": 1,
+      "mainClass": "Fighter",
+      "secondClass": "Gambler",
+      "baseTechnique": "weapons",
+      "stats": {
+        "health": 30.0,
+        "attack": 6.0,
+        "attackInterval": 1.2,
+        "range": 1.2,
+        "armour": 2,
+        "speed": 2.4,
+        "soothe": 0.6
+      },
+      "tree": [
+        {
+          "rank": 2,
+          "options": [
+            {
+              "id": "r2-grapple",
+              "technique": "grapple"
+            },
+            {
+              "id": "r2-cards",
+              "technique": "cards"
+            },
+            {
+              "id": "r2-master-weapons",
+              "technique": "weapons",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 3,
+          "options": [
+            {
+              "id": "r3-fists",
+              "technique": "fists"
+            },
+            {
+              "id": "r3-master-weapons",
+              "technique": "weapons",
+              "mastery": true
+            },
+            {
+              "id": "r3-master-grapple",
+              "technique": "grapple",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 4,
+          "options": [
+            {
+              "id": "r4-dice",
+              "technique": "dice"
+            },
+            {
+              "id": "r4-master-weapons",
+              "technique": "weapons",
+              "mastery": true
+            },
+            {
+              "id": "r4-master-grapple",
+              "technique": "grapple",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 5,
+          "options": [
+            {
+              "id": "r5-bones",
+              "technique": "bones"
+            },
+            {
+              "id": "r5-master-weapons",
+              "technique": "weapons",
+              "mastery": true
+            },
+            {
+              "id": "r5-master-grapple",
+              "technique": "grapple",
+              "mastery": true
+            }
+          ]
+        }
+      ],
+      "presets": [
+        {
+          "rank": 2,
+          "choices": [
+            "r2-grapple"
+          ]
+        },
+        {
+          "rank": 3,
+          "choices": [
+            "r2-grapple",
+            "r3-fists"
+          ]
+        },
+        {
+          "rank": 4,
+          "choices": [
+            "r2-grapple",
+            "r3-fists",
+            "r4-dice"
+          ]
+        },
+        {
+          "rank": 5,
+          "choices": [
+            "r2-grapple",
+            "r3-fists",
+            "r4-dice",
+            "r5-bones"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "staff-11",
+      "name": "Staff 11",
+      "adult": true,
+      "origin": "mortal-realm",
+      "ancestry": null,
+      "baseCost": 2,
+      "mainClass": "Fighter",
+      "secondClass": "Entertainer",
+      "baseTechnique": "grapple",
+      "stats": {
+        "health": 33.0,
+        "attack": 6.6,
+        "attackInterval": 1.2,
+        "range": 1.2,
+        "armour": 2,
+        "speed": 2.4,
+        "soothe": 0.66
+      },
+      "tree": [
+        {
+          "rank": 2,
+          "options": [
+            {
+              "id": "r2-fists",
+              "technique": "fists"
+            },
+            {
+              "id": "r2-song",
+              "technique": "song"
+            },
+            {
+              "id": "r2-master-grapple",
+              "technique": "grapple",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 3,
+          "options": [
+            {
+              "id": "r3-weapons",
+              "technique": "weapons"
+            },
+            {
+              "id": "r3-master-grapple",
+              "technique": "grapple",
+              "mastery": true
+            },
+            {
+              "id": "r3-master-fists",
+              "technique": "fists",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 4,
+          "options": [
+            {
+              "id": "r4-dance",
+              "technique": "dance"
+            },
+            {
+              "id": "r4-master-grapple",
+              "technique": "grapple",
+              "mastery": true
+            },
+            {
+              "id": "r4-master-fists",
+              "technique": "fists",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 5,
+          "options": [
+            {
+              "id": "r5-tales",
+              "technique": "tales"
+            },
+            {
+              "id": "r5-master-grapple",
+              "technique": "grapple",
+              "mastery": true
+            },
+            {
+              "id": "r5-master-fists",
+              "technique": "fists",
+              "mastery": true
+            }
+          ]
+        }
+      ],
+      "presets": [
+        {
+          "rank": 2,
+          "choices": [
+            "r2-fists"
+          ]
+        },
+        {
+          "rank": 3,
+          "choices": [
+            "r2-fists",
+            "r3-weapons"
+          ]
+        },
+        {
+          "rank": 4,
+          "choices": [
+            "r2-fists",
+            "r3-weapons",
+            "r4-dance"
+          ]
+        },
+        {
+          "rank": 5,
+          "choices": [
+            "r2-fists",
+            "r3-weapons",
+            "r4-dance",
+            "r5-tales"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "staff-12",
+      "name": "Staff 12",
+      "adult": true,
+      "origin": "gearbound-ruin",
+      "ancestry": null,
+      "baseCost": 3,
+      "mainClass": "Fighter",
+      "secondClass": "CompanionServer",
+      "baseTechnique": "fists",
+      "stats": {
+        "health": 36.0,
+        "attack": 7.2,
+        "attackInterval": 1.2,
+        "range": 1.2,
+        "armour": 2,
+        "speed": 2.4,
+        "soothe": 0.72
+      },
+      "tree": [
+        {
+          "rank": 2,
+          "options": [
+            {
+              "id": "r2-weapons",
+              "technique": "weapons"
+            },
+            {
+              "id": "r2-drink",
+              "technique": "drink"
+            },
+            {
+              "id": "r2-master-fists",
+              "technique": "fists",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 3,
+          "options": [
+            {
+              "id": "r3-grapple",
+              "technique": "grapple"
+            },
+            {
+              "id": "r3-food",
+              "technique": "food"
+            },
+            {
+              "id": "r3-master-fists",
+              "technique": "fists",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 4,
+          "options": [
+            {
+              "id": "r4-company",
+              "technique": "company"
+            },
+            {
+              "id": "r4-master-fists",
+              "technique": "fists",
+              "mastery": true
+            },
+            {
+              "id": "r4-master-weapons",
+              "technique": "weapons",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 5,
+          "options": [
+            {
+              "id": "r5-comfort",
+              "technique": "comfort"
+            },
+            {
+              "id": "r5-master-fists",
+              "technique": "fists",
+              "mastery": true
+            },
+            {
+              "id": "r5-master-weapons",
+              "technique": "weapons",
+              "mastery": true
+            }
+          ]
+        }
+      ],
+      "presets": [
+        {
+          "rank": 2,
+          "choices": [
+            "r2-weapons"
+          ]
+        },
+        {
+          "rank": 3,
+          "choices": [
+            "r2-weapons",
+            "r3-grapple"
+          ]
+        },
+        {
+          "rank": 4,
+          "choices": [
+            "r2-weapons",
+            "r3-grapple",
+            "r4-company"
+          ]
+        },
+        {
+          "rank": 5,
+          "choices": [
+            "r2-weapons",
+            "r3-grapple",
+            "r4-company",
+            "r5-comfort"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "staff-13",
+      "name": "Staff 13",
+      "adult": true,
+      "origin": "mortal-realm",
+      "ancestry": "hollow-wood",
+      "baseCost": 1,
+      "mainClass": "Entertainer",
+      "secondClass": "CompanionServer",
+      "baseTechnique": "song",
+      "stats": {
+        "health": 16.0,
+        "attack": 1.0,
+        "attackInterval": 1.8,
+        "range": 1,
+        "armour": 0,
+        "speed": 2.0,
+        "soothe": 1.1
+      },
+      "tree": [
+        {
+          "rank": 2,
+          "options": [
+            {
+              "id": "r2-dance",
+              "technique": "dance"
+            },
+            {
+              "id": "r2-drink",
+              "technique": "drink"
+            },
+            {
+              "id": "r2-master-song",
+              "technique": "song",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 3,
+          "options": [
+            {
+              "id": "r3-tales",
+              "technique": "tales"
+            },
+            {
+              "id": "r3-food",
+              "technique": "food"
+            },
+            {
+              "id": "r3-master-song",
+              "technique": "song",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 4,
+          "options": [
+            {
+              "id": "r4-company",
+              "technique": "company"
+            },
+            {
+              "id": "r4-master-song",
+              "technique": "song",
+              "mastery": true
+            },
+            {
+              "id": "r4-master-dance",
+              "technique": "dance",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 5,
+          "options": [
+            {
+              "id": "r5-comfort",
+              "technique": "comfort"
+            },
+            {
+              "id": "r5-master-song",
+              "technique": "song",
+              "mastery": true
+            },
+            {
+              "id": "r5-master-dance",
+              "technique": "dance",
+              "mastery": true
+            }
+          ]
+        }
+      ],
+      "presets": [
+        {
+          "rank": 2,
+          "choices": [
+            "r2-dance"
+          ]
+        },
+        {
+          "rank": 3,
+          "choices": [
+            "r2-dance",
+            "r3-tales"
+          ]
+        },
+        {
+          "rank": 4,
+          "choices": [
+            "r2-dance",
+            "r3-tales",
+            "r4-company"
+          ]
+        },
+        {
+          "rank": 5,
+          "choices": [
+            "r2-dance",
+            "r3-tales",
+            "r4-company",
+            "r5-comfort"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "staff-14",
+      "name": "Staff 14",
+      "adult": true,
+      "origin": "mortal-realm",
+      "ancestry": null,
+      "baseCost": 1,
+      "mainClass": "Entertainer",
+      "secondClass": "Fighter",
+      "baseTechnique": "dance",
+      "stats": {
+        "health": 16.0,
+        "attack": 1.0,
+        "attackInterval": 1.8,
+        "range": 1,
+        "armour": 0,
+        "speed": 2.0,
+        "soothe": 1.1
+      },
+      "tree": [
+        {
+          "rank": 2,
+          "options": [
+            {
+              "id": "r2-tales",
+              "technique": "tales"
+            },
+            {
+              "id": "r2-fists",
+              "technique": "fists"
+            },
+            {
+              "id": "r2-master-dance",
+              "technique": "dance",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 3,
+          "options": [
+            {
+              "id": "r3-song",
+              "technique": "song"
+            },
+            {
+              "id": "r3-master-dance",
+              "technique": "dance",
+              "mastery": true
+            },
+            {
+              "id": "r3-master-tales",
+              "technique": "tales",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 4,
+          "options": [
+            {
+              "id": "r4-weapons",
+              "technique": "weapons"
+            },
+            {
+              "id": "r4-master-dance",
+              "technique": "dance",
+              "mastery": true
+            },
+            {
+              "id": "r4-master-tales",
+              "technique": "tales",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 5,
+          "options": [
+            {
+              "id": "r5-grapple",
+              "technique": "grapple"
+            },
+            {
+              "id": "r5-master-dance",
+              "technique": "dance",
+              "mastery": true
+            },
+            {
+              "id": "r5-master-tales",
+              "technique": "tales",
+              "mastery": true
+            }
+          ]
+        }
+      ],
+      "presets": [
+        {
+          "rank": 2,
+          "choices": [
+            "r2-tales"
+          ]
+        },
+        {
+          "rank": 3,
+          "choices": [
+            "r2-tales",
+            "r3-song"
+          ]
+        },
+        {
+          "rank": 4,
+          "choices": [
+            "r2-tales",
+            "r3-song",
+            "r4-weapons"
+          ]
+        },
+        {
+          "rank": 5,
+          "choices": [
+            "r2-tales",
+            "r3-song",
+            "r4-weapons",
+            "r5-grapple"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "staff-15",
+      "name": "Staff 15",
+      "adult": true,
+      "origin": "pale-court",
+      "ancestry": null,
+      "baseCost": 2,
+      "mainClass": "Entertainer",
+      "secondClass": "Gambler",
+      "baseTechnique": "tales",
+      "stats": {
+        "health": 17.6,
+        "attack": 1.1,
+        "attackInterval": 1.8,
+        "range": 1,
+        "armour": 0,
+        "speed": 2.0,
+        "soothe": 1.21
+      },
+      "tree": [
+        {
+          "rank": 2,
+          "options": [
+            {
+              "id": "r2-song",
+              "technique": "song"
+            },
+            {
+              "id": "r2-cards",
+              "technique": "cards"
+            },
+            {
+              "id": "r2-master-tales",
+              "technique": "tales",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 3,
+          "options": [
+            {
+              "id": "r3-dance",
+              "technique": "dance"
+            },
+            {
+              "id": "r3-master-tales",
+              "technique": "tales",
+              "mastery": true
+            },
+            {
+              "id": "r3-master-song",
+              "technique": "song",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 4,
+          "options": [
+            {
+              "id": "r4-dice",
+              "technique": "dice"
+            },
+            {
+              "id": "r4-master-tales",
+              "technique": "tales",
+              "mastery": true
+            },
+            {
+              "id": "r4-master-song",
+              "technique": "song",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 5,
+          "options": [
+            {
+              "id": "r5-bones",
+              "technique": "bones"
+            },
+            {
+              "id": "r5-master-tales",
+              "technique": "tales",
+              "mastery": true
+            },
+            {
+              "id": "r5-master-song",
+              "technique": "song",
+              "mastery": true
+            }
+          ]
+        }
+      ],
+      "presets": [
+        {
+          "rank": 2,
+          "choices": [
+            "r2-song"
+          ]
+        },
+        {
+          "rank": 3,
+          "choices": [
+            "r2-song",
+            "r3-dance"
+          ]
+        },
+        {
+          "rank": 4,
+          "choices": [
+            "r2-song",
+            "r3-dance",
+            "r4-dice"
+          ]
+        },
+        {
+          "rank": 5,
+          "choices": [
+            "r2-song",
+            "r3-dance",
+            "r4-dice",
+            "r5-bones"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "staff-16",
+      "name": "Staff 16",
+      "adult": true,
+      "origin": "drowned-deep",
+      "ancestry": null,
+      "baseCost": 3,
+      "mainClass": "Entertainer",
+      "secondClass": "CompanionServer",
+      "baseTechnique": "song",
+      "stats": {
+        "health": 19.2,
+        "attack": 1.2,
+        "attackInterval": 1.8,
+        "range": 1,
+        "armour": 0,
+        "speed": 2.0,
+        "soothe": 1.32
+      },
+      "tree": [
+        {
+          "rank": 2,
+          "options": [
+            {
+              "id": "r2-dance",
+              "technique": "dance"
+            },
+            {
+              "id": "r2-drink",
+              "technique": "drink"
+            },
+            {
+              "id": "r2-master-song",
+              "technique": "song",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 3,
+          "options": [
+            {
+              "id": "r3-tales",
+              "technique": "tales"
+            },
+            {
+              "id": "r3-food",
+              "technique": "food"
+            },
+            {
+              "id": "r3-master-song",
+              "technique": "song",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 4,
+          "options": [
+            {
+              "id": "r4-company",
+              "technique": "company"
+            },
+            {
+              "id": "r4-master-song",
+              "technique": "song",
+              "mastery": true
+            },
+            {
+              "id": "r4-master-dance",
+              "technique": "dance",
+              "mastery": true
+            }
+          ]
+        },
+        {
+          "rank": 5,
+          "options": [
+            {
+              "id": "r5-comfort",
+              "technique": "comfort"
+            },
+            {
+              "id": "r5-master-song",
+              "technique": "song",
+              "mastery": true
+            },
+            {
+              "id": "r5-master-dance",
+              "technique": "dance",
+              "mastery": true
+            }
+          ]
+        }
+      ],
+      "presets": [
+        {
+          "rank": 2,
+          "choices": [
+            "r2-dance"
+          ]
+        },
+        {
+          "rank": 3,
+          "choices": [
+            "r2-dance",
+            "r3-tales"
+          ]
+        },
+        {
+          "rank": 4,
+          "choices": [
+            "r2-dance",
+            "r3-tales",
+            "r4-company"
+          ]
+        },
+        {
+          "rank": 5,
+          "choices": [
+            "r2-dance",
+            "r3-tales",
+            "r4-company",
+            "r5-comfort"
+          ]
+        }
+      ]
+    }
+  ]
+}

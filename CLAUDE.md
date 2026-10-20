@@ -5,15 +5,15 @@ inn up at Dusk; the Mist phase then plays out automatically until Dawn. Godot 4.
 hobby prototype. It is built one step at a time from the design document.
 
 ## Read first
-- `docs/SDD.md`: the design document (SDD v1.3, approved). Before any work, read sections 0, 2, 17 and 22 and
+- `docs/SDD.md`: the design document (SDD v1.5, approved). Before any work, read sections 0, 2, 17 and 22 and
   Appendix A, plus the sections the requested step lists. Appendix D indexes every requirement ID; Appendix E is the
   glossary. Earlier versions are kept as `docs/SDD_v<version>.md`.
 - `docs/PROGRESS.md`: step status, build, test and smoke-run results, toolchain and package versions.
-- `docs/DECISIONS.md`: recorded decisions, with an index table at the top (D-001 to D-050 so far; continue numbering).
+- `docs/DECISIONS.md`: recorded decisions, with an index table at the top (D-001 to D-060 so far; continue numbering).
 - `docs/ASSETS.md`: third-party assets and their licences (created when the first asset is added).
 
 ## Current state
-- SDD v1.3 is approved. Steps 0 and 1 are complete.
+- SDD v1.5 is approved. Steps 0 to 3 are complete.
 - Step 1 built the solution structure and the Core skeleton: `src/MistyInn.Core` (GameSession, SeededRandom, event
   buffer, cycle log, entity IDs), `tests/MistyInn.Core.Tests` (49/49 pass in the .NET SDK container), shared build
   settings (D-037), the classic `.sln` with export build types mapped by hand (D-035), and the Windows export preset
@@ -21,8 +21,12 @@ hobby prototype. It is built one step at a time from the design document.
 - Step 2 (board, cycle loop, isometric view) is complete: builds pass, 145/145 tests pass, and the human's
   play-through passed. Core board, A*, the Dusk/Mist/Dawn loop, arrivals and wandering with built-in content (D-044); `scenes/Main.tscn` is
   the main scene, with the isometric camera, board and unit views, drag-and-drop placement and a placeholder HUD
-  (D-048). Decisions D-042 to D-049 are Accepted. The headless smoke run (TST-12) applies from this step. The next step
-  is step 3 (content data and validation).
+  (D-048). Decisions D-042 to D-049 are Accepted. The headless smoke run (TST-12) applies from this step.
+- Step 3 (content data and validation) is complete: 197/197 tests, the smoke run and the demo passed.
+  `data/*.json` (placeholder roster and creatures, D-053), `ContentLoader`, `ContentValidator`, `UpgradeTrees`, the
+  built-in copy in Core (D-054) and `GodotContentSource`. Decisions D-001 to D-060 are Accepted. The next step is
+  step 4 (agitation, techniques and the bestiary); it starts by proposing providers for `Order` and `Darkness`
+  (D-060).
 - Godot is at `C:\Godot_v4.7.2`. If Smart App Control blocks `dotnet test`, the tests run in the .NET SDK Linux
   container.
 
@@ -35,7 +39,8 @@ hobby prototype. It is built one step at a time from the design document.
 - Never type package versions by hand. Provide `dotnet add <project> package <id>` commands (STR-09).
 - Game rules go in `src/MistyInn.Core`, which never references Godot (INV-01). Node scripts only present and command.
 - All randomness through the run's seeded `IRandomSource`, all time through `GameSession.Tick` (INV-02, INV-03).
-- Content is data in `data/*.json`, never literals in code (INV-04).
+- Content is data in `data/*.json`, never literals in code (INV-04). The files are strict JSON (no comments) and
+  unknown properties are errors (D-055); run the tests after editing them.
 - Content never goes past SDD section 17: every character is an adult; Company is off-screen in rooms, only with
   sapient adult creatures, and refusals are always honoured; no nudity or explicit content; moderate blood but no
   dismemberment; suggestive content and violence are never combined. When unsure, stop and ask (AGT-11).

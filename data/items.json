@@ -1,0 +1,58 @@
+[
+  {
+    "id": "brass-knuckles", "name": "Brass Knuckles", "kind": "Staff", "rarity": "Common", "price": 3,
+    "effects": [ { "kind": "Stat", "stat": "Attack", "amount": 3, "technique": "fists" } ],
+    "classTags": ["Fighter"]
+  },
+  {
+    "id": "lucky-dice", "name": "Lucky Dice", "kind": "Staff", "rarity": "Common", "price": 3,
+    "effects": [ { "kind": "Soothe", "technique": "dice", "multiplier": 1.3 } ],
+    "classTags": ["Gambler"]
+  },
+  {
+    "id": "silk-scarf", "name": "Silk Scarf", "kind": "Staff", "rarity": "Common", "price": 3,
+    "effects": [ { "kind": "Soothe", "technique": "company", "multiplier": 1.2 } ]
+  },
+  {
+    "id": "lute", "name": "Lute", "kind": "Staff", "rarity": "Common", "price": 3,
+    "effects": [ { "kind": "Stat", "stat": "Capacity", "amount": 2, "technique": "song" } ],
+    "classTags": ["Entertainer"]
+  },
+  {
+    "id": "ward-charm", "name": "Ward Charm", "kind": "Staff", "rarity": "Rare", "price": 5,
+    "effects": [ { "kind": "Aura", "radius": 2, "multiplier": 0.9 } ]
+  },
+  {
+    "id": "drowned-bell", "name": "Drowned Bell", "kind": "Inn", "rarity": "Common", "price": 4,
+    "effects": [ { "kind": "ArrivalAgitation", "plane": "drowned-deep", "amount": -10 } ],
+    "displayModel": "items/drowned-bell", "displaySpot": "front-door"
+  },
+  {
+    "id": "innkeepers-ledger", "name": "Innkeeper's Ledger", "kind": "Inn", "rarity": "Common", "price": 4,
+    "effects": [ { "kind": "Tribute", "amount": 1 } ],
+    "displayModel": "items/innkeepers-ledger", "displaySpot": "bar"
+  },
+  {
+    "id": "loaded-coin", "name": "Loaded Coin", "kind": "Inn", "rarity": "Rare", "price": 5,
+    "effects": [ { "kind": "RerollCost", "amount": -1 } ],
+    "displayModel": "items/loaded-coin", "displaySpot": "shop-counter"
+  },
+  {
+    "id": "ember-in-a-jar", "name": "Ember in a Jar", "kind": "Inn", "rarity": "Rare", "price": 5,
+    "effects": [ { "kind": "CountsAs", "fixture": "hearth", "countsAs": "lantern" } ],
+    "displayModel": "items/ember-in-a-jar", "displaySpot": "hearth"
+  },
+  {
+    "id": "spare-keys", "name": "Spare Keys", "kind": "Inn", "rarity": "Common", "price": 4,
+    "effects": [ { "kind": "RoomSlots", "amount": 1 } ],
+    "displayModel": "items/spare-keys", "displaySpot": "rooms"
+  },
+  {
+    "id": "cursed-crown", "name": "Cursed Crown", "kind": "Inn", "rarity": "Cursed", "price": 6,
+    "effects": [
+      { "kind": "BoardSlots", "amount": 1 },
+      { "kind": "Stat", "stat": "Health", "multiplier": 0.5, "target": "Innkeeper" }
+    ],
+    "displayModel": "items/cursed-crown", "displaySpot": "innkeeper"
+  }
+]

@@ -19,14 +19,14 @@ public class PlaneDrawTests
     [Property("Requirement", "PLN-03")]
     public void PlanesPerCycleFollowTheTable(int cycle, int expected)
     {
-        Assert.That(PlaneDraw.CountFor(cycle, DefaultContent.Balance, Unlocked.Length), Is.EqualTo(expected));
+        Assert.That(PlaneDraw.CountFor(cycle, GameContent.Default.Balance, Unlocked.Length), Is.EqualTo(expected));
     }
 
     [Test]
     [Property("Requirement", "PLN-03")]
     public void CountNeverExceedsTheUnlockedPlanes()
     {
-        Assert.That(PlaneDraw.CountFor(6, DefaultContent.Balance, 2), Is.EqualTo(2));
+        Assert.That(PlaneDraw.CountFor(6, GameContent.Default.Balance, 2), Is.EqualTo(2));
     }
 
     [Test]

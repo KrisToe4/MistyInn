@@ -62,6 +62,22 @@ internal sealed class ArrivalSystem
         return IntervalSeconds * jitter;
     }
 
+    /// <summary>A creature by the plane's weights (CRE-01).</summary>
+    private CreatureWeightDef PickWeighted(IReadOnlyList<CreatureWeightDef> choices)
+    {
+        var roll = _random.NextDouble() * choices.Sum(c => c.Weight);
+        foreach (var choice in choices)
+        {
+            roll -= choice.Weight;
+            if (roll < 0)
+            {
+                return choice;
+            }
+        }
+
+        return choices[^1];
+    }
+
     private void TrySpawn(double now)
     {
         if (_run.Creatures.Count >= _content.Balance.MaxCreatures)
@@ -71,9 +87,7 @@ internal sealed class ArrivalSystem
         }
 
         var plane = _run.ConvergingPlanes[_random.NextInt(0, _run.ConvergingPlanes.Count)];
-
-        // Step 3 adds the plane's creature weights (CRE-01); until then each plane has one creature.
-        var def = _content.Creatures.First(c => c.PlaneId == plane.Id);
+        var def = _content.Creature(PickWeighted(plane.Creatures).Creature);
         var gate = _content.GateFor(plane.Id);
         var target = WanderTiles[_random.NextInt(0, WanderTiles.Count)];
 

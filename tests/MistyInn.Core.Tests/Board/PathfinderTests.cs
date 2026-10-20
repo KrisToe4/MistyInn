@@ -52,7 +52,7 @@ public class PathfinderTests
     [Property("Requirement", "INV-02")]
     public void SameQueryGivesTheSamePath()
     {
-        var board = new InnBoard(DefaultContent.Create().Layout);
+        var board = new InnBoard(GameContent.Default.Layout);
 
         var first = board.FindPath(new Tile(0, 19), new Tile(18, 9));
         var second = board.FindPath(new Tile(0, 19), new Tile(18, 9));
@@ -67,7 +67,7 @@ public class PathfinderTests
     [Property("Requirement", "BRD-05")]
     public void EveryGateLeadsInThroughTheFrontDoor()
     {
-        var layout = DefaultContent.Create().Layout;
+        var layout = GameContent.Default.Layout;
         var board = new InnBoard(layout);
 
         foreach (var gate in layout.Gates)

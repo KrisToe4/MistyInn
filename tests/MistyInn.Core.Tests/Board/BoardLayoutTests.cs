@@ -5,7 +5,7 @@ namespace MistyInn.Core.Tests.Board;
 
 public class BoardLayoutTests
 {
-    private static BoardLayout Layout => DefaultContent.Create().Layout;
+    private static BoardLayout Layout => GameContent.Default.Layout;
 
     [Test]
     [Property("Requirement", "BRD-01")]

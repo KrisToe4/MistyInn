@@ -7,7 +7,7 @@ namespace MistyInn.Core.Run;
 /// <summary>A staff member or the innkeeper, on the board or on the bench. Mutable; only Core changes it.</summary>
 internal sealed class Unit
 {
-    public Unit(UnitId id, StaffDef def)
+    public Unit(UnitId id, UnitTemplate def)
     {
         Id = id;
         Def = def;
@@ -15,7 +15,7 @@ internal sealed class Unit
 
     public UnitId Id { get; }
 
-    public StaffDef Def { get; }
+    public UnitTemplate Def { get; }
 
     /// <summary>The tile it stands on, or null when it is on the bench.</summary>
     public Tile? Tile { get; set; }

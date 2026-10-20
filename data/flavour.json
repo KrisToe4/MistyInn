@@ -1,0 +1,12 @@
+[
+  {
+    "id": "company-room-1", "context": "company.room",
+    "text": "The door closes. For a while, the inn is a little quieter.",
+    "filterSafe": false, "bloodSafe": true
+  },
+  {
+    "id": "hosting-room-1", "context": "company.room",
+    "text": "The door closes on a long, unhurried conversation.",
+    "filterSafe": true, "bloodSafe": true
+  }
+]

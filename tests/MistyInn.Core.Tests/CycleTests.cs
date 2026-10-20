@@ -133,7 +133,7 @@ public class CycleTests
     [Property("Requirement", "ARC-11")]
     public void OnlyThreeStaffFitOnTheBoardInTheFirstCycle()
     {
-        var session = NewSession(content: ContentWith(staff: InnkeeperAndStaff(4)));
+        var session = NewSession(content: ContentWith(startingStaff: ["staff-01", "staff-02", "staff-03", "staff-04"]));
         var staff = Staff(session);
 
         for (var i = 0; i < 3; i++)

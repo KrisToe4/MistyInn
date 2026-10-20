@@ -6,7 +6,7 @@ namespace MistyInn.Core.Tests.Board;
 
 public class InnBoardTests
 {
-    private static InnBoard NewBoard() => new(DefaultContent.Create().Layout);
+    private static InnBoard NewBoard() => new(GameContent.Default.Layout);
 
     [TestCase(11, 12, true, TestName = "Entrance floor")]
     [TestCase(7, 5, true, TestName = "Kitchen floor")]

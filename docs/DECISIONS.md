@@ -56,6 +56,16 @@ proposed details were approved with SDD v1.0 (2026-10-20). **Proposed** marks a 
 | D-048 | Placeholder HUD and input for step 2 | Accepted | 2026-10-20 | CAM-12, CAM-13, CYC-10, UI-09 |
 | D-049 | Orthographic camera at 50° with a 45° start | Accepted | 2026-10-20 | CAM-10 |
 | D-050 | Every room must stay reachable on its own | Accepted | 2026-10-20 | BRD-03 |
+| D-051 | Masteries and one more technique per class | Accepted | 2026-10-20 | STF-02, STF-06, STF-07, STF-17 |
+| D-052 | Six more effect kinds | Accepted | 2026-10-20 | DAT-03 |
+| D-053 | Generic placeholder content | Accepted | 2026-10-20 | STF-14, CRE-03, DAT-01 |
+| D-054 | The data is built into Core; an export falls back to it as a whole | Accepted | 2026-10-20 | DAT-02, DAT-04 |
+| D-055 | Content file conventions | Accepted | 2026-10-20 | DAT-01..05 |
+| D-056 | The innkeeper is separate from the roster; starting staff in balance.json | Accepted | 2026-10-20 | RUN-01, STF-14, ESC-06 |
+| D-057 | Upgrade tree layout for the placeholder roster | Accepted | 2026-10-20 | STF-07, STF-10, STF-17 |
+| D-058 | Techniques say whether they need a fixture; fixtures name the techniques they enable | Accepted | 2026-10-20 | STF-02, FIX-02, DAT-03 |
+| D-059 | No scene markers: the board view is built from inn.json | Accepted | 2026-10-20 | SIM-04, TST-07 |
+| D-060 | Step 4 adds providers for Order and Darkness | Accepted | 2026-10-20 | AGI-05, AGI-06 |
 
 ---
 
@@ -587,3 +597,115 @@ proposed details were approved with SDD v1.0 (2026-10-20). **Proposed** marks a 
   which gives rooms their identity, extends it to each room.
 - **Alternatives considered:** The Rooms zone as a whole being enough.
 - **Requirement IDs affected:** BRD-03.
+
+## D-051 Masteries and one more technique per class
+- **Status:** Accepted (the human chose both, and kept the four technique names after step 3)
+- **Date / step:** 2026-10-20, step 3 (SDD v1.4)
+- **Context:** STF-06 gave a ★5 character five techniques, but two classes held at most five techniques between them,
+  and only four when neither was Companion/Server, so a Gambler/Fighter could never fill rank 5.
+- **Decision:** An upgrade pick is a new technique or the mastery of a known one (STF-17: stronger by the technique's
+  mastery values, once per technique). Each class also gets one more technique: **Comfort** (Companion/Server, answers
+  `Quiet`), **Bones** (Gambler, `Gambling` without a table), **Grapple** (Fighter, holds a turned creature; `Brawl`) and
+  **Tales** (Entertainer, `Spectacle` for a small audience). The validator checks that every path through every tree
+  always offers an available option.
+- **Alternatives considered:** Masteries only; more techniques only.
+- **Requirement IDs affected:** STF-02, STF-06, STF-07, STF-17, DAT-04.
+
+## D-052 Six more effect kinds
+- **Status:** Accepted
+- **Date / step:** 2026-10-20, step 3 (SDD v1.4)
+- **Context:** SHP-05 used `RerollCost`, and the fixtures and items of sections 12.2 and 13.2 needed effects DAT-03 did
+  not list (more rooms, a fixture giving an appetite, a technique needing a fixture, light and noise, one fixture
+  counting as another).
+- **Decision:** DAT-03 adds `RerollCost`, `RoomSlots`, `Provides`, `Enables`, `Emits` and `CountsAs`. The validator
+  checks each kind's required parameters.
+- **Alternatives considered:** Rewording the fixtures and items to fit the old list.
+- **Requirement IDs affected:** DAT-03, SHP-05, FIX-02, ITM-06.
+
+## D-053 Generic placeholder content
+- **Status:** Accepted
+- **Date / step:** 2026-10-20, step 3
+- **Context:** The human chose generic placeholders over agent-written names and personalities.
+- **Decision:** Characters are "Staff 01" to "Staff 16" (`staff-01`...) and creatures "Creature 01" to "Creature 10",
+  with plausible stats, appetites and triggers that follow each plane's character (PLN-02). Plane, fixture and item
+  names are the SDD's own. Everything in `data/` is tuning and may be rewritten freely; IDs should stay once saves
+  exist (DAT-05). Two appetites, `Order` and `Darkness`, have no provider yet (no technique or fixture answers them);
+  step 4 should give them one or the creatures that want them will only ever be soothed by their other appetites.
+- **Alternatives considered:** Agent-written roster; a roster supplied by the human first.
+- **Requirement IDs affected:** STF-14, CRE-03, DAT-01.
+
+## D-054 The data is built into Core; an export falls back to it as a whole
+- **Status:** Accepted (approved by the human after step 3)
+- **Date / step:** 2026-10-20, step 3
+- **Context:** DAT-04 says an invalid file in an export build falls back to "the version built into the game", and the
+  tests need the real data without touching the file system (TST-01).
+- **Decision:** `MistyInn.Core.csproj` embeds `data/*.json` as resources (`MistyInn.Data.<file>`), read by
+  `EmbeddedContentSource`; it is always the same as the committed files at build time. The game reads `res://data/`
+  through `GodotContentSource`. A debug build that finds invalid content shows the errors and stops; an export build
+  logs them and uses the built-in set. The fallback is the whole set, not one file, because the rules cross files (a
+  plane names creatures, a tree names techniques).
+- **Alternatives considered:** A per-file fallback (could mix files that no longer agree); no fallback.
+- **Requirement IDs affected:** DAT-02, DAT-04, TST-01.
+
+## D-055 Content file conventions
+- **Status:** Accepted (approved by the human after step 3)
+- **Date / step:** 2026-10-20, step 3
+- **Context:** DAT-01 to DAT-05 fix the files and IDs, but not the JSON details.
+- **Decision:** camelCase property names; enums written as their names (numbers are rejected); unknown properties are
+  rejected, so a typo is an error rather than a silently ignored value; no comments, because Godot also reads `.json`
+  files; one generic effect record with optional parameters, checked per kind. The loader reads every file and reports
+  every broken one at once; the validator reports every rule broken at once.
+- **Alternatives considered:** Comments in the data (System.Text.Json allows them, but Godot's JSON parser does not).
+- **Requirement IDs affected:** DAT-01 to DAT-05.
+
+## D-056 The innkeeper is separate from the roster; starting staff in balance.json
+- **Status:** Accepted (approved by the human after step 3)
+- **Date / step:** 2026-10-20, step 3
+- **Context:** STF-14's roster is 16 characters, 4 per class; the innkeeper has no class or tree (ESC-06); RUN-01 starts
+  with two staff.
+- **Decision:** `staff.json` has an `innkeeper` entry and a `characters` list. `balance.json` names the starting staff
+  (`staff-01`, a Companion/Server, and `staff-09`, a Fighter); MET-03 will let unlocks change them.
+- **Alternatives considered:** The innkeeper as a seventeenth character with a flag.
+- **Requirement IDs affected:** RUN-01, STF-14, ESC-06.
+
+## D-057 Upgrade tree layout for the placeholder roster
+- **Status:** Accepted (approved by the human after step 3)
+- **Date / step:** 2026-10-20, step 3
+- **Context:** STF-07 and STF-17 allow many tree shapes; the placeholder roster needs one that always works.
+- **Decision:** Every character has a second class. Each rank from 2 to 5 has three options: at least one new technique
+  (each new technique is offered only once, so it is always available), the spare new techniques at the earliest ranks,
+  and masteries for the rest, starting with the base technique. Preset builds take the first available option at each
+  rank. Option IDs are local to the character (`r2-food`, `r3-master-drink`). The data was generated once by a script
+  that checks every path; the validator checks the same rules on load.
+- **Alternatives considered:** Hand-made trees per character (better once the characters are real).
+- **Requirement IDs affected:** STF-07, STF-10, STF-17.
+
+## D-058 Techniques say whether they need a fixture
+- **Status:** Accepted (approved by the human after step 3)
+- **Date / step:** 2026-10-20, step 3
+- **Context:** Dice works "at a card table or any table" (STF-02), so one required fixture per technique was not enough.
+- **Decision:** A technique has `needsFixture`; the fixtures it works at are those with an `Enables` effect naming it
+  (the bar counter enables Drink, tables enable Food and Dice, card tables Cards and Dice, the stage boosts Song and
+  Dance). The validator checks that every technique that needs a fixture has one.
+- **Alternatives considered:** A list of fixtures on each technique (the same fact in two places).
+- **Requirement IDs affected:** STF-02, FIX-02, DAT-03.
+
+## D-059 No scene markers: the board view is built from inn.json
+- **Status:** Accepted (approved by the human after step 3)
+- **Date / step:** 2026-10-20, step 3
+- **Context:** SIM-04 and TST-07 ask for a test that the inn scene's markers agree with `inn.json`.
+- **Decision:** The inn scene has no hand-placed markers: `InnView` builds every tile and gate from the loaded layout, so
+  the two cannot disagree. The test checks instead that the board comes from `inn.json` and that every plane has a gate.
+  If hand-built inn art arrives in step 10, markers and their test come with it.
+- **Alternatives considered:** Hand-placing markers now, only to test them.
+- **Requirement IDs affected:** SIM-04, TST-07.
+
+## D-060 Step 4 adds providers for Order and Darkness
+- **Status:** Accepted
+- **Date / step:** 2026-10-20, step 3 report (SDD v1.5)
+- **Context:** No technique or fixture answers the `Order` and `Darkness` appetites (D-053), so the creatures that want
+  them could only be soothed by their other appetites.
+- **Decision:** Step 4 adds providers for both. Which ones (a technique, a fixture, or both) is a design choice: the
+  step 4 agent proposes them at the start of the step and waits for the human's answer before writing them (AGT-03).
+- **Alternatives considered:** Removing the two appetites from the closed set.
+- **Requirement IDs affected:** AGI-05, AGI-06, step 4.

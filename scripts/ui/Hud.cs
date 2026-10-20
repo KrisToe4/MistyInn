@@ -161,6 +161,31 @@ public partial class Hud : CanvasLayer
 
     public void ShowPauseMenu(bool open) => _pauseMenu.Visible = open;
 
+    /// <summary>Hides the game UI and shows an error that stops the game (DAT-04, debug builds).</summary>
+    public void ShowFatal(string text)
+    {
+        foreach (var child in GetChildren())
+        {
+            if (child is CanvasItem item)
+            {
+                item.Visible = false;
+            }
+        }
+
+        var panel = new PanelContainer();
+        AddChild(panel);
+        panel.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect, Control.LayoutPresetMode.KeepSize, 40);
+        var label = new Label
+        {
+            Text = text,
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+            VerticalAlignment = VerticalAlignment.Top,
+        };
+        label.AddThemeFontSizeOverride("font_size", 18);
+        label.AddThemeColorOverride("font_color", new Color(1f, 0.6f, 0.5f));
+        panel.AddChild(label);
+    }
+
     private void RefreshBench(IReadOnlyList<UnitSnapshot> units)
     {
         var benched = units.Where(u => u.IsOnBench).ToList();

@@ -23,7 +23,7 @@ Content: Mature. Moderate blood and suggestive themes; both can be reduced in Se
 
 Built one step at a time from the SDD (section 21). Steps 0 and 1 are done; step 2 adds the first playable loop with
 placeholder art: place the innkeeper and staff at Dusk, watch creatures walk in out of the mist, and see them dissolve
-at Dawn.
+at Dawn. Step 3 moves all content into `data/*.json`, checked by a validator when the game starts.
 
 ## Design documents
 
@@ -78,6 +78,8 @@ MistyInn.csproj/.sln   Godot C# project and solution (open the .sln in Visual St
 Directory.Build.props  Shared build settings for Core and the tests
 .editorconfig          Code style
 icon.svg               Project icon
+data/                  Game content as JSON: balance, inn map, planes, creatures, staff, techniques, items,
+                       fixtures, flavour (placeholder roster; edit freely, the validator checks it)
 scenes/                Main.tscn and the inn, unit and UI scenes (placeholder art)
 scripts/               Godot node scripts: GameRoot, camera, board, units, UI
 src/MistyInn.Core/     Engine-free game rules (no Godot reference)

@@ -1,0 +1,141 @@
+[
+  {
+    "id": "creature-01", "name": "Creature 01", "planeId": "drowned-deep",
+    "size": 1, "sapient": false, "adult": false, "speed": 1.2,
+    "appetites": [
+      { "appetite": "Drink", "strength": "Craves", "preferredTechnique": "drink" },
+      { "appetite": "Quiet", "strength": "Likes" }
+    ],
+    "triggers": [ { "trigger": "Heat", "spike": 10, "rateMultiplier": 1.5 } ],
+    "agitation": { "arrival": 15, "ratePerSecond": 0.6 },
+    "combat": { "health": 40, "attack": 5, "attackInterval": 1.6, "range": 1, "armour": 1 },
+    "escalation": {},
+    "tribute": 3
+  },
+  {
+    "id": "creature-02", "name": "Creature 02", "planeId": "drowned-deep",
+    "size": 2, "sapient": false, "adult": false, "speed": 1.0,
+    "appetites": [
+      { "appetite": "Drink", "strength": "Craves" },
+      { "appetite": "Darkness", "strength": "Likes" }
+    ],
+    "triggers": [ { "trigger": "Light", "rateMultiplier": 1.3 } ],
+    "agitation": { "arrival": 20, "ratePerSecond": 0.7 },
+    "combat": { "health": 60, "attack": 7, "attackInterval": 1.8, "range": 1, "armour": 2 },
+    "escalation": {},
+    "tribute": 4
+  },
+  {
+    "id": "creature-03", "name": "Creature 03", "planeId": "ashen-waste",
+    "size": 1, "sapient": false, "adult": false, "speed": 1.7,
+    "appetites": [
+      { "appetite": "Warmth", "strength": "Craves" },
+      { "appetite": "Brawl", "strength": "Likes", "preferredTechnique": "fists" }
+    ],
+    "triggers": [ { "trigger": "Cold", "spike": 10, "rateMultiplier": 1.5 } ],
+    "agitation": { "arrival": 20, "ratePerSecond": 0.9 },
+    "combat": { "health": 50, "attack": 8, "attackInterval": 1.2, "range": 1, "armour": 1 },
+    "escalation": {},
+    "tribute": 3
+  },
+  {
+    "id": "creature-04", "name": "Creature 04", "planeId": "ashen-waste",
+    "size": 2, "sapient": false, "adult": false, "speed": 1.5,
+    "appetites": [
+      { "appetite": "Brawl", "strength": "Craves", "preferredTechnique": "fists" },
+      { "appetite": "Drink", "strength": "Likes" }
+    ],
+    "triggers": [ { "trigger": "Violence", "spike": 15, "rateMultiplier": 1.4 } ],
+    "agitation": { "arrival": 25, "ratePerSecond": 1.0 },
+    "combat": { "health": 70, "attack": 10, "attackInterval": 1.4, "range": 1, "armour": 2 },
+    "escalation": {},
+    "tribute": 5
+  },
+  {
+    "id": "creature-05", "name": "Creature 05", "planeId": "hollow-wood",
+    "size": 1, "sapient": false, "adult": false, "speed": 1.4,
+    "appetites": [
+      { "appetite": "Music", "strength": "Craves", "preferredTechnique": "song" },
+      { "appetite": "Quiet", "strength": "Likes" }
+    ],
+    "triggers": [
+      { "trigger": "Heat", "spike": 20, "rateMultiplier": 2.0 },
+      { "trigger": "Light", "rateMultiplier": 1.2 }
+    ],
+    "agitation": { "arrival": 15, "ratePerSecond": 0.7 },
+    "combat": { "health": 35, "attack": 6, "attackInterval": 1.4, "range": 1, "armour": 0 },
+    "escalation": {},
+    "tribute": 3
+  },
+  {
+    "id": "creature-06", "name": "Creature 06", "planeId": "hollow-wood",
+    "size": 1, "sapient": false, "adult": false, "speed": 1.3,
+    "appetites": [
+      { "appetite": "Music", "strength": "Craves" },
+      { "appetite": "Spectacle", "strength": "Likes", "preferredTechnique": "dance" }
+    ],
+    "triggers": [ { "trigger": "Heat", "spike": 20, "rateMultiplier": 2.0 } ],
+    "agitation": { "arrival": 20, "ratePerSecond": 0.8 },
+    "combat": { "health": 45, "attack": 7, "attackInterval": 1.5, "range": 1.5, "armour": 1 },
+    "escalation": {},
+    "tribute": 4
+  },
+  {
+    "id": "creature-07", "name": "Creature 07", "planeId": "gearbound-ruin",
+    "size": 1, "sapient": false, "adult": false, "speed": 1.3,
+    "appetites": [
+      { "appetite": "Quiet", "strength": "Craves" },
+      { "appetite": "Order", "strength": "Likes" }
+    ],
+    "triggers": [
+      { "trigger": "Noise", "rateMultiplier": 1.5 },
+      { "trigger": "Crowding", "spike": 10, "count": 4 }
+    ],
+    "agitation": { "arrival": 10, "ratePerSecond": 0.6 },
+    "combat": { "health": 55, "attack": 6, "attackInterval": 1.5, "range": 1, "armour": 3 },
+    "escalation": {},
+    "tribute": 3
+  },
+  {
+    "id": "creature-08", "name": "Creature 08", "planeId": "gearbound-ruin",
+    "size": 2, "sapient": false, "adult": false, "speed": 1.1,
+    "appetites": [
+      { "appetite": "Order", "strength": "Craves" },
+      { "appetite": "Gambling", "strength": "Likes", "preferredTechnique": "cards" }
+    ],
+    "triggers": [ { "trigger": "Noise", "spike": 5, "rateMultiplier": 1.5 } ],
+    "agitation": { "arrival": 15, "ratePerSecond": 0.7 },
+    "combat": { "health": 65, "attack": 7, "attackInterval": 1.7, "range": 1, "armour": 4 },
+    "escalation": {},
+    "tribute": 4
+  },
+  {
+    "id": "creature-09", "name": "Creature 09", "planeId": "pale-court",
+    "size": 1, "sapient": true, "adult": true, "speed": 1.6,
+    "appetites": [
+      { "appetite": "Company", "strength": "Craves", "preferredTechnique": "company" },
+      { "appetite": "Drink", "strength": "Likes" }
+    ],
+    "triggers": [ { "trigger": "Light", "spike": 10, "rateMultiplier": 1.6 } ],
+    "agitation": { "arrival": 20, "ratePerSecond": 0.8 },
+    "combat": { "health": 40, "attack": 9, "attackInterval": 1.3, "range": 1, "armour": 1 },
+    "escalation": { "skip": ["Wreck"] },
+    "tribute": 5
+  },
+  {
+    "id": "creature-10", "name": "Creature 10", "planeId": "pale-court",
+    "size": 1, "sapient": true, "adult": true, "speed": 1.5,
+    "appetites": [
+      { "appetite": "Company", "strength": "Craves" },
+      { "appetite": "Spectacle", "strength": "Likes", "preferredTechnique": "dance" }
+    ],
+    "triggers": [
+      { "trigger": "Light", "spike": 10, "rateMultiplier": 1.6 },
+      { "trigger": "RivalPlane", "plane": "hollow-wood", "rateMultiplier": 1.3 }
+    ],
+    "agitation": { "arrival": 25, "ratePerSecond": 0.9 },
+    "combat": { "health": 50, "attack": 11, "attackInterval": 1.4, "range": 1, "armour": 1 },
+    "escalation": { "skip": ["Wreck"] },
+    "tribute": 6
+  }
+]

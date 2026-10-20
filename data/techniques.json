@@ -1,0 +1,70 @@
+[
+  {
+    "id": "company", "technique": "Company", "name": "Company", "class": "CompanionServer",
+    "answers": ["Company"], "soothe": 1.2, "capacity": 1, "range": 1.5,
+    "mastery": { "sootheMultiplier": 1.5 }
+  },
+  {
+    "id": "food", "technique": "Food", "name": "Food", "class": "CompanionServer",
+    "answers": ["Food"], "soothe": 1.0, "capacity": 1, "range": 1.5, "needsFixture": true, "supply": "Food",
+    "mastery": { "sootheMultiplier": 1.5, "capacityBonus": 1 }
+  },
+  {
+    "id": "drink", "technique": "Drink", "name": "Drink", "class": "CompanionServer",
+    "answers": ["Drink"], "soothe": 1.0, "capacity": 1, "range": 1.5, "needsFixture": true, "supply": "Drink",
+    "mastery": { "sootheMultiplier": 1.5, "capacityBonus": 1 }
+  },
+  {
+    "id": "comfort", "technique": "Comfort", "name": "Comfort", "class": "CompanionServer",
+    "answers": ["Quiet"], "soothe": 0.9, "capacity": 1, "range": 1.5,
+    "mastery": { "sootheMultiplier": 1.5 }
+  },
+  {
+    "id": "cards", "technique": "Cards", "name": "Cards", "class": "Gambler",
+    "answers": ["Gambling"], "soothe": 1.0, "capacity": 4, "range": 1.5, "needsFixture": true,
+    "mastery": { "sootheMultiplier": 1.4, "capacityBonus": 1 }
+  },
+  {
+    "id": "dice", "technique": "Dice", "name": "Dice", "class": "Gambler",
+    "answers": ["Gambling"], "soothe": 1.0, "capacity": 2, "range": 1.5, "needsFixture": true,
+    "mastery": { "sootheMultiplier": 1.4, "capacityBonus": 1 }
+  },
+  {
+    "id": "bones", "technique": "Bones", "name": "Bones", "class": "Gambler",
+    "answers": ["Gambling"], "soothe": 0.8, "capacity": 2, "range": 1.5,
+    "mastery": { "sootheMultiplier": 1.5, "capacityBonus": 1 }
+  },
+  {
+    "id": "fists", "technique": "Fists", "name": "Fists", "class": "Fighter",
+    "answers": ["Brawl"], "soothe": 0.8, "capacity": 1, "range": 1.2,
+    "engagesTurned": true, "attackBonus": 0, "attackIntervalMultiplier": 0.8,
+    "mastery": { "sootheMultiplier": 1.2, "attackBonus": 3 }
+  },
+  {
+    "id": "weapons", "technique": "Weapons", "name": "Weapons", "class": "Fighter",
+    "answers": [], "soothe": 0, "capacity": 1, "range": 1.4,
+    "engagesTurned": true, "attackBonus": 4, "attackIntervalMultiplier": 1.3,
+    "mastery": { "attackBonus": 3 }
+  },
+  {
+    "id": "grapple", "technique": "Grapple", "name": "Grapple", "class": "Fighter",
+    "answers": ["Brawl"], "soothe": 0.6, "capacity": 1, "range": 1.0,
+    "engagesTurned": true, "attackBonus": -2, "attackIntervalMultiplier": 1.0,
+    "mastery": { "sootheMultiplier": 1.2, "attackBonus": 2 }
+  },
+  {
+    "id": "song", "technique": "Song", "name": "Song", "class": "Entertainer",
+    "answers": ["Music"], "soothe": 1.0, "capacity": 6, "range": 4,
+    "mastery": { "sootheMultiplier": 1.4, "capacityBonus": 2, "rangeBonus": 1 }
+  },
+  {
+    "id": "dance", "technique": "Dance", "name": "Dance", "class": "Entertainer",
+    "answers": ["Spectacle"], "soothe": 1.1, "capacity": 4, "range": 3,
+    "mastery": { "sootheMultiplier": 1.4, "capacityBonus": 2 }
+  },
+  {
+    "id": "tales", "technique": "Tales", "name": "Tales", "class": "Entertainer",
+    "answers": ["Spectacle"], "soothe": 0.8, "capacity": 3, "range": 2,
+    "mastery": { "sootheMultiplier": 1.5, "capacityBonus": 1 }
+  }
+]

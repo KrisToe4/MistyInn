@@ -4,9 +4,11 @@ using System.Linq;
 using Godot;
 using MistyInn.Board;
 using MistyInn.Camera;
+using MistyInn.Data;
 using MistyInn.Core;
 using MistyInn.Core.Board;
 using MistyInn.Core.Commands;
+using MistyInn.Core.Content;
 using MistyInn.Core.Entities;
 using MistyInn.Core.Events;
 using MistyInn.Core.Randomness;
@@ -55,8 +57,24 @@ public partial class GameRoot : Node3D
 
     public override void _Ready()
     {
+        GameContent content;
+        try
+        {
+            content = LoadContent();
+        }
+        catch (ContentException e)
+        {
+            // Debug builds stop with a clear message (DAT-04).
+            GD.PushError(e.Message);
+            Hud.ShowFatal($"{Tr("The game data in res://data/ is invalid")}:\n\n{e.Message}");
+            SetProcess(false);
+            SetProcessInput(false);
+            SetProcessUnhandledInput(false);
+            return;
+        }
+
         var seed = Seed != 0 ? (ulong)Seed : (ulong)System.Random.Shared.NextInt64(1, long.MaxValue);
-        _session = new GameSession(new SeededRandom(seed));
+        _session = new GameSession(new SeededRandom(seed), content: content);
 
         Inn.Build(_session.Content);
         Inn.ShowGates(_session.ConvergingPlanes.Select(p => p.Id));
@@ -81,6 +99,23 @@ public partial class GameRoot : Node3D
         Hud.QuitPressed += OnQuit;
         Hud.Refresh(_session);
         Hud.ShowMessage(Tr("Drag the innkeeper and your staff onto the inn floor, then begin the mist."), 8);
+    }
+
+    /// <summary>
+    /// Loads <c>res://data/</c> and validates it (DAT-02, DAT-04). An export build falls back to the copy built into
+    /// Core when the shipped files cannot be used; a debug build lets the error through so it is fixed.
+    /// </summary>
+    private static GameContent LoadContent()
+    {
+        try
+        {
+            return GameContent.Create(ContentLoader.Load(new GodotContentSource()));
+        }
+        catch (ContentException e) when (!OS.IsDebugBuild())
+        {
+            GD.PushError($"Misty Inn: using the built-in content instead of res://data/. {e.Message}");
+            return GameContent.Default;
+        }
     }
 
     public override void _ExitTree()

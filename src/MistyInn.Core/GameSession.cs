@@ -48,7 +48,7 @@ public sealed class GameSession : IEventSink
         Ids = new IdAllocator();
         _events = new DomainEventBuffer(limits.EventCapacity);
         _cycleLog = new CycleLog(limits.CycleLogCapacity);
-        Content = content ?? DefaultContent.Create();
+        Content = content ?? GameContent.Default;
         _run = new RunState(Content, Ids);
         _arrivals = new ArrivalSystem(Content, _run, random, Ids, this);
         _movement = new CreatureMovementSystem(Content, _run, random, _arrivals.WanderTiles);

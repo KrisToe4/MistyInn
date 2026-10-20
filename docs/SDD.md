@@ -3,8 +3,8 @@
 
 | | |
 |---|---|
-| **Version** | 1.3 (approved) |
-| **Supersedes** | 1.2 |
+| **Version** | 1.5 (approved) |
+| **Supersedes** | 1.4 |
 | **Audience** | LLM-based coding agents and the human developer |
 | **Genre** | Dark roguelike autobattler: prepare the inn, then survive the mist |
 | **Engine** | Godot 4.7.2 (.NET build) |
@@ -76,6 +76,8 @@ step starts.
 
 | Version | Change | Reason |
 |---|---|---|
+| 1.5 | SIM-04 and TST-07: the board view is built from `inn.json`, so there are no scene markers to compare (until hand-built inn art arrives). STF-02: a technique says whether it needs a fixture, and fixtures' `Enables` effects say which. DAT-04: an export build falls back to the whole built-in set. Step 4: add providers for the `Order` and `Darkness` appetites | Step 3 report (D-054, D-058, D-059, D-060) |
+| 1.4 | STF-02: one more technique per class (Comfort, Bones, Grapple, Tales). STF-06, STF-07 and new STF-17: an upgrade adds a technique or masters a known one; every tree always offers an available option. DAT-03: effect kinds `RerollCost`, `RoomSlots`, `Provides`, `Enables`, `Emits` and `CountsAs` | Step 3: two classes could not fill five ranks, and sections 12.2, 13.2 and SHP-05 used effects DAT-03 did not list (D-051, D-052) |
 | 1.3 | SIM-02: `GameSession.Tick` takes real frame time and runs the due fixed steps itself (exact integer accounting, at most 120 steps per call, `InterpolationAlpha` for views); GameRoot passes frame time. ARC-10: `ContinueFromDawn` added to the commands. BRD-03: every room must stay reachable on its own, not just the Rooms zone; checked from step 5 | Step 2 report (D-042, D-047, D-050) |
 | 1.2 | TST-12: the headless smoke run starts at step 2, the first step with a main scene; before that, opening and building the project in the Godot editor stands in for it | Step 1 report |
 | 1.1 | STR-01: the solution stays a classic `.sln` (Godot expects it; never `dotnet new sln`, which makes `.slnx` on .NET 10), and Core and the tests map the solution's ExportDebug and ExportRelease configurations to their Debug and Release. TST-12: the Godot path on this machine is recorded in `docs/PROGRESS.md`. Step 1: the human creates the Windows export preset in the editor (`export_presets.cfg`, committed), with the agent giving the steps | Step 0 report (D-035, D-036) |
@@ -359,8 +361,10 @@ MistyInn/                            (repository root, also the Godot project ro
   next step is (SIM-03). Dusk and Dawn are not timed.
 - **SIM-03** Core owns positions. Units and creatures have a position in tile space (a tile plus an offset) and move
   along A* paths at their speed. Views interpolate between Core positions; they never move units themselves.
-- **SIM-04** The inn's grid, zones and mist gates are defined in data (`data/inn.json`). The inn scene places tiles to
-  match, and a test checks that the scene markers and the data agree (`TST-07`).
+- **SIM-04** The inn's grid, zones and mist gates are defined in data (`data/inn.json`). The inn view builds its tiles
+  and gates from that data at run time, so the two cannot disagree; a test checks that the board comes from `inn.json`
+  (`TST-07`). If hand-built inn art adds markers later (step 10), a test that the markers and the data agree comes with
+  it.
 
 ## 5.4 Scene tree (target)
 
@@ -600,15 +604,20 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
   | **Companion/Server** | Company | `Company` | On the floor or in a room (section 11.5) |
   | | Food | `Food` | Needs a table; uses a Food supply |
   | | Drink | `Drink` | Needs a bar counter; uses a Drink supply |
+  | | Comfort | `Quiet` | A soft voice and full attention; no supplies; one creature at a time |
   | **Gambler** | Cards | `Gambling` (skill) | Needs a card table |
   | | Dice | `Gambling` (chance) | Needs a card table or any table |
+  | | Bones | `Gambling` (chance) | Played on the floor; no table needed |
   | **Fighter** | Fists | Turned creatures; `Brawl` | Fast, light hits; sparring soothes calm creatures that crave `Brawl` |
   | | Weapons | Turned creatures | Slower, heavy hits; never used on calm creatures |
+  | | Grapple | Turned creatures; `Brawl` | Holds a turned creature, slowing its attacks, instead of hurting it |
   | **Entertainer** | Song | `Music` | Reaches the whole zone; more from the stage |
   | | Dance | `Spectacle` | Needs open floor or the stage |
+  | | Tales | `Spectacle` | A small audience close by; no stage needed |
 
-  Each technique's data gives its soothe multiplier, capacity (`AGI-07`), range, required fixture, supplies used and,
-  for Fighter techniques, its attack modifiers.
+  Each technique's data gives its soothe multiplier, capacity (`AGI-07`), range, whether it needs a fixture (the
+  fixtures it works at are those whose `Enables` effects name it, `DAT-03`), supplies used,
+  its mastery values (`STF-17`) and, for Fighter techniques, its attack modifiers.
 - **STF-03** A character **has a class** if it knows at least one technique of that class. Items may add further
   class **tags**, which count only for synergies (`ITM-03`).
 - **STF-04** **What staff do in the mist phase.** Each time a staff member is free, it chooses in this order:
@@ -623,11 +632,12 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
 
 ## 11.2 Ranks and upgrade trees
 
-- **STF-06** Characters have **five ranks**, ★1 to ★5. Each rank above ★1 adds one technique and multiplies the base
-  stats by that rank's multiplier from data. A ★5 character knows five techniques.
-- **STF-07** Each character has an **upgrade tree**: for each of ranks ★2 to ★5, two or three options, each a
-  technique. Options come from the main class or from **one second class**; a tree spans **at most two classes**.
-  An option may require an earlier choice, so the tree can branch.
+- **STF-06** Characters have **five ranks**, ★1 to ★5. Each rank above ★1 gives one upgrade pick, either a new
+  technique or the mastery of one the character already knows (`STF-17`), and multiplies the base stats by that
+  rank's multiplier from data. A ★5 character has its base technique and four picks.
+- **STF-07** Each character has an **upgrade tree**: for each of ranks ★2 to ★5, two or three options, each a new
+  technique or a mastery. Options come from the main class or from **one second class**; a tree spans **at most two
+  classes**. An option may require an earlier choice, so the tree can branch.
 - **STF-08** **Upgrading**: buying a shop offer of a character the player already owns raises the owned character by
   **exactly one rank**, whatever rank the offer shows. The player then picks one option for the new rank
   (`ChooseUpgrade`). The price paid is the offer's price, so upgrading from a high-rank offer costs more for the same
@@ -637,6 +647,11 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
 - **STF-10** **Hiring** a character the player does not own gives that character at the offer's rank with its
   **preset build** for that rank (techniques predetermined in data). Later upgrades continue up the tree from that
   build.
+- **STF-17** **Mastery** makes a known technique stronger by the mastery values in its data (for example ×1.5 soothe
+  and +1 capacity, or +3 attack for a Fighter technique). Each technique can be mastered once. An option is
+  **available** when its requirement (if any) was chosen, and its technique is not known yet (a new technique) or is
+  known and not yet mastered (a mastery). Every tree offers at least one available option at every rank, whatever was
+  picked before; the validator checks every path (`DAT-04`).
 
 ## 11.3 Wounds and death
 
@@ -979,12 +994,17 @@ This section is the only place that sets what content is allowed. Agents shall n
 - **DAT-03** Effects, appetites, triggers and roles are closed sets of kinds with parameters, for example
   `{ "kind": "AgitationRate", "radius": 2, "multiplier": 0.75 }`. Effect kinds: `AgitationRate`, `ArrivalAgitation`,
   `Soothe`, `ArrivalRate`, `PlaneWeight`, `Stat` (stat + amount or multiplier), `Radius`, `BoardSlots`, `Tribute`,
-  `Income`, `ShopOdds`, `Supplies`, `Blocks`, `PlaneBarrier`, `Aura`. A new kind in any of these sets is an SDD change.
+  `Income`, `ShopOdds`, `Supplies`, `Blocks`, `PlaneBarrier`, `Aura`, `RerollCost` (shop rerolls cost more or less),
+  `RoomSlots` (more or fewer rooms), `Provides` (a fixture gives an appetite to a number of seats or tiles), `Enables`
+  (a technique needs this fixture to work, with its seats), `Emits` (a fixture gives off `Light`, `Noise`, `Heat` or
+  `Cold` within a radius) and `CountsAs` (one fixture also counts as another, for example a hearth as a lantern). A new
+  kind in any of these sets is an SDD change.
 - **DAT-04** The content validator runs at load time and in the tests. It rejects: duplicate IDs, references to IDs
   that do not exist (including an ancestry plane), unknown kinds, values out of range, staff or companions without `"adult": true`, creatures with a
   `Company` appetite without `"sapient": true` and `"adult": true`, flavour text without its `filterSafe` and
   `bloodSafe` flags, and an `inn.json` with no path from the door to every zone. In a debug build an invalid file stops
-  the game with a clear message; in an export build the file falls back to the version built into the game.
+  the game with a clear message; in an export build the game falls back to the whole content set built into it (the
+  rules cross files, so one file is never swapped on its own).
 - **DAT-05** IDs are lowercase kebab-case (`drowned-deep`, `pale-duchess`) and never change once a save may contain
   them. Display names may change freely.
 - **DAT-06** Flavour text has a `filterSafe` flag and a `bloodSafe` flag. With a content filter on, only lines with
@@ -1033,8 +1053,8 @@ This section is the only place that sets what content is allowed. Agents shall n
   provider capacity, supplies, each trigger kind, contagion, the cycle log recording causes.
 - **TST-06** Escalation and combat: stage order and timers, profile overrides, guard targeting order, damage formula,
   banishing, staff falling and the wound-or-die roll, the innkeeper ending the run, fixture destruction, integrity.
-- **TST-07** Board and content: placement rules, path checks, adjacency, `inn.json` against the scene markers (a data
-  test of exported marker names), the real `data/` folder loading and validating, each validator rule rejecting a bad
+- **TST-07** Board and content: placement rules, path checks, adjacency, the board coming from `inn.json` (`SIM-04`),
+  the real `data/` folder loading and validating, each validator rule rejecting a bad
   example, content filters.
 - **TST-08** Saves: round trip, atomic replace, `.bak` kept, corrupt file quarantined, older version migrated, newer
   version refused.
@@ -1065,7 +1085,7 @@ acceptance criteria and a demo. After each step the human builds, tests, plays t
 
 **Common preamble** (put before every step prompt):
 
-> You are implementing Misty Inn from SDD v1.3. Work **only** on the step below; do not start later steps. Read
+> You are implementing Misty Inn from SDD v1.5. Work **only** on the step below; do not start later steps. Read
 > sections 0, 2, 17 and 22 and the sections the step lists first. Apply the invariants (section 2) and the agent
 > rules (section 22). If anything is ambiguous, contradictory or missing, **stop and ask** before writing code. Do not
 > run builds, tests, Godot or git: list the exact commands for the human and mark results NOT RUN. Finish with the
@@ -1132,7 +1152,9 @@ a tree with three classes.
 **Prompt:** Add agitation (rates, thresholds, behaviours), appetites with preferred techniques, the non-fighting
 techniques (Company on the floor, Food, Drink, Cards, Dice, Song, Dance, and Fists for `Brawl`), how staff choose
 what to do (`STF-04`), fixtures with radius effects and the build menu with supplies, triggers, contagion, tributes at
-dawn, the bestiary reveal rules and the forecast, and the cycle log entries for each cause.
+dawn, the bestiary reveal rules and the forecast, and the cycle log entries for each cause. Add providers for the
+`Order` and `Darkness` appetites, which nothing answers yet (D-060): propose them (techniques or fixtures) at the
+start of the step and wait for the human's answer before writing them.
 **Covers:** AGI-01..10, CRE-05, STF-02..05, FIX-02, FIX-04..06, CMP-03, BST-01..04, INV-12, TST-05.
 **Acceptance:** Tests for every agitation rule and for the technique choice; a cycle shows creatures calming and
 turning for visible reasons.
@@ -1348,7 +1370,7 @@ Every requirement ID in this document, in order. Generated from the text by `too
 regenerate it whenever the SDD changes.
 
 <!-- REQUIREMENT-INDEX:START -->
-248 requirements.
+249 requirements.
 
 | ID | Summary | Section |
 |---|---|---|
@@ -1464,6 +1486,7 @@ regenerate it whenever the SDD changes.
 | STF-08 | Upgrading: buying a shop offer of a character the player already owns raises the owned... | 11.2 |
 | STF-09 | Selling a character returns half the silver spent on it, rounded down | 11.2 |
 | STF-10 | Hiring a character the player does not own gives that character at the offer's rank... | 11.2 |
+| STF-17 | Mastery makes a known technique stronger by the mastery values in its data (for... | 11.2 |
 | STF-11 | A fallen staff member is wounded or dead at Dawn (`ESC-09`) | 11.3 |
 | STF-12 | At Dawn, wounded staff recover to full health; staff who fell and survived the roll... | 11.3 |
 | STF-13 | Every staff member is an adult (`RAT-01`); the data has `"adult": true` (`DAT-04`) | 11.3 |
@@ -1580,7 +1603,7 @@ regenerate it whenever the SDD changes.
 | TST-04 | Cycle and simulation: phase transitions, commands refused in the wrong phase, arrival... | 20 |
 | TST-05 | Agitation and service: rise rates, thresholds and their behaviours, appetite matching... | 20 |
 | TST-06 | Escalation and combat: stage order and timers, profile overrides, guard targeting... | 20 |
-| TST-07 | Board and content: placement rules, path checks, adjacency, `inn.json` against the... | 20 |
+| TST-07 | Board and content: placement rules, path checks, adjacency, the board coming from... | 20 |
 | TST-08 | Saves: round trip, atomic replace, `.bak` kept, corrupt file quarantined, older... | 20 |
 | TST-09 | Shop, staff and roguelike: rank odds per cycle, pity and home-plane weights (including... | 20 |
 | TST-10 | Company: refusals always honoured, preferences, sapient-only Company, floor company,... | 20 |
@@ -1601,7 +1624,7 @@ regenerate it whenever the SDD changes.
 | AGT-13 | Keep `README.md` current when controls, run instructions or the folder layout change | 22 |
 | AGT-14 | Balance changes go in `data/`, with a decision entry (section 0.1) | 22 |
 
-**By prefix:** `SCP` (22), `INV` (12), `STR` (11), `ARC` (11), `SIM` (4), `RUN` (4), `CYC` (6), `PLN` (5), `CRE` (7), `AGI` (10), `ESC` (10), `STF` (16), `CMP` (6), `BRD` (7), `FIX` (6), `SHP` (9), `ITM` (7), `SYN` (3), `OMN` (3), `BST` (4), `MET` (3), `CAM` (4), `UI` (11), `ART` (8), `AUD` (5), `RAT` (10), `DAT` (6), `SAV` (6), `SET` (6), `TST` (12), `AGT` (14)
+**By prefix:** `SCP` (22), `INV` (12), `STR` (11), `ARC` (11), `SIM` (4), `RUN` (4), `CYC` (6), `PLN` (5), `CRE` (7), `AGI` (10), `ESC` (10), `STF` (17), `CMP` (6), `BRD` (7), `FIX` (6), `SHP` (9), `ITM` (7), `SYN` (3), `OMN` (3), `BST` (4), `MET` (3), `CAM` (4), `UI` (11), `ART` (8), `AUD` (5), `RAT` (10), `DAT` (6), `SAV` (6), `SET` (6), `TST` (12), `AGT` (14)
 <!-- REQUIREMENT-INDEX:END -->
 
 # Appendix E: Glossary

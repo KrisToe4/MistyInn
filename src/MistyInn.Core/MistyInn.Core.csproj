@@ -10,4 +10,12 @@
     <InternalsVisibleTo Include="MistyInn.Core.Tests" />
   </ItemGroup>
 
+  <!--
+    The committed data/*.json files, built in as the fallback content and the tests' content (DAT-02, DAT-04).
+    Resource names are MistyInn.Data.<file name>.
+  -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\data\*.json" LogicalName="MistyInn.Data.%(Filename)%(Extension)" Link="Data\%(Filename)%(Extension)" />
+  </ItemGroup>
+
 </Project>

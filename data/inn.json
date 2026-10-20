@@ -1,0 +1,39 @@
+{
+  "rows": [
+    ".............G............",
+    "..........................",
+    "..........................",
+    ".....################.....",
+    ".....#KKKKBBBBBBSSSS#.....",
+    ".....#KKKKBBBBBBSSSS#.....",
+    ".....#KKKKCCCCCCSSSS#.....",
+    ".....#KKKKCCCCCCSSSS#.....",
+    ".....#####CCCCCCLLLL#.....",
+    ".....#RRRrCCCCCCLLLL#.....",
+    "G....#RRR#CCCCCCLLLL#....G",
+    ".....#####CCCCCCCCCX#.....",
+    ".....#RRRrCEEEEECCCC#.....",
+    ".....#RRR#CEEEEECCCC#.....",
+    ".....########D#######.....",
+    "..........................",
+    "..........................",
+    "..........................",
+    "..........................",
+    "G........................G"
+  ],
+  "legend": {
+    ".": { "kind": "Outside", "zone": "outside" },
+    "G": { "kind": "Gate", "zone": "outside" },
+    "#": { "kind": "Wall", "zone": "" },
+    "D": { "kind": "Door", "zone": "door" },
+    "E": { "kind": "Floor", "zone": "entrance" },
+    "C": { "kind": "Floor", "zone": "common-room" },
+    "B": { "kind": "Floor", "zone": "bar" },
+    "K": { "kind": "Floor", "zone": "kitchen" },
+    "S": { "kind": "Floor", "zone": "stage" },
+    "L": { "kind": "Floor", "zone": "lounge" },
+    "R": { "kind": "Floor", "zone": "rooms" },
+    "r": { "kind": "Floor", "zone": "rooms" },
+    "X": { "kind": "Floor", "zone": "cellar-door" }
+  }
+}

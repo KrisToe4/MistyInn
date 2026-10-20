@@ -1,0 +1,37 @@
+[
+  {
+    "id": "drowned-deep",
+    "name": "The Drowned Deep",
+    "mistColor": "#3f8fa6",
+    "ambience": "ambience/drowned-deep",
+    "creatures": [ { "creature": "creature-01", "weight": 3 }, { "creature": "creature-02", "weight": 1 } ]
+  },
+  {
+    "id": "ashen-waste",
+    "name": "The Ashen Waste",
+    "mistColor": "#d0602f",
+    "ambience": "ambience/ashen-waste",
+    "creatures": [ { "creature": "creature-03", "weight": 3 }, { "creature": "creature-04", "weight": 1 } ]
+  },
+  {
+    "id": "hollow-wood",
+    "name": "The Hollow Wood",
+    "mistColor": "#6e9a3f",
+    "ambience": "ambience/hollow-wood",
+    "creatures": [ { "creature": "creature-05", "weight": 3 }, { "creature": "creature-06", "weight": 1 } ]
+  },
+  {
+    "id": "gearbound-ruin",
+    "name": "The Gearbound Ruin",
+    "mistColor": "#b8933a",
+    "ambience": "ambience/gearbound-ruin",
+    "creatures": [ { "creature": "creature-07", "weight": 3 }, { "creature": "creature-08", "weight": 1 } ]
+  },
+  {
+    "id": "pale-court",
+    "name": "The Pale Court",
+    "mistColor": "#c8b4dc",
+    "ambience": "ambience/pale-court",
+    "creatures": [ { "creature": "creature-09", "weight": 3 }, { "creature": "creature-10", "weight": 1 } ]
+  }
+]

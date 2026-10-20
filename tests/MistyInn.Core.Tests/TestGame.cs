@@ -35,25 +35,19 @@ internal static class TestGame
         Assert.That(session.Execute(new ContinueFromDawn()).Succeeded, Is.True);
     }
 
-    /// <summary>The default content with other staff or tuning values.</summary>
+    /// <summary>The real content (the built-in copy of <c>data/</c>) with other starting staff or tuning values.</summary>
     public static GameContent ContentWith(
-        IReadOnlyList<StaffDef>? staff = null, Func<BalanceDef, BalanceDef>? balance = null)
+        IReadOnlyList<string>? startingStaff = null, Func<BalanceDef, BalanceDef>? balance = null)
     {
-        var d = DefaultContent.Create();
-        return new GameContent(
-            d.Layout,
-            d.Planes,
-            d.Creatures,
-            staff ?? d.StartingStaff,
-            d.UnlockedPlanes,
-            d.WanderZones,
-            balance is null ? d.Balance : balance(d.Balance));
-    }
+        var set = GameContent.Default.Set;
+        var b = balance is null ? set.Balance : balance(set.Balance);
+        if (startingStaff is not null)
+        {
+            b = b with { StartingStaff = startingStaff };
+        }
 
-    public static IReadOnlyList<StaffDef> InnkeeperAndStaff(int staffCount) =>
-        new[] { new StaffDef("innkeeper", "The Innkeeper", IsInnkeeper: true) }
-            .Concat(Enumerable.Range(1, staffCount).Select(i => new StaffDef($"staff-{i}", $"Staff {i}", false)))
-            .ToList();
+        return GameContent.Create(set with { Balance = b });
+    }
 
     /// <summary>Steps the mist one fixed step at a time, calling <paramref name="afterStep"/> after each.</summary>
     public static void StepThroughMist(GameSession session, Action afterStep)
