@@ -5,4 +5,15 @@
     <RootNamespace>MistyInn</RootNamespace>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+
+  <!-- The Godot SDK compiles every *.cs under the project folder; Core and the tests build on their own (STR-04). -->
+  <ItemGroup>
+    <Compile Remove="src/**" />
+    <Compile Remove="tests/**" />
+  </ItemGroup>
+
+  <!-- Game → Core only (STR-02, STR-05). -->
+  <ItemGroup>
+    <ProjectReference Include="src\MistyInn.Core\MistyInn.Core.csproj" />
+  </ItemGroup>
 </Project>

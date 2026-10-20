@@ -44,7 +44,7 @@ one step at a time.
 1. Extract `Godot_v4.7.2-stable_mono_win64.zip` somewhere permanent, for example `C:\Tools\Godot`.
 2. Start `Godot_v4.7.2-stable_mono_win64.exe`, choose **Import**, and select this folder's `project.godot`.
 
-There is no main scene until step 2. From step 1 on:
+There is no main scene until step 2. To build and test the C#:
 
 ```bash
 dotnet build MistyInn.sln
@@ -58,8 +58,12 @@ dotnet test MistyInn.sln
 
 ```
 project.godot          Godot project settings
-MistyInn.csproj/.sln   C# project (open in Visual Studio)
+MistyInn.csproj/.sln   Godot C# project and solution (open the .sln in Visual Studio)
+Directory.Build.props  Shared build settings for Core and the tests
+.editorconfig          Code style
 icon.svg               Project icon
+src/MistyInn.Core/     Engine-free game rules (no Godot reference)
+tests/MistyInn.Core.Tests/  NUnit tests for Core
 docs/                  SDD (and earlier versions), decisions, progress
 tools/                 gen-requirement-index.py (regenerates SDD Appendix D)
 ```

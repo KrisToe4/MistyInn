@@ -5,18 +5,21 @@ inn up at Dusk; the Mist phase then plays out automatically until Dawn. Godot 4.
 hobby prototype. It is built one step at a time from the design document.
 
 ## Read first
-- `docs/SDD.md`: the design document (SDD v1.1, approved). Before any work, read sections 0, 2, 17 and 22 and
+- `docs/SDD.md`: the design document (SDD v1.2, approved). Before any work, read sections 0, 2, 17 and 22 and
   Appendix A, plus the sections the requested step lists. Appendix D indexes every requirement ID; Appendix E is the
   glossary. Earlier versions are kept as `docs/SDD_v<version>.md`.
 - `docs/PROGRESS.md`: step status, build, test and smoke-run results, toolchain and package versions.
-- `docs/DECISIONS.md`: recorded decisions, with an index table at the top (D-001 to D-036 so far; continue numbering).
+- `docs/DECISIONS.md`: recorded decisions, with an index table at the top (D-001 to D-041 so far; continue numbering).
 - `docs/ASSETS.md`: third-party assets and their licences (created when the first asset is added).
 
 ## Current state
-- SDD v1.1 is approved. The pre-SDD prototype code was removed (D-034); the repository holds only the Godot project
-  shell (`project.godot`, `MistyInn.csproj`, `MistyInn.sln`, `icon.svg`), the documents and `tools/`.
-- Step 0 (read-only inspection) is complete. The next step is step 1 (solution structure and Core skeleton). Keep the
-  classic `.sln` and map the export configurations by hand (D-035); the human creates the export preset (D-036).
+- SDD v1.2 is approved. Steps 0 and 1 are complete.
+- Step 1 built the solution structure and the Core skeleton: `src/MistyInn.Core` (GameSession, SeededRandom, event
+  buffer, cycle log, entity IDs), `tests/MistyInn.Core.Tests` (49/49 pass in the .NET SDK container), shared build
+  settings (D-037), the classic `.sln` with export build types mapped by hand (D-035), and the Windows export preset
+  (`export_presets.cfg`, committed). The Godot editor builds the project. Decisions D-001 to D-041 are Accepted.
+- The next step is step 2 (board, cycle loop, isometric view). It creates `scenes/Main.tscn` and sets it as the main
+  scene, so the headless smoke run (TST-12) starts with it.
 - Godot is at `C:\Godot_v4.7.2`. If Smart App Control blocks `dotnet test`, the tests run in the .NET SDK Linux
   container.
 
@@ -47,6 +50,8 @@ hobby prototype. It is built one step at a time from the design document.
 ```
 dotnet build MistyInn.sln
 dotnet test MistyInn.sln
+# or, when Smart App Control blocks the test DLLs, in the .NET SDK container (also in docs/PROGRESS.md):
+docker run --rm -v "${PWD}:/src:ro" mcr.microsoft.com/dotnet/sdk:10.0 bash -c "cp -r /src /work && cd /work && find . -type d \( -name bin -o -name obj -o -name .git \) -prune -exec rm -rf {} + && dotnet test tests/MistyInn.Core.Tests/MistyInn.Core.Tests.csproj"
 C:\Godot_v4.7.2\Godot_v4.7.2-stable_mono_win64_console.exe --headless --path . --quit-after 600
 python tools/gen-requirement-index.py docs/SDD.md
 ```

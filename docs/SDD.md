@@ -3,8 +3,8 @@
 
 | | |
 |---|---|
-| **Version** | 1.1 (approved) |
-| **Supersedes** | 1.0 |
+| **Version** | 1.2 (approved) |
+| **Supersedes** | 1.1 |
 | **Audience** | LLM-based coding agents and the human developer |
 | **Genre** | Dark roguelike autobattler: prepare the inn, then survive the mist |
 | **Engine** | Godot 4.7.2 (.NET build) |
@@ -76,6 +76,7 @@ step starts.
 
 | Version | Change | Reason |
 |---|---|---|
+| 1.2 | TST-12: the headless smoke run starts at step 2, the first step with a main scene; before that, opening and building the project in the Godot editor stands in for it | Step 1 report |
 | 1.1 | STR-01: the solution stays a classic `.sln` (Godot expects it; never `dotnet new sln`, which makes `.slnx` on .NET 10), and Core and the tests map the solution's ExportDebug and ExportRelease configurations to their Debug and Release. TST-12: the Godot path on this machine is recorded in `docs/PROGRESS.md`. Step 1: the human creates the Windows export preset in the editor (`export_presets.cfg`, committed), with the agent giving the steps | Step 0 report (D-035, D-036) |
 | 1.0 | Approved. Final review changes: 3 staff offers per Dusk (`SHP-02`); a home-plane draw weight (`SHP-04`); the 16-character roster, 4 per main class, weighted towards the Mortal Realm (`STF-14`); hidden ancestry, revealed by observation and kept across runs (`STF-15`, `STF-16`, `SYN-01`, `MET-01`, `SAV-02`, `UI-06`); the Company section renumbered 11.5. Steps 0 to 2 updated because the pre-SDD prototype code was removed. Every Proposed decision is Accepted | The human approved the SDD as the initial version (D-032 to D-034) |
 | 0.2 | Review point 2: staff are unique named characters with **classes** (Companion/Server, Gambler, Fighter, Entertainer) and **techniques**; five **ranks**, with an upgrade tree of at most two classes and one technique chosen per upgrade; upgrades come from buying the same character again in a random **shop** of ranked staff and items (in-run silver only, never real money); **staff items** and **inn items**, which replace relics; a fixed **build menu** for fixtures and supplies; Company on the floor or in a **room**; new appetites `Spectacle` and `Brawl`. Removed: `REL-*`, the Guard, Warden and Fixer roles, three-copy merging, the Dawn relic choice, lounge booths | Review point 2: staff classes and upgrades (D-025 to D-031) |
@@ -1046,7 +1047,9 @@ This section is the only place that sets what content is allowed. Agents shall n
   the manual check, and the human runs it in the editor.
 - **TST-12** A headless smoke run is part of every step's commands for the human:
   `<Godot folder>\Godot_v4.7.2-stable_mono_win64_console.exe --headless --path . --quit-after 600`. It shall print no
-  errors. The Godot folder on the development machine is recorded in `docs/PROGRESS.md` (toolchain table).
+  errors. The Godot folder on the development machine is recorded in `docs/PROGRESS.md` (toolchain table). The smoke
+  run starts at step 2, the first step with a main scene; in steps 0 and 1 the human opens and builds the project in
+  the Godot editor instead.
 
 ---
 
@@ -1057,7 +1060,7 @@ acceptance criteria and a demo. After each step the human builds, tests, plays t
 
 **Common preamble** (put before every step prompt):
 
-> You are implementing Misty Inn from SDD v1.1. Work **only** on the step below; do not start later steps. Read
+> You are implementing Misty Inn from SDD v1.2. Work **only** on the step below; do not start later steps. Read
 > sections 0, 2, 17 and 22 and the sections the step lists first. Apply the invariants (section 2) and the agent
 > rules (section 22). If anything is ambiguous, contradictory or missing, **stop and ask** before writing code. Do not
 > run builds, tests, Godot or git: list the exact commands for the human and mark results NOT RUN. Finish with the

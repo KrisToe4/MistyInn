@@ -1,8 +1,10 @@
 # Godot
 .godot/
 /android/
-export_presets.cfg
 *.translation
+
+# Exports (STR-11)
+builds/
 
 # .NET / Visual Studio
 bin/

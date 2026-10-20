@@ -42,6 +42,11 @@ proposed details were approved with SDD v1.0 (2026-10-20). **Proposed** marks a 
 | D-034 | SDD v1.0 approved; pre-SDD prototype code removed | Accepted | 2026-10-20 | AGT-01, step 0 |
 | D-035 | Keep a classic `.sln` with explicit configuration mapping | Accepted | 2026-10-20 | STR-01 |
 | D-036 | Create the Windows export preset in step 1 | Accepted | 2026-10-20 | STR-08, DAT-02, step 1 |
+| D-037 | Shared build settings scoped to Core and tests | Accepted | 2026-10-20 | STR-06 |
+| D-038 | Random source: xoshiro256** seeded by SplitMix64 | Accepted | 2026-10-20 | INV-02, SAV-01 |
+| D-039 | Full event buffer drops the oldest event | Accepted | 2026-10-20 | ARC-12, INV-05 |
+| D-040 | Bounded cycle log with a truncation marker and key strings | Accepted | 2026-10-20 | INV-12, INV-05 |
+| D-041 | GameSession skeleton without a run state | Accepted | 2026-10-20 | ARC-01, ARC-11 |
 
 ---
 
@@ -409,3 +414,63 @@ proposed details were approved with SDD v1.0 (2026-10-20). **Proposed** marks a 
   files filter). The human creates it, and it is committed.
 - **Alternatives considered:** Waiting until step 11; writing the file by hand.
 - **Requirement IDs affected:** STR-08, STR-11, DAT-02.
+
+## D-037 Shared build settings scoped to Core and tests
+- **Status:** Accepted (approved by the human after step 1)
+- **Date / step:** 2026-10-20, step 1
+- **Context:** STR-06 puts nullable, latest C#, implicit usings and warnings as errors on Core and the tests, but not on
+  the Godot project. `Directory.Build.props` at the root is picked up by every project, including `MistyInn.csproj`.
+- **Decision:** The settings apply only when `$(MSBuildProjectName)` starts with `MistyInn.Core`. The Godot project keeps
+  its own `Nullable` setting. When Godot exports, it builds Core through the `ProjectReference` with the configuration
+  `ExportRelease`, which a plain project does not know; Core then turns on `Optimize`, like Release.
+- **Alternatives considered:** A `Directory.Build.props` in `src/` and another in `tests/` (two files to keep in step).
+- **Requirement IDs affected:** STR-06.
+
+## D-038 Random source: xoshiro256** seeded by SplitMix64
+- **Status:** Accepted (approved by the human after step 1)
+- **Date / step:** 2026-10-20, step 1
+- **Context:** INV-02 forbids `System.Random`, and SAV-01 saves the generator's state, so the algorithm must be fixed and
+  its state small and serialisable.
+- **Decision:** `SeededRandom` implements xoshiro256** with a 64-bit seed expanded by SplitMix64; its state is four
+  `ulong` words (`RandomState`). `NextInt` rejects biased values so every result is equally likely. A test pins the
+  output for seed 42 (values computed independently in Python), so an accidental change to the algorithm fails the
+  tests. Changing the algorithm later breaks saves and needs a decision. The namespace is `MistyInn.Core.Randomness`, to
+  avoid clashing with `System.Random`.
+- **Alternatives considered:** PCG32 (smaller state, shorter period); `System.Random` with a seed (forbidden, and its
+  algorithm is not guaranteed across .NET versions).
+- **Requirement IDs affected:** INV-02, SAV-01, TST-01.
+
+## D-039 Full event buffer drops the oldest event
+- **Status:** Accepted (approved by the human after step 1)
+- **Date / step:** 2026-10-20, step 1
+- **Context:** ARC-12 needs a bounded event buffer (INV-05), but does not say what happens when it fills between
+  drains.
+- **Decision:** The buffer (default 4,096 events) drops the oldest event and counts it in `DroppedEventCount`. Events
+  only drive presentation; the cycle log is the authoritative record (INV-12), so a dropped event never changes the
+  game. The GameRoot node (step 2) should log a warning if the count rises.
+- **Alternatives considered:** Throwing when full (would crash the game over a view lagging behind); refusing new
+  events (would keep stale ones and lose the latest state).
+- **Requirement IDs affected:** ARC-12, INV-05.
+
+## D-040 Bounded cycle log with a truncation marker and key strings
+- **Status:** Accepted (approved by the human after step 1)
+- **Date / step:** 2026-10-20, step 1
+- **Context:** INV-12 needs every cause recorded, and INV-05 needs a cap.
+- **Decision:** The log holds up to 20,000 entries per cycle. When one slot is left, a `log.truncated` entry is written
+  and later records are only counted, so the timeline can always show that it was cut. Each entry has a sequence
+  number, the game time, a `Kind` and a `Cause` as machine-readable keys (for example `agitation.rose` and
+  `trigger.light`, turned into text by the UI with `Tr()`), and optional subject and source entities.
+- **Alternatives considered:** Dropping the oldest entries (would lose the start of a chain reaction); enums for kinds
+  and causes (would need a Core change for every new content cause).
+- **Requirement IDs affected:** INV-12, INV-05, UI-07.
+
+## D-041 GameSession skeleton without a run state
+- **Status:** Accepted (approved by the human after step 1)
+- **Date / step:** 2026-10-20, step 1
+- **Context:** ARC-01 says `GameSession` holds the current `RunState`, but runs, phases and the fixed-step tick belong to
+  step 2.
+- **Decision:** In step 1, `GameSession` has the random source, the ID allocator, the event buffer, the cycle log, a
+  game clock advanced by `Tick`, `Execute` and `DrainEvents`. `Execute` refuses every command with `NotSupported` until
+  a step adds its handler. `RunState`, concrete commands and concrete events are added by the steps that need them.
+- **Alternatives considered:** An empty `RunState` placeholder now (dead code until step 2).
+- **Requirement IDs affected:** ARC-01, ARC-03, ARC-11.

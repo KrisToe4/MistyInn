@@ -6,19 +6,20 @@
 | SDD | 0.1 | 2026-10-19 | Superseded | n/a | n/a | n/a | First draft (cute inn management); kept as `docs/SDD_v0.1.md` |
 | SDD | 0.2 | 2026-10-20 | Superseded | n/a | n/a | n/a | Review points 1 and 2; kept as `docs/SDD_v0.2.md` |
 | SDD | 1.0 | 2026-10-20 | Superseded | n/a | n/a | n/a | Initial version: 248 requirements, decisions D-001 to D-034; kept as `docs/SDD_v1.0.md` |
-| SDD | 1.1 | 2026-10-20 | Approved | n/a | n/a | n/a | Step 0 recommendations: `.sln` kept with configuration mapping (STR-01), Godot path in PROGRESS (TST-12), export preset created in step 1 (D-035, D-036) |
+| SDD | 1.1 | 2026-10-20 | Superseded | n/a | n/a | n/a | Step 0 recommendations: `.sln` kept with configuration mapping (STR-01), Godot path in PROGRESS (TST-12), export preset created in step 1 (D-035, D-036); kept as `docs/SDD_v1.1.md` |
+| SDD | 1.2 | 2026-10-20 | Approved | n/a | n/a | n/a | Step 1 recommendation: smoke run starts at step 2 (TST-12); D-037 to D-041 accepted |
 | 0 | 1.0 | 2026-10-20 | Complete | NOT RUN (read-only step) | NOT RUN | NOT RUN | Read-only inspection: repository matches the v1.0 shell; gaps are step 1 work (STR-02..08, STR-11); risks: solution configuration mapping, `.sln` vs `.slnx`, Smart App Control may block test DLLs |
-| 1 | 1.1 | | Not started | | | | Solution structure and Core skeleton |
-| 2 | 1.1 | | Not started | | | | Board, cycle loop, isometric view |
-| 3 | 1.1 | | Not started | | | | Content data and validation |
-| 4 | 1.1 | | Not started | | | | Agitation, techniques and the bestiary |
-| 5 | 1.1 | | Not started | | | | Escalation, combat, Company and content filters |
-| 6 | 1.1 | | Not started | | | | Shop, ranks, items and synergies |
-| 7 | 1.1 | | Not started | | | | Roguelike layer |
-| 8 | 1.1 | | Not started | | | | Saves, profile and settings |
-| 9 | 1.1 | | Not started | | | | UI pass |
-| 10 | 1.1 | | Not started | | | | Art and audio pass |
-| 11 | 1.1 | | Not started | | | | Audit, export and traceability |
+| 1 | 1.1 | 2026-10-20 | Complete | Passed: Core and tests (human, .NET SDK 10 container); Godot project (human, Godot 4.7.2 editor) | 49/49 passed (human, container, 72 ms) | n/a (no main scene until step 2; TST-12 as of v1.2) | Core library and NUnit project, shared build settings, `.sln` with build type mapping, `.gitignore` fixed; Windows Desktop export preset created by the human (path `builds/windows/MistyInn.exe`, includes `data/*.json`); decisions D-037 to D-041 accepted |
+| 2 | 1.2 | | Not started | | | | Board, cycle loop, isometric view |
+| 3 | 1.2 | | Not started | | | | Content data and validation |
+| 4 | 1.2 | | Not started | | | | Agitation, techniques and the bestiary |
+| 5 | 1.2 | | Not started | | | | Escalation, combat, Company and content filters |
+| 6 | 1.2 | | Not started | | | | Shop, ranks, items and synergies |
+| 7 | 1.2 | | Not started | | | | Roguelike layer |
+| 8 | 1.2 | | Not started | | | | Saves, profile and settings |
+| 9 | 1.2 | | Not started | | | | UI pass |
+| 10 | 1.2 | | Not started | | | | Art and audio pass |
+| 11 | 1.2 | | Not started | | | | Audit, export and traceability |
 
 ## Toolchain
 
@@ -33,7 +34,23 @@
 
 ## Packages
 
-None yet. Test packages are added in step 1 with `dotnet add` (STR-09), and their resolved versions are recorded here.
+Added in step 1 with `dotnet add` (STR-09); versions as resolved by NuGet.
+
+| Project | Package | Version | Step |
+|---|---|---|---|
+| MistyInn.Core.Tests | Microsoft.NET.Test.Sdk | 18.11.0 | 1 |
+| MistyInn.Core.Tests | NUnit | 5.0.0 | 1 |
+| MistyInn.Core.Tests | NUnit3TestAdapter | 6.3.1 | 1 |
+
+## Running the tests in a container
+
+When Smart App Control blocks the test DLLs on Windows, run the tests in the .NET SDK Linux container from the
+repository root (PowerShell). The repository is mounted read-only and copied inside, without the Windows `bin/` and
+`obj/` folders, so the two builds never mix:
+
+```
+docker run --rm -v "${PWD}:/src:ro" mcr.microsoft.com/dotnet/sdk:10.0 bash -c "cp -r /src /work && cd /work && find . -type d \( -name bin -o -name obj -o -name .git \) -prune -exec rm -rf {} + && dotnet test tests/MistyInn.Core.Tests/MistyInn.Core.Tests.csproj"
+```
 
 ## Smoke-run command (TST-12)
 

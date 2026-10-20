@@ -1,0 +1,22 @@
+<Project>
+  <!--
+    Shared settings for the engine-free projects (STR-06). MistyInn.Core and MistyInn.Core.Tests get nullable,
+    the latest C# version, implicit usings and warnings as errors. The Godot project (MistyInn.csproj) is left out on
+    purpose: the Godot source generators can raise warnings outside our control.
+  -->
+  <PropertyGroup Condition="$(MSBuildProjectName.StartsWith('MistyInn.Core'))">
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <!--
+    When Godot exports, it builds MistyInn.csproj (and so Core, through the ProjectReference) with its own
+    configuration names. Core treats ExportRelease like Release.
+  -->
+  <PropertyGroup Condition="$(MSBuildProjectName.StartsWith('MistyInn.Core')) And '$(Configuration)' == 'ExportRelease'">
+    <Optimize>true</Optimize>
+    <DebugType>portable</DebugType>
+  </PropertyGroup>
+</Project>
