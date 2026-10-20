@@ -1,0 +1,49 @@
+# CLAUDE.md
+
+Misty Inn: a dark roguelike autobattler about an inn at the nexus of hostile, converging planes. The player sets the
+inn up at Dusk; the Mist phase then plays out automatically until Dawn. Godot 4.7.2 .NET, C# (`net8.0`), Windows,
+hobby prototype. It is built one step at a time from the design document.
+
+## Read first
+- `docs/SDD.md`: the design document (SDD v1.0, approved). Before any work, read sections 0, 2, 17 and 22 and
+  Appendix A, plus the sections the requested step lists. Appendix D indexes every requirement ID; Appendix E is the
+  glossary. Earlier versions are kept as `docs/SDD_v<version>.md`.
+- `docs/PROGRESS.md`: step status, build, test and smoke-run results, toolchain and package versions.
+- `docs/DECISIONS.md`: recorded decisions, with an index table at the top (D-001 to D-034 so far; continue numbering).
+- `docs/ASSETS.md`: third-party assets and their licences (created when the first asset is added).
+
+## Current state
+- SDD v1.0 is approved. The pre-SDD prototype code was removed (D-034); the repository holds only the Godot project
+  shell (`project.godot`, `MistyInn.csproj`, `MistyInn.sln`, `icon.svg`), the documents and `tools/`.
+- No SDD step has started. The next step is step 0 (read-only inspection).
+
+## Working rules
+- Do only the step requested. Start from the SDD section 21 common preamble, and finish with the Appendix A step
+  report.
+- If the SDD is ambiguous, contradictory or silent on a material decision, stop and ask (AGT-03).
+- Do not run builds, tests, the Godot editor, headless Godot or git commands. The human runs them. List the exact
+  commands and mark results NOT RUN (AGT-05).
+- Never type package versions by hand. Provide `dotnet add <project> package <id>` commands (STR-09).
+- Game rules go in `src/MistyInn.Core`, which never references Godot (INV-01). Node scripts only present and command.
+- All randomness through the run's seeded `IRandomSource`, all time through `GameSession.Tick` (INV-02, INV-03).
+- Content is data in `data/*.json`, never literals in code (INV-04).
+- Content never goes past SDD section 17: every character is an adult; Company is off-screen in rooms, only with
+  sapient adult creatures, and refusals are always honoured; no nudity or explicit content; moderate blood but no
+  dismemberment; suggestive content and violence are never combined. When unsure, stop and ask (AGT-11).
+- Every mist-phase outcome must be explainable from the cycle log (INV-12).
+- No real money anywhere: the shop's random draws use only in-run silver (SCP-27).
+- Never add an asset without its licence in `docs/ASSETS.md`, and never download assets yourself (AGT-12).
+- Edit `.tscn`/`.tres` files by hand only for small changes, and never change a `uid` (AGT-07).
+- Edit `docs/SDD.md` only when the human explicitly asks. Then bump the version, update the change log, save the
+  previous version as `docs/SDD_v<old>.md` first, and regenerate Appendix D with `tools/gen-requirement-index.py`.
+  Otherwise put recommended SDD changes in the step report (AGT-08).
+- Update `docs/PROGRESS.md` and `docs/DECISIONS.md` as part of every step (AGT-09).
+- Tag every test with `[Property("Requirement", "<ID>")]` (TST-02).
+
+## Commands (for the human to run)
+```
+dotnet build MistyInn.sln
+dotnet test MistyInn.sln
+<path-to>\Godot_v4.7.2-stable_mono_win64_console.exe --headless --path . --quit-after 600
+python tools/gen-requirement-index.py docs/SDD.md
+```

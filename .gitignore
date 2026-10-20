@@ -1,0 +1,17 @@
+# Godot
+.godot/
+/android/
+export_presets.cfg
+*.translation
+
+# .NET / Visual Studio
+bin/
+obj/
+.vs/
+*.user
+*.suo
+mono_crash.*
+
+# OS
+Thumbs.db
+.DS_Store
