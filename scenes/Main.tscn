@@ -1,0 +1,63 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/GameRoot.cs" id="1_root"]
+[ext_resource type="PackedScene" path="res://scenes/inn/Inn.tscn" id="2_inn"]
+[ext_resource type="PackedScene" path="res://scenes/units/Staff.tscn" id="3_staff"]
+[ext_resource type="PackedScene" path="res://scenes/units/Innkeeper.tscn" id="4_keeper"]
+[ext_resource type="PackedScene" path="res://scenes/units/Creature.tscn" id="5_creature"]
+[ext_resource type="Script" path="res://scripts/camera/IsoCameraRig.cs" id="6_rig"]
+[ext_resource type="PackedScene" path="res://scenes/ui/Hud.tscn" id="7_hud"]
+
+[sub_resource type="Environment" id="Environment_night"]
+background_mode = 1
+background_color = Color(0.07, 0.08, 0.11, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.45, 0.48, 0.62, 1)
+ambient_light_energy = 0.55
+tonemap_mode = 2
+fog_enabled = true
+fog_light_color = Color(0.3, 0.33, 0.42, 1)
+fog_density = 0.008
+
+[node name="Main" type="Node3D" node_paths=PackedStringArray("Inn", "UnitsRoot", "CreaturesRoot", "CameraRig", "Hud")]
+script = ExtResource("1_root")
+Inn = NodePath("Inn")
+UnitsRoot = NodePath("Units")
+CreaturesRoot = NodePath("Creatures")
+CameraRig = NodePath("CameraRig")
+Hud = NodePath("UI")
+StaffScene = ExtResource("3_staff")
+InnkeeperScene = ExtResource("4_keeper")
+CreatureScene = ExtResource("5_creature")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_night")
+
+[node name="Moon" type="DirectionalLight3D" parent="."]
+rotation = Vector3(-0.95, 0.6, 0)
+light_color = Color(0.72, 0.78, 1, 1)
+light_energy = 0.7
+shadow_enabled = true
+
+[node name="Inn" parent="." instance=ExtResource("2_inn")]
+
+[node name="Units" type="Node3D" parent="."]
+
+[node name="Creatures" type="Node3D" parent="."]
+
+[node name="CameraRig" type="Node3D" parent="." node_paths=PackedStringArray("Camera", "Pitch")]
+script = ExtResource("6_rig")
+Camera = NodePath("Pitch/Camera3D")
+Pitch = NodePath("Pitch")
+
+[node name="Pitch" type="Node3D" parent="CameraRig"]
+
+[node name="Camera3D" type="Camera3D" parent="CameraRig/Pitch"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 40)
+projection = 1
+current = true
+size = 20.0
+near = 0.1
+far = 200.0
+
+[node name="UI" parent="." instance=ExtResource("7_hud")]

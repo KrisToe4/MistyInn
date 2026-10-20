@@ -21,8 +21,9 @@ Content: Mature. Moderate blood and suggestive themes; both can be reduced in Se
 
 ## Status
 
-The design is complete (SDD v1.0). There is no game code yet: development starts at step 0 of the SDD (section 21),
-one step at a time.
+Built one step at a time from the SDD (section 21). Steps 0 and 1 are done; step 2 adds the first playable loop with
+placeholder art: place the innkeeper and staff at Dusk, watch creatures walk in out of the mist, and see them dissolve
+at Dawn.
 
 ## Design documents
 
@@ -44,7 +45,7 @@ one step at a time.
 1. Extract `Godot_v4.7.2-stable_mono_win64.zip` somewhere permanent, for example `C:\Tools\Godot`.
 2. Start `Godot_v4.7.2-stable_mono_win64.exe`, choose **Import**, and select this folder's `project.godot`.
 
-There is no main scene until step 2. To build and test the C#:
+Press **F5** in the editor to play. To build and test the C#:
 
 ```bash
 dotnet build MistyInn.sln
@@ -54,6 +55,21 @@ dotnet build MistyInn.sln
 dotnet test MistyInn.sln
 ```
 
+## Controls
+
+| Input | Action |
+|---|---|
+| Drag a name from the bench onto the floor | Place a staff member (Dusk) |
+| Drag a placed unit | Move it; drop it on the bench to bench it (Dusk) |
+| Right-click a placed unit | Bench it (Dusk) |
+| WASD / arrow keys, middle mouse drag, screen edges | Pan the camera |
+| Mouse wheel | Zoom |
+| Q / E | Rotate the camera 90° |
+| Left-click (mist) | Select a creature or unit |
+| F | Follow the selection |
+| Pause, 1×, 2×, 4× buttons | Mist speed |
+| Esc | Pause menu |
+
 ## Layout
 
 ```
@@ -62,6 +78,8 @@ MistyInn.csproj/.sln   Godot C# project and solution (open the .sln in Visual St
 Directory.Build.props  Shared build settings for Core and the tests
 .editorconfig          Code style
 icon.svg               Project icon
+scenes/                Main.tscn and the inn, unit and UI scenes (placeholder art)
+scripts/               Godot node scripts: GameRoot, camera, board, units, UI
 src/MistyInn.Core/     Engine-free game rules (no Godot reference)
 tests/MistyInn.Core.Tests/  NUnit tests for Core
 docs/                  SDD (and earlier versions), decisions, progress

@@ -12,6 +12,7 @@ config_version=5
 
 config/name="Misty Inn"
 config/description="A dark roguelike autobattler about an inn at the nexus of hostile, converging planes."
+run/main_scene="res://scenes/Main.tscn"
 config/features=PackedStringArray("4.7", "C#", "Forward Plus")
 config/icon="res://icon.svg"
 

@@ -12,8 +12,27 @@ public enum CommandFailure
     WrongPhase,
 
     NotEnoughSilver,
+
+    /// <summary>The tile is not inn floor, or a placement there would block the way in (BRD-02, BRD-03).</summary>
     TileBlocked,
+
+    /// <summary>No more staff may stand on the board this cycle (section 6.4).</summary>
     BoardFull,
+
+    /// <summary>The command names a unit that does not exist.</summary>
+    UnknownUnit,
+
+    /// <summary>Another unit already stands on that tile.</summary>
+    TileOccupied,
+
+    /// <summary>The innkeeper cannot be benched (ESC-06).</summary>
+    CannotBench,
+
+    /// <summary>The mist cannot begin until the innkeeper is on the board (ESC-06).</summary>
+    InnkeeperNotPlaced,
+
+    /// <summary>A value outside what the command allows (for example a speed of 3).</summary>
+    InvalidValue,
 }
 
 /// <summary>The outcome of <see cref="GameSession.Execute"/>.</summary>

@@ -1,0 +1,24 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/units/CreatureView.cs" id="1_creature"]
+
+[sub_resource type="SphereMesh" id="SphereMesh_creature"]
+radius = 0.36
+height = 0.9
+
+[node name="Creature" type="Node3D" node_paths=PackedStringArray("Body", "Label")]
+script = ExtResource("1_creature")
+Body = NodePath("Body")
+Label = NodePath("Label")
+
+[node name="Body" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45, 0)
+mesh = SubResource("SphereMesh_creature")
+
+[node name="Label" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
+billboard = 1
+pixel_size = 0.004
+font_size = 34
+outline_size = 10
+text = "Creature"

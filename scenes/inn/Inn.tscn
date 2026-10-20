@@ -1,0 +1,12 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/board/InnView.cs" id="1_inn"]
+[ext_resource type="PackedScene" path="res://scenes/inn/Tile.tscn" id="2_tile"]
+[ext_resource type="PackedScene" path="res://scenes/inn/MistGate.tscn" id="3_gate"]
+[ext_resource type="PackedScene" path="res://scenes/inn/TileCursor.tscn" id="4_cursor"]
+
+[node name="Inn" type="Node3D"]
+script = ExtResource("1_inn")
+TileScene = ExtResource("2_tile")
+GateScene = ExtResource("3_gate")
+CursorScene = ExtResource("4_cursor")

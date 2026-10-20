@@ -3,8 +3,8 @@
 
 | | |
 |---|---|
-| **Version** | 1.2 (approved) |
-| **Supersedes** | 1.1 |
+| **Version** | 1.3 (approved) |
+| **Supersedes** | 1.2 |
 | **Audience** | LLM-based coding agents and the human developer |
 | **Genre** | Dark roguelike autobattler: prepare the inn, then survive the mist |
 | **Engine** | Godot 4.7.2 (.NET build) |
@@ -76,6 +76,7 @@ step starts.
 
 | Version | Change | Reason |
 |---|---|---|
+| 1.3 | SIM-02: `GameSession.Tick` takes real frame time and runs the due fixed steps itself (exact integer accounting, at most 120 steps per call, `InterpolationAlpha` for views); GameRoot passes frame time. ARC-10: `ContinueFromDawn` added to the commands. BRD-03: every room must stay reachable on its own, not just the Rooms zone; checked from step 5 | Step 2 report (D-042, D-047, D-050) |
 | 1.2 | TST-12: the headless smoke run starts at step 2, the first step with a main scene; before that, opening and building the project in the Godot editor stands in for it | Step 1 report |
 | 1.1 | STR-01: the solution stays a classic `.sln` (Godot expects it; never `dotnet new sln`, which makes `.slnx` on .NET 10), and Core and the tests map the solution's ExportDebug and ExportRelease configurations to their Debug and Release. TST-12: the Godot path on this machine is recorded in `docs/PROGRESS.md`. Step 1: the human creates the Windows export preset in the editor (`export_presets.cfg`, committed), with the agent giving the steps | Step 0 report (D-035, D-036) |
 | 1.0 | Approved. Final review changes: 3 staff offers per Dusk (`SHP-02`); a home-plane draw weight (`SHP-04`); the 16-character roster, 4 per main class, weighted towards the Mortal Realm (`STF-14`); hidden ancestry, revealed by observation and kept across runs (`STF-15`, `STF-16`, `SYN-01`, `MET-01`, `SAV-02`, `UI-06`); the Company section renumbered 11.5. Steps 0 to 2 updated because the pre-SDD prototype code was removed. Every Proposed decision is Accepted | The human approved the SDD as the initial version (D-032 to D-034) |
@@ -334,7 +335,7 @@ MistyInn/                            (repository root, also the Godot project ro
   `Reroll`, `LockShop`, `PlaceUnit(unitId, tile)`, `BenchUnit(unitId)`, `SellUnit(unitId)`,
   `EquipItem(itemId, unitId)`, `UnequipItem(itemId)`, `BuildFixture(fixtureId)`,
   `PlaceFixture(fixtureId, tile, rotation)`, `BuySupplies(kind, amount)`, `Repair(target)`, `BeginMist`,
-  `SetSpeed(multiplier)`, `StartRun(seed)`.
+  `ContinueFromDawn`, `SetSpeed(multiplier)`, `StartRun(seed)`.
 - **ARC-11** `Execute` returns a `CommandResult` (success, or a reason code such as `WrongPhase`, `NotEnoughSilver`,
   `TileBlocked`, `BoardFull`). A command that is not valid changes nothing. During the mist phase only `SetSpeed` is
   accepted (`SCP-13`).
@@ -351,8 +352,11 @@ MistyInn/                            (repository root, also the Godot project ro
 
 - **SIM-01** Core measures time as `TimeSpan` game time since the start of the mist phase. Durations are in game
   seconds.
-- **SIM-02** Core runs fixed steps of 1/30 s. `GameRoot` accumulates frame time and runs as many fixed steps as are due,
-  multiplied by the speed setting (1×, 2× or 4×; 0 when paused). Dusk and Dawn are not timed.
+- **SIM-02** Core runs fixed steps of 1/30 s. `GameRoot` passes each frame's real time to `GameSession.Tick`, which
+  multiplies it by the speed setting (1×, 2× or 4×; 0 when paused) and runs as many fixed steps as are due. The owed
+  time is kept exactly, so the outcome never depends on the frame rate. One `Tick` runs at most 120 steps; a longer
+  frame drops the backlog rather than freezing to catch up. `GameSession.InterpolationAlpha` tells views how far the
+  next step is (SIM-03). Dusk and Dawn are not timed.
 - **SIM-03** Core owns positions. Units and creatures have a position in tile space (a tile plus an offset) and move
   along A* paths at their speed. Views interpolate between Core positions; they never move units themselves.
 - **SIM-04** The inn's grid, zones and mist gates are defined in data (`data/inn.json`). The inn scene places tiles to
@@ -692,8 +696,9 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
 - **BRD-02** During Dusk, the player places units and fixtures on free floor tiles by drag and drop. Some fixtures
   belong to a zone (the bar counter in the Bar, the stage in the Stage zone); some techniques need a fixture to work
   (Drink needs a bar counter, Food a table, Cards a card table, `STF-02`).
-- **BRD-03** Placements must leave a path from the front door to every zone. A placement that would block it is
-  refused (`TileBlocked`).
+- **BRD-03** Placements must leave a path from the front door to every zone, and to **every room on its own**: a
+  placement that cuts off any single room is refused, even when another room is still reachable. A placement that
+  would block either is refused (`TileBlocked`).
 - **BRD-04** Placements stay from cycle to cycle until the player moves them; destroyed fixtures stay in place,
   broken, until they are repaired.
 - **BRD-05** The front door is where every creature enters. Fixtures may not be placed on the door tile or the two
@@ -1060,7 +1065,7 @@ acceptance criteria and a demo. After each step the human builds, tests, plays t
 
 **Common preamble** (put before every step prompt):
 
-> You are implementing Misty Inn from SDD v1.2. Work **only** on the step below; do not start later steps. Read
+> You are implementing Misty Inn from SDD v1.3. Work **only** on the step below; do not start later steps. Read
 > sections 0, 2, 17 and 22 and the sections the step lists first. Apply the invariants (section 2) and the agent
 > rules (section 22). If anything is ambiguous, contradictory or missing, **stop and ask** before writing code. Do not
 > run builds, tests, Godot or git: list the exact commands for the human and mark results NOT RUN. Finish with the
@@ -1139,8 +1144,9 @@ turning for visible reasons.
 **Prompt:** Add turning and the three escalation stages, combat with the Fists and Weapons techniques, banishing,
 staff falling and the wound-or-die roll, the innkeeper's fall ending the run, fixture damage and integrity, Dawn
 repairs, Company preferences and refusals, room sessions, interruptions (violence and attacked doors), hosting, and
-both content filters. Blood and flavour text follow section 17.
-**Covers:** ESC-01..10, STF-11, STF-12, CMP-01..06, BRD-06, BRD-07, RUN-03, RAT-02..09, SET-04 (logic), DAT-06,
+both content filters, and extend the path check so that every room stays reachable on its own (`BRD-03`). Blood and
+flavour text follow section 17.
+**Covers:** ESC-01..10, STF-11, STF-12, CMP-01..06, BRD-03, BRD-06, BRD-07, RUN-03, RAT-02..09, SET-04 (logic), DAT-06,
 TST-06, TST-10.
 **Acceptance:** Tests for every escalation and combat rule, for refusals being honoured and for room sessions; a chain
 reaction can happen and be read in the log.
@@ -1472,7 +1478,7 @@ regenerate it whenever the SDD changes.
 | CMP-06 | With the suggestive content filter on (`SET-04`), Company becomes Hosting:... | 11.5 |
 | BRD-01 | The inn is a grid of 1 m tiles (prototype: 14 × 10) divided into zones: Entrance,... | 12.1 |
 | BRD-02 | During Dusk, the player places units and fixtures on free floor tiles by drag and drop | 12.1 |
-| BRD-03 | Placements must leave a path from the front door to every zone | 12.1 |
+| BRD-03 | Placements must leave a path from the front door to every zone, and to every room on... | 12.1 |
 | BRD-04 | Placements stay from cycle to cycle until the player moves them; destroyed fixtures... | 12.1 |
 | BRD-05 | The front door is where every creature enters | 12.1 |
 | BRD-06 | Integrity is the inn's overall health (100 at the start of a run) | 12.1 |

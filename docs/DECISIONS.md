@@ -47,6 +47,15 @@ proposed details were approved with SDD v1.0 (2026-10-20). **Proposed** marks a 
 | D-039 | Full event buffer drops the oldest event | Accepted | 2026-10-20 | ARC-12, INV-05 |
 | D-040 | Bounded cycle log with a truncation marker and key strings | Accepted | 2026-10-20 | INV-12, INV-05 |
 | D-041 | GameSession skeleton without a run state | Accepted | 2026-10-20 | ARC-01, ARC-11 |
+| D-042 | Core owns the fixed-step accumulator | Accepted | 2026-10-20 | SIM-02, INV-03 |
+| D-043 | Staff do not block movement; one unit per tile | Accepted | 2026-10-20 | BRD-02, BRD-03 |
+| D-044 | Built-in step 2 content and layout | Accepted | 2026-10-20 | BRD-01, PLN-02, PLN-04, INV-04 |
+| D-045 | A new run is a new session; the first Dusk raises no events | Accepted | 2026-10-20 | ARC-01, RUN-01 |
+| D-046 | Game time runs only during the mist | Accepted | 2026-10-20 | SIM-01, CYC-01, INV-03 |
+| D-047 | ContinueFromDawn and new refusal reasons | Accepted | 2026-10-20 | ARC-10, ARC-11, CYC-04, ESC-06 |
+| D-048 | Placeholder HUD and input for step 2 | Accepted | 2026-10-20 | CAM-12, CAM-13, CYC-10, UI-09 |
+| D-049 | Orthographic camera at 50° with a 45° start | Accepted | 2026-10-20 | CAM-10 |
+| D-050 | Every room must stay reachable on its own | Accepted | 2026-10-20 | BRD-03 |
 
 ---
 
@@ -474,3 +483,107 @@ proposed details were approved with SDD v1.0 (2026-10-20). **Proposed** marks a 
   a step adds its handler. `RunState`, concrete commands and concrete events are added by the steps that need them.
 - **Alternatives considered:** An empty `RunState` placeholder now (dead code until step 2).
 - **Requirement IDs affected:** ARC-01, ARC-03, ARC-11.
+
+## D-042 Core owns the fixed-step accumulator
+- **Status:** Accepted (approved by the human after step 2)
+- **Date / step:** 2026-10-20, step 2
+- **Context:** SIM-02 says GameRoot accumulates frame time and runs the due fixed steps; INV-03 says time advances only
+  through `GameSession.Tick`, with a fixed step.
+- **Decision:** `Tick(delta)` takes real frame time, multiplies it by the speed, and runs the due 1/30 s steps inside
+  Core. The owed time is kept as an integer (TimeSpan ticks × 30), so whole steps are exact and the outcome never
+  depends on the frame rate (tested). One `Tick` runs at most 120 steps; a longer frame drops the backlog instead of
+  freezing to catch up. `InterpolationAlpha` tells views how far the next step is.
+- **Alternatives considered:** GameRoot accumulating and calling `Tick(step)` repeatedly, as SIM-02 is worded (the same
+  result, but the rule would live in an untested node).
+- **Requirement IDs affected:** SIM-02, SIM-03, INV-03. SIM-02's wording should follow (recommended SDD change).
+
+## D-043 Staff do not block movement; one unit per tile
+- **Status:** Accepted (approved by the human after step 2)
+- **Date / step:** 2026-10-20, step 2
+- **Context:** The SDD places staff on tiles but does not say whether creatures can walk through them.
+- **Decision:** One unit per tile; creatures walk past staff (staff never block a path). Staff may stand anywhere on
+  the inn floor, including the two tiles in front of the door; only fixtures are kept off them (BRD-05). The path rule
+  (BRD-03) therefore matters only for blocking fixtures, from step 4; `InnBoard.WouldBlockPath` is ready for them.
+  Rooms are one zone until step 5 gives each room its own door rules.
+- **Alternatives considered:** Staff blocking tiles (a staff member in the doorway would lock the inn).
+- **Requirement IDs affected:** BRD-02, BRD-03, BRD-05.
+
+## D-044 Built-in step 2 content and layout
+- **Status:** Accepted (approved by the human after step 2)
+- **Date / step:** 2026-10-20, step 2
+- **Context:** Step 2 uses a hard-coded layout; content files arrive in step 3.
+- **Decision:** `DefaultContent` holds a 26 × 20 map: the inn (14 × 10 floor inside walls) in the middle of the
+  clearing, with the front door on the south wall and five mist gates at the edges. It has every BRD-01 zone (two back
+  rooms with doorways), the five planes (three unlocked), one placeholder creature per plane, three starting units
+  (the innkeeper and two staff) and the section 6.4 tuning. Planes take the gates in map order. `GameContent` checks
+  only what the simulation relies on; step 3 replaces this with `data/*.json` and the full validator.
+- **Alternatives considered:** Writing `data/inn.json` now (step 3 work).
+- **Requirement IDs affected:** BRD-01, PLN-02, PLN-04, INV-04.
+
+## D-045 A new run is a new session; the first Dusk raises no events
+- **Status:** Accepted (approved by the human after step 2)
+- **Date / step:** 2026-10-20, step 2
+- **Context:** ARC-10 lists `StartRun(seed)`, but there is no title screen until step 9.
+- **Decision:** A run is one `GameSession`, created with its seeded random source; GameRoot makes one at start (seed
+  from its `Seed` export, or random). The session starts at Dusk of cycle 1 with the forecast drawn, and the views read
+  that starting state through queries, so no events are raised for it. `StartRun` waits for the title screen (steps 7
+  and 9).
+- **Alternatives considered:** A `StartRun` command on an empty session now.
+- **Requirement IDs affected:** ARC-01, ARC-10, RUN-01.
+
+## D-046 Game time runs only during the mist
+- **Status:** Accepted (approved by the human after step 2)
+- **Date / step:** 2026-10-20, step 2
+- **Context:** SIM-01 measures time from the start of the mist; Dusk and Dawn are untimed (SIM-02, CYC-01).
+- **Decision:** `Tick` does nothing at Dusk, at Dawn or at speed 0, and `Time` restarts at 0 when the mist begins. Three
+  step 1 tests that ticked at Dusk now begin the mist first, or compare the state hash instead of the time; what they
+  check is unchanged.
+- **Alternatives considered:** A clock that runs in every phase (nothing would use it).
+- **Requirement IDs affected:** SIM-01, SIM-02, CYC-01, INV-03, INV-08.
+
+## D-047 ContinueFromDawn and new refusal reasons
+- **Status:** Accepted (approved by the human after step 2)
+- **Date / step:** 2026-10-20, step 2
+- **Context:** CYC-04 says moving on from Dawn starts the next Dusk, but ARC-10 has no command for it; the step's rules
+  need more refusal reasons than ARC-11 lists.
+- **Decision:** New command `ContinueFromDawn`. New `CommandFailure` values: `UnknownUnit`, `TileOccupied`,
+  `CannotBench` (the innkeeper, ESC-06), `InnkeeperNotPlaced` (the mist cannot begin without the innkeeper on the board)
+  and `InvalidValue` (a speed other than 0, 1, 2 or 4). Every refusal changes nothing (tested with the state hash).
+- **Alternatives considered:** Starting the next Dusk automatically after Dawn (the player needs Dawn to read the
+  summary).
+- **Requirement IDs affected:** ARC-10, ARC-11, CYC-04, ESC-06.
+
+## D-048 Placeholder HUD and input for step 2
+- **Status:** Accepted (approved by the human after step 2)
+- **Date / step:** 2026-10-20, step 2
+- **Context:** Step 2 needs enough UI to play a cycle; the UI pass is step 9.
+- **Decision:** A HUD built in code (`Hud.cs`): cycle, phase, time to dawn, speed, the forecast, staff slots, the seed,
+  messages for refused commands, the bench (drag a name onto the floor), Begin the Mist, speed buttons, Continue, a
+  selection line and a pause menu. Dragging a placed unit moves it; dropping it on the bench, or right-clicking it,
+  benches it (Sell and Rotate come with the shop and fixtures). In the mist, clicking selects the nearest creature or
+  unit, and F follows it (CAM-12); the full panel comes in step 9. Esc opens the pause menu, which stops ticking
+  (CYC-10); its Quit closes the game until the title screen exists, and Settings comes in step 8. Texts go through
+  `Tr()` with English keys.
+- **Alternatives considered:** Designed `.tscn` screens now (would be redone in step 9).
+- **Requirement IDs affected:** CAM-12, CAM-13, CYC-10, UI-09.
+
+## D-049 Orthographic camera at 50° with a 45° start
+- **Status:** Accepted (approved by the human after step 2)
+- **Date / step:** 2026-10-20, step 2
+- **Context:** CAM-10 allows orthographic or narrow-FOV perspective, about 45° down.
+- **Decision:** Orthographic, pitched 50° down, starting at a 45° yaw for the classic isometric look; zoom changes the
+  orthographic size (8 to 34 m). Edge panning is on by default (SET-03 will make it a setting). The roof fade (CAM-11)
+  waits for walls tall enough to hide anything (step 10).
+- **Alternatives considered:** A narrow-FOV perspective camera.
+- **Requirement IDs affected:** CAM-10, CAM-11.
+
+## D-050 Every room must stay reachable on its own
+- **Status:** Accepted
+- **Date / step:** 2026-10-20, step 2 report (SDD v1.3)
+- **Context:** BRD-03 required a path from the front door to every zone. The Rooms zone holds several rooms, so
+  blocking one room's doorway passed the check as long as another room was still reachable (D-043).
+- **Decision:** The human chose the stricter rule: every room must stay reachable on its own, and a placement that cuts
+  off any single room is refused (`TileBlocked`). The step 2 check (`InnBoard.WouldBlockPath`) is zone-based; step 5,
+  which gives rooms their identity, extends it to each room.
+- **Alternatives considered:** The Rooms zone as a whole being enough.
+- **Requirement IDs affected:** BRD-03.

@@ -19,7 +19,9 @@ public class GameSessionTests
     [Property("Requirement", "INV-03")]
     public void TickAdvancesGameTime()
     {
+        // Since step 2, game time runs only during the mist (SIM-01).
         var session = NewSession();
+        TestGame.StartMist(session);
 
         session.Tick(TimeSpan.FromSeconds(1.5));
         session.Tick(TimeSpan.FromSeconds(0.5));
@@ -54,13 +56,13 @@ public class GameSessionTests
     public void CommandWithoutAHandlerIsRefusedAndChangesNothing()
     {
         var session = NewSession();
-        session.Tick(TimeSpan.FromSeconds(3));
+        var before = session.ComputeStateHash();
 
         var result = session.Execute(new UnknownCommand());
 
         Assert.That(result.Succeeded, Is.False);
         Assert.That(result.Failure, Is.EqualTo(CommandFailure.NotSupported));
-        Assert.That(session.Time, Is.EqualTo(TimeSpan.FromSeconds(3)));
+        Assert.That(session.ComputeStateHash(), Is.EqualTo(before));
         Assert.That(session.DrainEvents(), Is.Empty);
         Assert.That(session.CycleLogEntries, Is.Empty);
     }
@@ -123,13 +125,15 @@ public class GameSessionTests
     public void LogEntriesAreStampedWithGameTime()
     {
         var session = NewSession();
+        TestGame.StartMist(session);
         session.Tick(TimeSpan.FromSeconds(4));
 
         session.Log("test.kind", "test.cause", new UnitId(1).ToRef());
 
-        Assert.That(session.CycleLogEntries, Has.Count.EqualTo(1));
-        Assert.That(session.CycleLogEntries[0].At, Is.EqualTo(TimeSpan.FromSeconds(4)));
-        Assert.That(session.CycleLogEntries[0].Subject, Is.EqualTo(new UnitId(1).ToRef()));
+        var last = session.CycleLogEntries[^1];
+        Assert.That(last.Kind, Is.EqualTo("test.kind"));
+        Assert.That(last.At, Is.EqualTo(TimeSpan.FromSeconds(4)));
+        Assert.That(last.Subject, Is.EqualTo(new UnitId(1).ToRef()));
     }
 
     [Test]

@@ -1,0 +1,27 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/units/UnitView.cs" id="1_unit"]
+
+[sub_resource type="StandardMaterial3D" id="Material_staff"]
+albedo_color = Color(0.72, 0.66, 0.55, 1)
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_staff"]
+material = SubResource("Material_staff")
+radius = 0.26
+height = 1.3
+
+[node name="Staff" type="Node3D" node_paths=PackedStringArray("Label")]
+script = ExtResource("1_unit")
+Label = NodePath("Label")
+
+[node name="Body" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.65, 0)
+mesh = SubResource("CapsuleMesh_staff")
+
+[node name="Label" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.7, 0)
+billboard = 1
+pixel_size = 0.004
+font_size = 40
+outline_size = 10
+text = "Staff"
