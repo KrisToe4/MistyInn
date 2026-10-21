@@ -26,7 +26,8 @@ placeholder art: place the innkeeper and staff at Dusk, watch creatures walk in 
 at Dawn. Step 3 moves all content into `data/*.json`, checked by a validator when the game starts. Step 4 brings the inn to
 life: creatures get agitated, seek what they want, and are soothed by your staff and fixtures, or turn. Step 5 makes
 turning dangerous: turned creatures wreck, prey and hunt the innkeeper, fighters defend the inn, and companions take
-guests to the back rooms.
+guests to the back rooms. Step 6 adds the shop: hire staff at a rank, buy them again to upgrade them one rank and pick
+from their tree, give them items, buy inn items that show in the inn, and build synergies from classes and origins.
 
 ## Design documents
 
@@ -65,14 +66,17 @@ dotnet test MistyInn.sln
 | Drag a name from the bench onto the floor | Place a staff member (Dusk) |
 | Drag a placed unit | Move it; drop it on the bench to bench it (Dusk) |
 | Right-click a placed unit | Bench it (Dusk) |
-| Build menu (top right) | Buy fixtures into storage, and supplies (Dusk) |
+| Shop tab (top right) | Hire staff or upgrade owned ones (badge *Upgrade*), buy items, Reroll, Lock; synergies below (Dusk) |
+| Upgrade dialog | After buying an upgrade, pick the new rank's option; nothing else works until you do |
+| Build menu tab (top right) | Buy fixtures into storage, and supplies (Dusk) |
+| Staff and items tab (top right) | Sell staff, give items from storage (*Give to…*), unequip, sell items and inn items (Dusk) |
 | Drag a fixture from storage or the floor; R while dragging | Place or move it; rotate it (Dusk) |
 | Right-click a placed fixture; Sell in storage | Put it back in storage; sell it for half (Dusk) |
 | WASD / arrow keys, middle mouse drag, screen edges | Pan the camera |
 | Mouse wheel | Zoom |
 | Hover over the board | The HUD shows the tile (x,y) and its zone; a drag label shows the drop tile |
 | Q / E | Rotate the camera 90° |
-| Left-click (mist) | Select a creature or unit |
+| Left-click (mist) | Select a creature or unit; a staff member shows rank, classes, origin, ancestry (? until revealed), techniques and items |
 | F | Follow the selection |
 | Pause, 1×, 2×, 4× buttons | Mist speed |
 | Repair buttons (Dawn) | Repair integrity, 1 silver per 5 points; fixtures repair for free |
@@ -87,8 +91,9 @@ MistyInn.csproj/.sln   Godot C# project and solution (open the .sln in Visual St
 Directory.Build.props  Shared build settings for Core and the tests
 .editorconfig          Code style
 icon.svg               Project icon
-data/                  Game content as JSON: balance, inn map, planes, creatures, staff, techniques, items,
-                       fixtures, flavour (placeholder roster; edit freely, the validator checks it)
+data/                  Game content as JSON: balance, inn map (with display spots), planes, creatures, staff,
+                       techniques, items, fixtures, flavour, synergies (placeholder roster; edit freely, the
+                       validator checks it)
 scenes/                Main.tscn and the inn, unit and UI scenes (placeholder art)
 scripts/               Godot node scripts: GameRoot, camera, board, units, UI
 src/MistyInn.Core/     Engine-free game rules (no Godot reference)

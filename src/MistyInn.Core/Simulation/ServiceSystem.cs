@@ -16,14 +16,16 @@ internal sealed class ServiceSystem
     private readonly RunState _run;
     private readonly IEventSink _sink;
     private readonly InnSense _sense;
+    private readonly AncestryObserver _ancestry;
     private readonly Dictionary<CreatureId, (double Rate, string By)> _rates = new();
 
-    public ServiceSystem(GameContent content, RunState run, IEventSink sink, InnSense sense)
+    public ServiceSystem(GameContent content, RunState run, IEventSink sink, InnSense sense, AncestryObserver ancestry)
     {
         _content = content;
         _run = run;
         _sink = sink;
         _sense = sense;
+        _ancestry = ancestry;
     }
 
     /// <summary>The soothe rate (agitation points per second) each served creature gets this step, and from what.</summary>
@@ -105,7 +107,7 @@ internal sealed class ServiceSystem
             }
         }
 
-        return Reaches(post, technique, creature);
+        return Reaches(post, technique, creature, unit);
     }
 
     /// <summary>A companion's refusals are always honoured (CMP-02, RAT-07).</summary>
@@ -114,11 +116,13 @@ internal sealed class ServiceSystem
     /// <summary>
     /// Reach (D-064): a technique that needs a fixture serves creatures seated at a working fixture that enables it,
     /// within the technique's range of the staff member; from beside the stage, Song and Dance reach the stage's zone
-    /// and the zones next to it; otherwise the technique reaches its range.
+    /// and the zones next to it, plus a zone for an adjacent Lantern (FIX-03) and the Entertainer synergy (SYN-02);
+    /// otherwise the technique reaches its range (with a mastery's bonus, STF-17).
     /// </summary>
-    public bool Reaches(Tile post, TechniqueDef technique, Creature creature)
+    public bool Reaches(Tile post, TechniqueDef technique, Creature creature, Unit? unit = null)
     {
         var postPosition = TilePosition.Center(post);
+        var range = unit?.RangeOf(technique) ?? technique.Range;
 
         if (technique.NeedsFixture)
         {
@@ -126,7 +130,7 @@ internal sealed class ServiceSystem
                 && _sense.Working(EffectKind.Enables).Any(w =>
                     w.Effect.Technique == technique.Id
                     && w.Fixture.Seats.Contains(spot)
-                    && InnSense.DistanceToTiles(postPosition, w.Fixture.Tiles) <= technique.Range + 0.5);
+                    && InnSense.DistanceToTiles(postPosition, w.Fixture.Tiles) <= range + 0.5);
         }
 
         foreach (var (fixture, effect) in _sense.Working(EffectKind.Enables))
@@ -134,7 +138,8 @@ internal sealed class ServiceSystem
             if (effect.Technique == technique.Id && effect.Zones is > 0
                 && fixture.Tiles.Any(t => Math.Max(Math.Abs(t.X - post.X), Math.Abs(t.Y - post.Y)) <= 1))
             {
-                var zones = _sense.ZonesAround(_content.Layout.ZoneAt(fixture.Tiles[0]), effect.Zones.Value);
+                var levels = effect.Zones.Value + _sense.AdjacentAmount(fixture, EffectKind.Radius) + (unit?.ExtraZones(technique) ?? 0);
+                var zones = _sense.ZonesAround(_content.Layout.ZoneAt(fixture.Tiles[0]), levels);
                 if (zones.Contains(_sense.ZoneOf(creature.Position)))
                 {
                     return true;
@@ -142,15 +147,17 @@ internal sealed class ServiceSystem
             }
         }
 
-        return postPosition.DistanceTo(creature.Position) <= technique.Range;
+        return postPosition.DistanceTo(creature.Position) <= range;
     }
 
     /// <summary>
-    /// Agitation points per second this staff member soothes with this technique (AGI-06): ×1.5 for a companion's
-    /// preferred guest (CMP-02) and ×0.8 while Shaken (STF-12).
+    /// Agitation points per second this staff member soothes with this technique (AGI-06): the rank (STF-06), mastery,
+    /// items and synergies (STF-17, ITM-06, SYN-02), a revealed ancestry (STF-16), ×1.5 for a companion's preferred
+    /// guest (CMP-02) and ×0.8 while Shaken (STF-12).
     /// </summary>
     public double SootheRate(Unit unit, TechniqueDef technique, Creature creature) =>
         unit.Stats.Soothe * unit.RankMultiplier * technique.Soothe
+        * unit.SootheBonus(technique, creature.Def.PlaneId) * _ancestry.SootheBonus(unit, creature.Def)
         * Strength(creature.Def, technique) * Tuning.SootheScale
         * (technique.Technique == Technique.Company && unit.Def.PrefersOrEmpty.Contains(creature.Def.Id)
             ? _content.Balance.Company.PreferredSoothe
@@ -184,7 +191,7 @@ internal sealed class ServiceSystem
         }
 
         var t = choice.Technique;
-        var limit = t.Capacity;
+        var limit = unit.CapacityOf(t);
         if (t.Supply is { } s)
         {
             limit = Math.Min(limit, _run.Supplies[s]);
@@ -207,8 +214,10 @@ internal sealed class ServiceSystem
         _sink.Raise(new ServiceStarted(_sink.Time, unit.Id, t.Id, targets));
         foreach (var id in targets)
         {
-            _run.FindCreature(id)!.WasServed = true;
+            var served = _run.FindCreature(id)!;
+            served.WasServed = true;
             _sink.Log("service.started", $"technique.{t.Id}", id.ToRef(), unit.Id.ToRef());
+            _ancestry.Observe(unit, served.Def);
         }
 
         return new ServiceSession(t, targets, now + _content.Balance.ServiceSessionSeconds);

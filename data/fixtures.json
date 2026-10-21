@@ -46,11 +46,17 @@
   },
   {
     "id": "lantern", "name": "Lantern", "shape": [[0, 0]], "health": 10, "cost": 1,
-    "effects": [ { "kind": "Emits", "trigger": "Light", "radius": 3 } ]
+    "effects": [
+      { "kind": "Emits", "trigger": "Light", "radius": 3 },
+      { "kind": "Radius", "adjacentTo": "stage", "amount": 1 }
+    ]
   },
   {
     "id": "ward-circle", "name": "Ward circle", "shape": [[0, 0]], "health": 40, "cost": 4,
-    "effects": [ { "kind": "AgitationRate", "radius": 2, "multiplier": 0.75 } ]
+    "effects": [
+      { "kind": "AgitationRate", "radius": 2, "multiplier": 0.75 },
+      { "kind": "Blocks", "adjacentTo": "RoomDoor", "amount": 1 }
+    ]
   },
   {
     "id": "barricade", "name": "Barricade", "shape": [[0, 0]], "health": 60, "cost": 2,

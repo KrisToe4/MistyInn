@@ -29,11 +29,51 @@ internal sealed class InnSense
     public static double DistanceBetween(IReadOnlyList<Tile> a, IReadOnlyList<Tile> b) =>
         a.Count == 0 || b.Count == 0 ? double.PositiveInfinity : a.Min(t => DistanceToTiles(TilePosition.Center(t), b));
 
-    /// <summary>The effects of working (placed, unbroken) fixtures, of one kind, in fixture order.</summary>
+    /// <summary>
+    /// The effects of working (placed, unbroken) fixtures, of one kind, in fixture order: their own, and those of the
+    /// fixtures they count as through inn items (<c>CountsAs</c>, ITM-06). An effect with an adjacency rule works only
+    /// while that rule holds (FIX-03, D-079).
+    /// </summary>
     public IEnumerable<(Fixture Fixture, EffectDef Effect)> Working(EffectKind kind) =>
         _run.PlacedFixtures
             .Where(f => !f.IsBroken)
-            .SelectMany(f => f.Def.Effects.Where(e => e.Kind == kind).Select(e => (f, e)));
+            .SelectMany(f => EffectsOf(f).Where(e => e.Kind == kind && (e.AdjacentTo is null || IsAdjacentTo(f, e.AdjacentTo))).Select(e => (f, e)));
+
+    /// <summary>
+    /// The sum of the amounts of working <paramref name="kind"/> effects whose fixtures stand next to
+    /// <paramref name="target"/> and name its type (FIX-03): for example a Lantern adding a zone to the Stage's reach.
+    /// </summary>
+    public int AdjacentAmount(Fixture target, EffectKind kind) =>
+        (int)Working(kind)
+            .Where(w => w.Fixture != target && w.Effect.AdjacentTo == target.Def.Id && AreAdjacent(w.Fixture.Tiles, target.Tiles))
+            .Sum(w => w.Effect.Amount ?? 0);
+
+    /// <summary>The door attacks a room's session is shielded from this mist: Ward circles next to its door (FIX-03, D-079).</summary>
+    public int ShieldsFor(Room room) =>
+        (int)Working(EffectKind.Blocks)
+            .Where(w => w.Effect.AdjacentTo == EffectDef.AdjacentToRoomDoor && AreAdjacent(w.Fixture.Tiles, new[] { room.Door }))
+            .Sum(w => w.Effect.Amount ?? 1);
+
+    /// <summary>Whether two sets of tiles touch, counting diagonals (the 8 neighbours of FIX-03).</summary>
+    public static bool AreAdjacent(IReadOnlyList<Tile> a, IReadOnlyList<Tile> b) =>
+        a.Any(t => b.Any(u => t != u && Math.Abs(t.X - u.X) <= 1 && Math.Abs(t.Y - u.Y) <= 1));
+
+    private IEnumerable<EffectDef> EffectsOf(Fixture fixture)
+    {
+        var effects = fixture.Def.Effects.AsEnumerable();
+        foreach (var countsAs in _run.InnItems.SelectMany(i => i.Def.Effects)
+                     .Where(e => e.Kind == EffectKind.CountsAs && e.Fixture == fixture.Def.Id))
+        {
+            effects = effects.Concat(_content.Fixture(countsAs.CountsAs!).Effects);
+        }
+
+        return effects;
+    }
+
+    private bool IsAdjacentTo(Fixture fixture, string adjacentTo) =>
+        adjacentTo == EffectDef.AdjacentToRoomDoor
+            ? _run.Rooms.Any(r => AreAdjacent(fixture.Tiles, new[] { r.Door }))
+            : _run.PlacedFixtures.Any(f => f != fixture && !f.IsBroken && f.Def.Id == adjacentTo && AreAdjacent(fixture.Tiles, f.Tiles));
 
     /// <summary>
     /// Whether a fixture-borne trigger (Light, Noise, Heat) reaches <paramref name="tiles"/> from within its radius

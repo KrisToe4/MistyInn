@@ -45,7 +45,8 @@ public static partial class ContentValidator
             if (Missing(_set.Balance, "balance.json") | Missing(_set.Inn, "inn.json") | Missing(_set.Planes, "planes.json")
                 | Missing(_set.Creatures, "creatures.json") | Missing(_set.Techniques, "techniques.json")
                 | Missing(_set.Staff, "staff.json") | Missing(_set.Items, "items.json")
-                | Missing(_set.Fixtures, "fixtures.json") | Missing(_set.Flavour, "flavour.json"))
+                | Missing(_set.Fixtures, "fixtures.json") | Missing(_set.Flavour, "flavour.json")
+                | Missing(_set.Synergies, "synergies.json"))
             {
                 return;
             }
@@ -59,6 +60,7 @@ public static partial class ContentValidator
             Fixtures();
             Items();
             Flavour();
+            Synergies();
             Balance();
         }
 
@@ -161,6 +163,12 @@ public static partial class ContentValidator
             if (unreachable.Count > 0)
             {
                 Error($"inn.json: no path from the front door to {string.Join(", ", unreachable)} (BRD-03).");
+            }
+
+            foreach (var (name, at) in inn.DisplaySpots ?? new Dictionary<string, IReadOnlyList<int>>())
+            {
+                if (at is null || at.Count != 2 || !_layout.Contains(new Tile(at[0], at[1])))
+                    Error($"inn.json: display spot '{name}' must be an [x, y] tile on the map (ITM-04).");
             }
 
             if (_set.Planes.Count > _layout.Gates.Count)
@@ -445,6 +453,10 @@ public static partial class ContentValidator
                 if (i.Effects is null || i.Effects.Count == 0) Error($"{where} has no effects.");
                 if (i.Kind == ItemKind.Inn && (string.IsNullOrWhiteSpace(i.DisplaySpot) || string.IsNullOrWhiteSpace(i.DisplayModel)))
                     Error($"{where}: an inn item needs a display model and a display spot (ITM-04).");
+                if (i.Kind == ItemKind.Inn && i.DisplaySpot is { } spot && _set.Inn.DisplaySpots?.ContainsKey(spot) != true)
+                    Error($"{where}: display spot '{spot}' is not in inn.json (ITM-04).");
+                if (i.ClassTags is { } tags && tags.Distinct().Count() != tags.Count)
+                    Error($"{where}: a class tag is listed twice (ITM-03).");
                 if (i.Kind == ItemKind.Staff && i.DisplaySpot is not null)
                     Error($"{where}: a staff item has no display spot.");
                 foreach (var effect in i.Effects ?? []) Effect(where, effect);
@@ -458,6 +470,37 @@ public static partial class ContentValidator
                 var where = $"flavour.json: line '{f.Id}'";
                 if (string.IsNullOrWhiteSpace(f.Text) || string.IsNullOrWhiteSpace(f.Context)) Error($"{where} needs a context and text.");
                 if (f.FilterSafe is null || f.BloodSafe is null) Error($"{where}: filterSafe and bloodSafe are both required (DAT-06).");
+            }
+        }
+
+        /// <summary>SYN-01: a class synergy has tiers at 2, 4 and 6 (or some of them), an origin synergy at 2 and 4.</summary>
+        private void Synergies()
+        {
+            var ids = new HashSet<string>();
+            foreach (var syn in _set.Synergies)
+            {
+                Id("synergies.json", syn.Id, ids);
+                var where = $"synergies.json: synergy '{syn.Id}'";
+                if (string.IsNullOrWhiteSpace(syn.Name)) Error($"{where} has no name.");
+                if ((syn.Class is null) == (syn.Origin is null)) Error($"{where} needs either a class or an origin (SYN-01).");
+                if (syn.Origin is { } origin && origin != MortalRealm && !_planeIds.Contains(origin))
+                    Error($"{where}: unknown origin '{origin}'.");
+
+                var allowed = syn.Class is not null ? new[] { 2, 4, 6 } : new[] { 2, 4 };
+                if (syn.Tiers is null || syn.Tiers.Count == 0)
+                {
+                    Error($"{where} needs at least one tier.");
+                    continue;
+                }
+
+                for (var i = 0; i < syn.Tiers.Count; i++)
+                {
+                    var tier = syn.Tiers[i];
+                    if (!allowed.Contains(tier.Count) || (i > 0 && tier.Count <= syn.Tiers[i - 1].Count))
+                        Error($"{where}: tier counts must be from {string.Join(", ", allowed)}, in increasing order (SYN-01).");
+                    if (tier.Effects is null || tier.Effects.Count == 0) Error($"{where}: the tier at {tier.Count} has no effects.");
+                    foreach (var effect in tier.Effects ?? []) Effect(where, effect);
+                }
             }
         }
 
@@ -543,6 +586,9 @@ public static partial class ContentValidator
             if (shop.StaffOffers < 1 || shop.ItemOffers < 0 || shop.RerollBase < 0 || shop.RerollStep < 0
                 || shop.PityWeight < 1 || shop.HomePlaneWeight < 1 || shop.RankPriceStep < 0)
                 Error($"{where}: a shop value is out of range.");
+            if (shop.ItemWeights is null || Enum.GetValues<Rarity>().Any(r => !shop.ItemWeights.TryGetValue(r, out var w) || w < 0)
+                || shop.ItemWeights.Values.Sum() <= 0)
+                Error($"{where}: shop.itemWeights needs a weight of at least 0 for every rarity, not all 0 (D-080).");
             if (shop.RankOdds is null || shop.RankOdds.Count == 0 || shop.RankOdds[0].FromCycle != 1)
                 Error($"{where}: rankOdds must start from cycle 1.");
             else
@@ -584,6 +630,8 @@ public static partial class ContentValidator
             if (e.Technique is { } t && !_techniqueIds.Contains(t)) Error($"{where}: unknown technique '{t}'.");
             if (e.Fixture is { } f && !_fixtureIds.Contains(f)) Error($"{where}: unknown fixture '{f}'.");
             if (e.CountsAs is { } ca && !_fixtureIds.Contains(ca)) Error($"{where}: unknown fixture '{ca}'.");
+            if (e.AdjacentTo is { } adj && adj != EffectDef.AdjacentToRoomDoor && !_fixtureIds.Contains(adj))
+                Error($"{where}: adjacentTo must be a fixture or {EffectDef.AdjacentToRoomDoor}, not '{adj}' (FIX-03).");
             if (e.Kind == EffectKind.Emits && e.Trigger is not (TriggerKind.Light or TriggerKind.Noise or TriggerKind.Heat or TriggerKind.Cold))
                 Error($"{where}: a fixture can only give off Light, Noise, Heat or Cold.");
             if (e.Radius is < 0 || e.Seats is < 1 || e.Zones is < 0) Error($"{where}: a {e.Kind} effect has an out-of-range value.");

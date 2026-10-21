@@ -1,0 +1,87 @@
+[
+  {
+    "id": "companion-server", "name": "Companion/Server", "class": "CompanionServer",
+    "tiers": [
+      { "count": 2, "effects": [
+        { "kind": "Soothe", "technique": "company", "multiplier": 1.1 },
+        { "kind": "Soothe", "technique": "food", "multiplier": 1.1 },
+        { "kind": "Soothe", "technique": "drink", "multiplier": 1.1 } ] },
+      { "count": 4, "effects": [
+        { "kind": "Soothe", "technique": "company", "multiplier": 1.25 },
+        { "kind": "Soothe", "technique": "food", "multiplier": 1.25 },
+        { "kind": "Soothe", "technique": "drink", "multiplier": 1.25 } ] },
+      { "count": 6, "effects": [
+        { "kind": "Soothe", "technique": "company", "multiplier": 1.5 },
+        { "kind": "Soothe", "technique": "food", "multiplier": 1.5 },
+        { "kind": "Soothe", "technique": "drink", "multiplier": 1.5 } ] }
+    ]
+  },
+  {
+    "id": "gambler", "name": "Gambler", "class": "Gambler",
+    "tiers": [
+      { "count": 2, "effects": [ { "kind": "Tribute", "amount": 1 } ] },
+      { "count": 4, "effects": [ { "kind": "Tribute", "amount": 3 } ] }
+    ]
+  },
+  {
+    "id": "fighter", "name": "Fighter", "class": "Fighter",
+    "tiers": [
+      { "count": 2, "effects": [ { "kind": "Stat", "stat": "Armour", "amount": 2 } ] },
+      { "count": 4, "effects": [ { "kind": "Stat", "stat": "Armour", "amount": 4 } ] },
+      { "count": 6, "effects": [ { "kind": "Stat", "stat": "Armour", "amount": 7 } ] }
+    ]
+  },
+  {
+    "id": "entertainer", "name": "Entertainer", "class": "Entertainer",
+    "tiers": [
+      { "count": 2, "effects": [
+        { "kind": "Radius", "technique": "song", "amount": 1 },
+        { "kind": "Radius", "technique": "dance", "amount": 1 } ] },
+      { "count": 4, "effects": [
+        { "kind": "Radius", "technique": "song", "amount": 2 },
+        { "kind": "Radius", "technique": "dance", "amount": 2 } ] }
+    ]
+  },
+  {
+    "id": "mortal", "name": "Mortal", "origin": "mortal-realm",
+    "tiers": [
+      { "count": 2, "effects": [ { "kind": "Stat", "stat": "Health", "multiplier": 1.1 } ] },
+      { "count": 4, "effects": [ { "kind": "Stat", "stat": "Health", "multiplier": 1.25 } ] }
+    ]
+  },
+  {
+    "id": "drowned", "name": "Drowned", "origin": "drowned-deep",
+    "tiers": [
+      { "count": 2, "effects": [ { "kind": "Soothe", "plane": "drowned-deep", "multiplier": 1.5 } ] },
+      { "count": 4, "effects": [ { "kind": "Soothe", "plane": "drowned-deep", "multiplier": 1.75 } ] }
+    ]
+  },
+  {
+    "id": "ashen", "name": "Ashen", "origin": "ashen-waste",
+    "tiers": [
+      { "count": 2, "effects": [ { "kind": "Soothe", "plane": "ashen-waste", "multiplier": 1.5 } ] },
+      { "count": 4, "effects": [ { "kind": "Soothe", "plane": "ashen-waste", "multiplier": 1.75 } ] }
+    ]
+  },
+  {
+    "id": "hollow", "name": "Hollow", "origin": "hollow-wood",
+    "tiers": [
+      { "count": 2, "effects": [ { "kind": "Soothe", "plane": "hollow-wood", "multiplier": 1.5 } ] },
+      { "count": 4, "effects": [ { "kind": "Soothe", "plane": "hollow-wood", "multiplier": 1.75 } ] }
+    ]
+  },
+  {
+    "id": "gearbound", "name": "Gearbound", "origin": "gearbound-ruin",
+    "tiers": [
+      { "count": 2, "effects": [ { "kind": "Soothe", "plane": "gearbound-ruin", "multiplier": 1.5 } ] },
+      { "count": 4, "effects": [ { "kind": "Soothe", "plane": "gearbound-ruin", "multiplier": 1.75 } ] }
+    ]
+  },
+  {
+    "id": "pale", "name": "Pale", "origin": "pale-court",
+    "tiers": [
+      { "count": 2, "effects": [ { "kind": "Soothe", "plane": "pale-court", "multiplier": 1.5 } ] },
+      { "count": 4, "effects": [ { "kind": "Soothe", "plane": "pale-court", "multiplier": 1.75 } ] }
+    ]
+  }
+]

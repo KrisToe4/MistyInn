@@ -5,15 +5,15 @@ inn up at Dusk; the Mist phase then plays out automatically until Dawn. Godot 4.
 hobby prototype. It is built one step at a time from the design document.
 
 ## Read first
-- `docs/SDD.md`: the design document (SDD v1.8, approved). Before any work, read sections 0, 2, 17 and 22 and
+- `docs/SDD.md`: the design document (SDD v1.9, approved). Before any work, read sections 0, 2, 17 and 22 and
   Appendix A, plus the sections the requested step lists. Appendix D indexes every requirement ID; Appendix E is the
   glossary. Earlier versions are kept as `docs/SDD_v<version>.md`.
 - `docs/PROGRESS.md`: step status, build, test and smoke-run results, toolchain and package versions.
-- `docs/DECISIONS.md`: recorded decisions, with an index table at the top (D-001 to D-076 so far; continue numbering).
+- `docs/DECISIONS.md`: recorded decisions, with an index table at the top (D-001 to D-083 so far; continue numbering).
 - `docs/ASSETS.md`: third-party assets and their licences (created when the first asset is added).
 
 ## Current state
-- SDD v1.8 is approved. Steps 0 to 5 are complete.
+- SDD v1.9 is approved. Steps 0 to 6 are complete (step 6 demo not reported yet).
 - Step 1 built the solution structure and the Core skeleton: `src/MistyInn.Core` (GameSession, SeededRandom, event
   buffer, cycle log, entity IDs), `tests/MistyInn.Core.Tests` (49/49 pass in the .NET SDK container), shared build
   settings (D-037), the classic `.sln` with export build types mapped by hand (D-035), and the Windows export preset
@@ -33,7 +33,14 @@ hobby prototype. It is built one step at a time from the design document.
   play-through passed. It adds `CombatSystem`, `CompanySystem`, `InnDamage`, back rooms as their own zones with `RoomDoor` tiles,
   integrity and Dawn repairs, the Dawn wound-or-die roll, `ContentFilters` and `FlavourPicker`, and the debug dev
   panel (`DevAddStaff`, `DevSetConvergingPlanes`). Older cycle tests use `TestGame.Sturdy` content (D-076). Decisions
-  D-001 to D-076 are Accepted. The next step is step 6 (shop, ranks, items and synergies).
+  D-001 to D-076 are Accepted.
+- Step 6 (shop, ranks, items and synergies) is complete: build, 326/326 tests and smoke run passed (the demo
+  play-through is not reported yet); SDD v1.9 records it. The next step is step 7 (roguelike layer). It adds
+  `ShopSystem` (its own random stream, D-080), `Modifiers` (item, inn item and synergy effects; synergies go to all staff
+  on the board, D-077), `AncestryObserver` and `AncestryRecord` (kept across runs like the bestiary, D-082), ranks and
+  the pending upgrade pick (every other command refused until it is made, D-081), owned items with `ItemId`,
+  `data/synergies.json`, the locked annex `room-3` and `displaySpots` in `inn.json` (D-078), and `adjacentTo` effects
+  (D-079). The HUD has Shop, Build menu and Staff and items tabs and an upgrade dialog. D-077 to D-083 are Accepted (2026-10-21).
 - Godot is at `C:\Godot_v4.7.2`. If Smart App Control blocks `dotnet test`, the tests run in the .NET SDK Linux
   container.
 

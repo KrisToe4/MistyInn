@@ -8,10 +8,10 @@
     ".....#KKKKBBBBBBSSSS#.....",
     ".....#KKKKCCCCCCSSSS#.....",
     ".....#KKKKCCCCCCSSSS#.....",
-    ".....#####CCCCCCLLLL#.....",
-    ".....#RRRrCCCCCCLLLL#.....",
-    "G....#RRR#CCCCCCLLLL#....G",
-    ".....#####CCCCCCCCCX#.....",
+    ".....#####CCCCCCLLLL#####.",
+    ".....#RRRrCCCCCCLLLLpPPP#.",
+    "G....#RRR#CCCCCCLLLL#PPP#G",
+    ".....#####CCCCCCCCCX#####.",
     ".....#QQQqCEEEEECCCC#.....",
     ".....#QQQ#CEEEEECCCC#.....",
     ".....########D#######.....",
@@ -36,6 +36,16 @@
     "r": { "kind": "RoomDoor", "zone": "room-1" },
     "Q": { "kind": "Floor", "zone": "room-2" },
     "q": { "kind": "RoomDoor", "zone": "room-2" },
+    "P": { "kind": "Floor", "zone": "room-3" },
+    "p": { "kind": "RoomDoor", "zone": "room-3" },
     "X": { "kind": "Floor", "zone": "cellar-door" }
+  },
+  "displaySpots": {
+    "front-door": [12, 14],
+    "bar": [12, 3],
+    "shop-counter": [14, 3],
+    "innkeeper": [11, 3],
+    "hearth": [5, 5],
+    "rooms": [9, 10]
   }
 }

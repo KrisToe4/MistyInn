@@ -61,6 +61,9 @@ public partial class GameRoot : Node3D
 
     // The bestiary outlives the run and the scene (BST-04, D-066); step 8 saves it in the profile.
     private static readonly CreatureBestiary Bestiary = new();
+
+    // Revealed ancestries are kept across runs too (STF-16, D-082); step 8 saves them in the profile.
+    private static readonly AncestryRecord Ancestry = new();
     private GameSession _session = null!;
     private UnitId? _dragging;
     private FixtureId? _draggingFixture;
@@ -92,10 +95,11 @@ public partial class GameRoot : Node3D
         }
 
         var seed = Seed != 0 ? (ulong)Seed : (ulong)System.Random.Shared.NextInt64(1, long.MaxValue);
-        _session = new GameSession(new SeededRandom(seed), content: content, bestiary: Bestiary);
+        _session = new GameSession(new SeededRandom(seed), content: content, bestiary: Bestiary, ancestry: Ancestry);
 
         Inn.Build(_session.Content);
         Inn.ShowGates(_session.ConvergingPlanes.Select(p => p.Id));
+        Inn.ShowLockedRooms(_session.LockedRooms);
         var (min, max) = Inn.Bounds;
         CameraRig.SetBounds(min, max);
 
@@ -122,6 +126,14 @@ public partial class GameRoot : Node3D
         Hud.DevAddStaffPressed += OnDevAddStaff;
         Hud.DevPlanePressed += OnDevPlane;
         Hud.FiltersChanged += OnFiltersChanged;
+        Hud.BuyOfferPressed += OnBuyOffer;
+        Hud.RerollPressed += OnReroll;
+        Hud.LockToggled += OnLock;
+        Hud.ChooseUpgradePressed += OnChooseUpgrade;
+        Hud.SellUnitPressed += OnSellUnit;
+        Hud.EquipPressed += OnEquip;
+        Hud.UnequipPressed += OnUnequip;
+        Hud.SellItemPressed += OnSellItem;
         Hud.Refresh(_session);
         Hud.ShowMessage(Tr("Place the innkeeper, your staff and your fixtures, then begin the mist."), 8);
     }
@@ -160,6 +172,14 @@ public partial class GameRoot : Node3D
         Hud.DevAddStaffPressed -= OnDevAddStaff;
         Hud.DevPlanePressed -= OnDevPlane;
         Hud.FiltersChanged -= OnFiltersChanged;
+        Hud.BuyOfferPressed -= OnBuyOffer;
+        Hud.RerollPressed -= OnReroll;
+        Hud.LockToggled -= OnLock;
+        Hud.ChooseUpgradePressed -= OnChooseUpgrade;
+        Hud.SellUnitPressed -= OnSellUnit;
+        Hud.EquipPressed -= OnEquip;
+        Hud.UnequipPressed -= OnUnequip;
+        Hud.SellItemPressed -= OnSellItem;
     }
 
     public override void _Process(double delta)
@@ -324,6 +344,29 @@ public partial class GameRoot : Node3D
             case UnitJoined joined when _session.Units.FirstOrDefault(u => u.Id == joined.Unit) is { } unit:
                 AddUnitView(unit);
                 Hud.ShowMessage($"{unit.Name} {Tr("joins the bench.")}");
+                break;
+            case StaffSold sold when _units.Remove(sold.Unit, out var view):
+                if (_selected == view)
+                {
+                    ClearSelection();
+                }
+
+                view.QueueFree();
+                break;
+            case StaffHired hired:
+                Hud.ShowMessage($"{_session.Content.Character(hired.CharacterId).Name} {Tr("is hired at")} ★{hired.Rank}.");
+                break;
+            case UnitUpgraded upgraded when _units.TryGetValue(upgraded.Unit, out var view):
+                Hud.ShowMessage($"{view.DisplayName} {Tr("is now")} ★{upgraded.Rank}.");
+                break;
+            case InnItemAdded or InnItemRemoved:
+                Inn.ShowInnItems(_session.Items, _session.Content.DisplaySpots);
+                break;
+            case RoomsChanged:
+                Inn.ShowLockedRooms(_session.LockedRooms);
+                break;
+            case AncestryRevealed revealed when _units.TryGetValue(revealed.Unit, out var view):
+                Hud.ShowMessage($"{view.DisplayName}: {Tr("an old link to")} {_session.Content.Plane(revealed.PlaneId).Name} {Tr("comes to light.")}");
                 break;
             case StaffDied died when _units.Remove(died.Unit, out var view):
                 if (_selected == view)
@@ -661,6 +704,22 @@ public partial class GameRoot : Node3D
 
     private void OnFiltersChanged(ContentFilters filters) => Report(_session.Execute(new SetContentFilters(filters)));
 
+    private void OnBuyOffer(ShopSection section, int index) => Report(_session.Execute(new BuyOffer(section, index)));
+
+    private void OnReroll() => Report(_session.Execute(new Reroll()));
+
+    private void OnLock(bool locked) => Report(_session.Execute(new LockShop(locked)));
+
+    private void OnChooseUpgrade(UnitId unit, string optionId) => Report(_session.Execute(new ChooseUpgrade(unit, optionId)));
+
+    private void OnSellUnit(UnitId unit) => Report(_session.Execute(new SellUnit(unit)));
+
+    private void OnEquip(ItemId item, UnitId unit) => Report(_session.Execute(new EquipItem(item, unit)));
+
+    private void OnUnequip(ItemId item) => Report(_session.Execute(new UnequipItem(item)));
+
+    private void OnSellItem(ItemId item) => Report(_session.Execute(new SellItem(item)));
+
     private void SetPaused(bool paused)
     {
         _paused = paused;
@@ -693,9 +752,27 @@ public partial class GameRoot : Node3D
         Hud.SetSelection(nearest switch
         {
             CreatureView creature => $"{Tr("Selected")}: {creature.DisplayName}  ({Tr("F to follow")})",
-            UnitView unit => $"{Tr("Selected")}: {unit.DisplayName}  ({Tr("F to follow")})",
+            UnitView unit => $"{Tr("Selected")}: {UnitDetails(unit.Id) ?? unit.DisplayName}  ({Tr("F to follow")})",
             _ => null,
         });
+    }
+
+    /// <summary>
+    /// A staff member's rank, classes, origin, ancestry ("?" until revealed), techniques and items (UI-06, placeholder).
+    /// </summary>
+    private string? UnitDetails(UnitId id)
+    {
+        if (_session.Units.FirstOrDefault(u => u.Id == id) is not { IsInnkeeper: false } unit)
+        {
+            return null;
+        }
+
+        var character = _session.Content.Character(unit.StaffId);
+        var origin = character.Origin == ContentValidator.MortalRealm ? Tr("Mortal") : _session.Content.Plane(character.Origin).Name;
+        var ancestry = unit.RevealedAncestry is { } plane ? _session.Content.Plane(plane).Name : "?";
+        var techniques = string.Join(", ", unit.Techniques.Select(t => unit.Mastered.Contains(t) ? $"{_session.TechniqueName(t)}+" : _session.TechniqueName(t)));
+        var items = unit.ItemDefIds.Count == 0 ? "" : $"  ·  {string.Join(", ", unit.ItemDefIds.Select(i => _session.Content.Item(i).Name))}";
+        return $"{unit.Name} ★{unit.Rank}  ·  {string.Join("/", unit.Classes.Select(MistyInn.UI.ShopPanel.ClassName))}  ·  {origin}, {Tr("ancestry")} {ancestry}  ·  {techniques}{items}";
     }
 
     private void ClearSelection()

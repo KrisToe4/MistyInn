@@ -36,12 +36,13 @@ public enum UnitActivity
 internal sealed class Unit
 {
     private readonly Queue<Tile> _path = new();
+    private readonly List<TechniqueDef> _techniques;
 
-    public Unit(UnitId id, UnitTemplate def, IReadOnlyList<TechniqueDef> techniques, double rankMultiplier)
+    public Unit(UnitId id, UnitTemplate def, IEnumerable<TechniqueDef> techniques, double rankMultiplier)
     {
         Id = id;
         Def = def;
-        Techniques = techniques;
+        _techniques = techniques.ToList();
         RankMultiplier = rankMultiplier;
         Health = MaxHealth;
     }
@@ -52,15 +53,80 @@ internal sealed class Unit
 
     public StatsDef Stats => Def.Stats;
 
-    /// <summary>The rank's stat multiplier (STF-06); ★1 until step 6 (D-065).</summary>
-    public double RankMultiplier { get; }
+    /// <summary>★1 to ★5 (STF-06). The innkeeper stays at ★1.</summary>
+    public int Rank { get; set; } = 1;
 
-    public double MaxHealth => Stats.Health * RankMultiplier;
+    /// <summary>The rank's multiplier for health, attack and soothe (STF-06, D-081).</summary>
+    public double RankMultiplier { get; set; }
 
-    public double Attack => Stats.Attack * RankMultiplier;
+    /// <summary>The upgrade options picked, in rank order from ★2 (STF-07, STF-10).</summary>
+    public List<string> Chosen { get; } = new();
+
+    /// <summary>The technique IDs it has mastered (STF-17).</summary>
+    public HashSet<string> Mastered { get; } = new();
+
+    /// <summary>Silver spent on it: the hire and every upgrade; half comes back when it is sold (STF-09).</summary>
+    public int Spent { get; set; }
+
+    /// <summary>Raised a rank by an upgrade offer and waiting for <c>ChooseUpgrade</c> (STF-08).</summary>
+    public bool UpgradePending { get; set; }
+
+    /// <summary>
+    /// The effects that apply to it, from carried items, active synergies and inn items (ITM-02, ITM-04, SYN-03); set by
+    /// <see cref="Simulation.Modifiers"/>.
+    /// </summary>
+    public IReadOnlyList<EffectDef> Effects { get; set; } = Array.Empty<EffectDef>();
+
+    public double MaxHealth =>
+        Stats.Health * RankMultiplier * StatEffects(StatKind.Health, null).Aggregate(1.0, (m, e) => m * (e.Multiplier ?? 1))
+        + StatEffects(StatKind.Health, null).Sum(e => e.Amount ?? 0);
+
+    /// <summary>Attack with no technique (the innkeeper striking back, ESC-06).</summary>
+    public double Attack => Stats.Attack * RankMultiplier + StatEffects(StatKind.Attack, null).Sum(e => e.Amount ?? 0);
+
+    public double Armour => Stats.Armour + StatEffects(StatKind.Armour, null).Sum(e => e.Amount ?? 0);
 
     /// <summary>What it knows, in the order it learned them (STF-02).</summary>
-    public IReadOnlyList<TechniqueDef> Techniques { get; }
+    public IReadOnlyList<TechniqueDef> Techniques => _techniques;
+
+    /// <summary>Its classes, from the techniques it knows (STF-03); item tags are counted only by synergies.</summary>
+    public IReadOnlyList<StaffClass> Classes => _techniques.Select(t => t.Class).Distinct().Order().ToList();
+
+    public bool IsMastered(TechniqueDef technique) => Mastered.Contains(technique.Id);
+
+    public void Learn(TechniqueDef technique) => _techniques.Add(technique);
+
+    /// <summary>Attack with a Fighter technique: its bonus, its mastery and items for it (STF-02, STF-17, ITM-06).</summary>
+    public double AttackWith(TechniqueDef technique) =>
+        Attack + technique.AttackBonus + (IsMastered(technique) ? technique.Mastery.AttackBonus : 0)
+        + StatEffects(StatKind.Attack, technique.Id).Sum(e => e.Amount ?? 0);
+
+    /// <summary>How many creatures one session can serve (AGI-07), with its mastery and items.</summary>
+    public int CapacityOf(TechniqueDef technique) =>
+        technique.Capacity + (IsMastered(technique) ? technique.Mastery.CapacityBonus : 0)
+        + (int)StatEffects(StatKind.Capacity, technique.Id).Sum(e => e.Amount ?? 0);
+
+    public double RangeOf(TechniqueDef technique) =>
+        technique.Range + (IsMastered(technique) ? technique.Mastery.RangeBonus : 0);
+
+    /// <summary>
+    /// The soothe multiplier from its mastery, items and synergies for a creature of <paramref name="plane"/> (STF-17,
+    /// ITM-06, SYN-02). The rank and the ancestry bonus are applied by the service rules.
+    /// </summary>
+    public double SootheBonus(TechniqueDef technique, string plane) =>
+        (IsMastered(technique) ? technique.Mastery.SootheMultiplier : 1)
+        * Effects.Where(e => e.Kind == EffectKind.Soothe && (e.Technique is null || e.Technique == technique.Id) && (e.Plane is null || e.Plane == plane))
+            .Aggregate(1.0, (m, e) => m * (e.Multiplier ?? 1))
+        * Effects.Where(e => e.Kind == EffectKind.Stat && e.Stat == StatKind.Soothe && (e.Technique is null || e.Technique == technique.Id))
+            .Aggregate(1.0, (m, e) => m * (e.Multiplier ?? 1));
+
+    /// <summary>Extra zones a technique reaches from beside the stage (the Entertainer synergy, SYN-02).</summary>
+    public int ExtraZones(TechniqueDef technique) =>
+        (int)Effects.Where(e => e.Kind == EffectKind.Radius && e.Technique == technique.Id).Sum(e => e.Amount ?? 0);
+
+    /// <summary>Stat effects for one stat: general ones, plus those for <paramref name="techniqueId"/> when given.</summary>
+    private IEnumerable<EffectDef> StatEffects(StatKind stat, string? techniqueId) =>
+        Effects.Where(e => e.Kind == EffectKind.Stat && e.Stat == stat && e.Technique == techniqueId);
 
     /// <summary>Its first Fighter technique, if it has one (ESC-07).</summary>
     public TechniqueDef? FighterTechnique => Techniques.FirstOrDefault(t => t.EngagesTurned);
@@ -125,7 +191,7 @@ internal sealed class Unit
         RestUntil = 0;
     }
 
-    public UnitSnapshot Snapshot() => new(
+    public UnitSnapshot Snapshot(IReadOnlyList<OwnedItem> carried, string? revealedAncestry) => new(
         Id, Def.Id, Def.Name, Def.IsInnkeeper, Tile,
         Techniques.Select(t => t.Id).ToList(),
         Session?.Technique.Id,
@@ -135,7 +201,16 @@ internal sealed class Unit
         Health,
         MaxHealth,
         Activity,
-        Shaken);
+        Shaken,
+        Rank,
+        Classes,
+        Mastered.Order().ToList(),
+        UpgradePending,
+        carried.Select(i => i.Id).ToList(),
+        carried.Select(i => i.Def.Id).ToList(),
+        revealedAncestry,
+        Attack,
+        Armour);
 }
 
 /// <summary>
@@ -172,7 +247,16 @@ public sealed record UnitSnapshot(
     double Health,
     double MaxHealth,
     UnitActivity Activity,
-    bool Shaken)
+    bool Shaken,
+    int Rank,
+    IReadOnlyList<StaffClass> Classes,
+    IReadOnlyList<string> Mastered,
+    bool UpgradePending,
+    IReadOnlyList<ItemId> Items,
+    IReadOnlyList<string> ItemDefIds,
+    string? RevealedAncestry,
+    double Attack,
+    double Armour)
 {
     public bool IsOnBench => Tile is null;
 

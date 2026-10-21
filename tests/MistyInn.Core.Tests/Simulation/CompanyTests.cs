@@ -245,7 +245,7 @@ public class CompanyTests
     public void CombatCompanyAndRoomValuesAreChecked()
     {
         var set = ContentTestKit.Set;
-        ContentTestKit.AssertRejected(set with { Balance = set.Balance with { Rooms = 3 } }, "back rooms");
+        ContentTestKit.AssertRejected(set with { Balance = set.Balance with { Rooms = 4 } }, "back rooms");
         ContentTestKit.AssertRejected(set with { Balance = set.Balance with { Combat = set.Balance.Combat with { WoundChance = 2 } } },
             "combat value");
         ContentTestKit.AssertRejected(set with { Balance = set.Balance with { Company = set.Balance.Company with { DoorHealth = 0 } } },

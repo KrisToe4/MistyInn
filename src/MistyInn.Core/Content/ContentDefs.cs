@@ -15,7 +15,8 @@ public sealed record ContentSet(
     StaffFileDef Staff,
     IReadOnlyList<ItemDef> Items,
     IReadOnlyList<FixtureDef> Fixtures,
-    IReadOnlyList<FlavourDef> Flavour);
+    IReadOnlyList<FlavourDef> Flavour,
+    IReadOnlyList<SynergyDef> Synergies);
 
 /// <summary><c>balance.json</c>: the tuning values of section 6.4 and the run's starting set-up.</summary>
 /// <param name="PlanesPerCycle">Converging planes for cycles 1, 2, 3...; the last entry repeats; 0 means all unlocked.</param>
@@ -130,7 +131,7 @@ public sealed record CompanyBalanceDef(
 /// <param name="StudiedPoints">Cycles of being served and staying calm until dawn before a creature is Studied.</param>
 public sealed record BestiaryBalanceDef(int StudiedPoints = 3);
 
-/// <summary>The shop's tuning (section 13.1).</summary>
+/// <summary>The shop's tuning (section 13.1). <paramref name="ItemWeights"/> are the item draw weights by rarity (D-080).</summary>
 public sealed record ShopDef(
     int StaffOffers,
     int ItemOffers,
@@ -139,13 +140,20 @@ public sealed record ShopDef(
     double PityWeight,
     double HomePlaneWeight,
     int RankPriceStep,
-    IReadOnlyList<RankOddsDef> RankOdds);
+    IReadOnlyList<RankOddsDef> RankOdds,
+    IReadOnlyDictionary<Rarity, double> ItemWeights);
 
 /// <summary>Rank odds (percent for ★1 to ★5) from a cycle onward (SHP-03).</summary>
 public sealed record RankOddsDef(int FromCycle, IReadOnlyList<int> Odds);
 
-/// <summary><c>inn.json</c>: the board map and how to read it (BRD-01, SIM-04). Legend keys are single characters.</summary>
-public sealed record InnDef(IReadOnlyList<string> Rows, IReadOnlyDictionary<string, LegendDef> Legend);
+/// <summary>
+/// <c>inn.json</c>: the board map and how to read it (BRD-01, SIM-04). Legend keys are single characters.
+/// <paramref name="DisplaySpots"/> names the [x, y] tiles where inn items are shown (ITM-04, ART-17, D-078).
+/// </summary>
+public sealed record InnDef(
+    IReadOnlyList<string> Rows,
+    IReadOnlyDictionary<string, LegendDef> Legend,
+    IReadOnlyDictionary<string, IReadOnlyList<int>>? DisplaySpots = null);
 
 public sealed record LegendDef(TileKind Kind, string Zone);
 
@@ -294,7 +302,8 @@ public sealed record FixtureDef(
 
 /// <summary>
 /// An effect (DAT-03): a kind and the parameters that kind needs. Plane and fixture values are IDs; technique values
-/// are technique IDs.
+/// are technique IDs. <paramref name="AdjacentTo"/> makes a fixture's effect work only while the fixture stands next to
+/// (8 neighbours) a working fixture of that ID, or a room door for <see cref="AdjacentToRoomDoor"/> (FIX-03, D-079).
 /// </summary>
 public sealed record EffectDef(
     EffectKind Kind,
@@ -311,7 +320,28 @@ public sealed record EffectDef(
     int? Seats = null,
     int? Zones = null,
     TriggerKind? CancelledBy = null,
-    EffectTarget? Target = null);
+    EffectTarget? Target = null,
+    string? AdjacentTo = null)
+{
+    /// <summary>The <see cref="AdjacentTo"/> value that means a back room's door (D-079).</summary>
+    public const string AdjacentToRoomDoor = "RoomDoor";
+}
+
+/// <summary>
+/// <c>synergies.json</c> (SYN-01, SYN-02): a bonus for distinct characters on the board with one class, or of one origin
+/// (a plane ID or <c>mortal-realm</c>). Exactly one of <paramref name="Class"/> and <paramref name="Origin"/> is set.
+/// Only the highest tier reached applies; its effects go to every staff member on the board, or to the inn for
+/// inn-wide kinds such as <c>Tribute</c> (D-077).
+/// </summary>
+public sealed record SynergyDef(
+    string Id,
+    string Name,
+    IReadOnlyList<SynergyTierDef> Tiers,
+    StaffClass? Class = null,
+    string? Origin = null);
+
+/// <summary>One threshold of a synergy and what it gives.</summary>
+public sealed record SynergyTierDef(int Count, IReadOnlyList<EffectDef> Effects);
 
 /// <summary><c>flavour.json</c> (DAT-06). Both flags are required.</summary>
 public sealed record FlavourDef(string Id, string Context, string Text, bool? FilterSafe, bool? BloodSafe);

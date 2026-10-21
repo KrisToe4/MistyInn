@@ -1,13 +1,16 @@
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 using MistyInn.Core.Board;
 using MistyInn.Core.Content;
+using MistyInn.Core.Run;
 
 namespace MistyInn.Board;
 
 /// <summary>
 /// Shows the board from Core's layout (SIM-04): one placeholder tile scene per tile, coloured by zone, the mist gates,
-/// and the placement cursor (CAM-13). It also converts between Core's tile space and world space.
+/// the placement cursor (CAM-13), shut doors of rooms not in use (D-078) and inn items at their display spots (ART-17). It
+/// also converts between Core's tile space and world space.
 /// </summary>
 public partial class InnView : Node3D
 {
@@ -31,6 +34,7 @@ public partial class InnView : Node3D
         ["lounge"] = new Color("#5a3a47"),
         ["room-1"] = new Color("#4a4039"),
         ["room-2"] = new Color("#463b3f"),
+        ["room-3"] = new Color("#43403a"),
         ["cellar-door"] = new Color("#3d3a34"),
     };
 
@@ -42,6 +46,8 @@ public partial class InnView : Node3D
     private readonly Dictionary<Color, StandardMaterial3D> _materials = new();
     private readonly Dictionary<string, MistGateView> _gates = new();
     private readonly List<MeshInstance3D> _cursors = new();
+    private readonly Dictionary<string, MeshInstance3D> _roomDoors = new();
+    private readonly List<Node3D> _innItems = new();
     private BoardLayout _layout = null!;
     private StandardMaterial3D _validCursorMaterial = null!;
     private StandardMaterial3D _invalidCursorMaterial = null!;
@@ -67,6 +73,7 @@ public partial class InnView : Node3D
             else if (kind == TileKind.RoomDoor)
             {
                 view.MaterialOverride = Material(RoomDoorColor);
+                _roomDoors[_layout.ZoneAt(tile)] = view;
             }
             else
             {
@@ -86,6 +93,63 @@ public partial class InnView : Node3D
 
         _validCursorMaterial = TransparentMaterial(ValidCursor);
         _invalidCursorMaterial = TransparentMaterial(InvalidCursor);
+    }
+
+    /// <summary>A back room not in use yet shows its door shut, in the wall colour (D-078).</summary>
+    public void ShowLockedRooms(IReadOnlySet<string> locked)
+    {
+        foreach (var (zone, door) in _roomDoors)
+        {
+            door.MaterialOverride = Material(locked.Contains(zone) ? WallColor : RoomDoorColor);
+        }
+    }
+
+    /// <summary>
+    /// Inn items at their display spots (ITM-04, ART-17): a placeholder box coloured by rarity with the item's name above
+    /// it, stacked when several share a spot, until the art pass (ART-16).
+    /// </summary>
+    public void ShowInnItems(IEnumerable<ItemSnapshot> items, IReadOnlyDictionary<string, Tile> spots)
+    {
+        foreach (var node in _innItems)
+        {
+            node.QueueFree();
+        }
+
+        _innItems.Clear();
+        var stacked = new Dictionary<string, int>();
+        foreach (var item in items.Where(i => i.Kind == ItemKind.Inn && i.DisplaySpot is not null))
+        {
+            if (!spots.TryGetValue(item.DisplaySpot!, out var tile))
+            {
+                continue;
+            }
+
+            var level = stacked.GetValueOrDefault(item.DisplaySpot!);
+            stacked[item.DisplaySpot!] = level + 1;
+
+            var root = new Node3D { Position = TileToWorld(tile) + new Vector3(0, WallHeight + 0.25f + 0.5f * level, 0) };
+            AddChild(root);
+            var color = item.Rarity switch
+            {
+                Rarity.Cursed => new Color("#7a2f3a"),
+                Rarity.Rare => new Color("#3f6f9a"),
+                _ => new Color("#b8933a"),
+            };
+            root.AddChild(new MeshInstance3D
+            {
+                Mesh = new BoxMesh { Size = new Vector3(0.35f, 0.35f, 0.35f) },
+                MaterialOverride = Material(color),
+            });
+            root.AddChild(new Label3D
+            {
+                Text = item.Name,
+                Position = new Vector3(0, 0.4f, 0),
+                Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
+                FontSize = 40,
+                OutlineSize = 8,
+            });
+            _innItems.Add(root);
+        }
     }
 
     /// <summary>The ground rectangle (x, z) the camera may look at.</summary>

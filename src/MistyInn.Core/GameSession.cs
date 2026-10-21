@@ -14,7 +14,7 @@ namespace MistyInn.Core;
 /// <summary>
 /// The single entry point into Core (ARC-01). It holds the run, and its state changes only through <see cref="Tick"/>
 /// and <see cref="Execute"/> (ARC-03); everything else is a read-only query. A new run is a new session; the bestiary
-/// passed in outlives it (BST-04).
+/// and the ancestry record passed in outlive it (BST-04, STF-16).
 /// </summary>
 public sealed class GameSession : IEventSink
 {
@@ -28,6 +28,9 @@ public sealed class GameSession : IEventSink
     public const int MaxStepsPerTick = 120;
 
     private const double StepSeconds = 1.0 / StepsPerSecond;
+
+    /// <summary>Mixed into the run's starting random state to seed the shop's own stream (D-080).</summary>
+    private const ulong ShopStreamSalt = 0x5348_4F50_5354_524DUL;
 
     private static readonly int[] AllowedSpeeds = [0, 1, 2, 4];
 
@@ -43,13 +46,20 @@ public sealed class GameSession : IEventSink
     private readonly InnDamage _damage;
     private readonly CompanySystem _company;
     private readonly CombatSystem _combat;
+    private readonly AncestryObserver _ancestry;
+    private readonly Modifiers _modifiers;
+    private readonly ShopSystem _shop;
 
     // Real time owed to the simulation, in TimeSpan ticks × StepsPerSecond, so whole steps are exact integers.
     private long _owed;
     private long _steps;
 
     public GameSession(
-        IRandomSource random, GameSessionLimits? limits = null, GameContent? content = null, CreatureBestiary? bestiary = null)
+        IRandomSource random,
+        GameSessionLimits? limits = null,
+        GameContent? content = null,
+        CreatureBestiary? bestiary = null,
+        AncestryRecord? ancestry = null)
     {
         ArgumentNullException.ThrowIfNull(random);
 
@@ -60,6 +70,7 @@ public sealed class GameSession : IEventSink
         _cycleLog = new CycleLog(limits.CycleLogCapacity);
         Content = content ?? GameContent.Default;
         Bestiary = bestiary ?? new CreatureBestiary();
+        Ancestry = ancestry ?? new AncestryRecord();
         _run = new RunState(Content, Ids);
 
         var wanderTiles = _run.Board.WalkableTilesIn(Content.WanderZones);
@@ -70,13 +81,19 @@ public sealed class GameSession : IEventSink
 
         _sense = new InnSense(Content, _run);
         _bestiary = new BestiaryRecorder(Content, Bestiary, this);
-        _service = new ServiceSystem(Content, _run, this, _sense);
+        _ancestry = new AncestryObserver(Content, Ancestry, this);
+        _modifiers = new Modifiers(Content, _run, _ancestry);
+        _service = new ServiceSystem(Content, _run, this, _sense, _ancestry);
         _behaviour = new CreatureBehaviourSystem(Content, _run, random, wanderTiles, _service, _sense);
         _damage = new InnDamage(Content, _run, this);
         _company = new CompanySystem(Content, _run, this, _sense, _service, _behaviour);
         _agitation = new AgitationSystem(Content, _run, this, _sense, _bestiary, _behaviour, _damage);
-        _combat = new CombatSystem(Content, _run, this, _damage, _bestiary, _behaviour, _company);
-        _arrivals = new ArrivalSystem(Content, _run, random, Ids, this, _behaviour, _bestiary);
+        _combat = new CombatSystem(Content, _run, this, _damage, _bestiary, _behaviour, _company, _ancestry);
+        _arrivals = new ArrivalSystem(Content, _run, random, Ids, this, _behaviour, _bestiary, _modifiers);
+
+        // The shop's own stream, derived from the run's starting state without drawing from it (D-080).
+        var start = random.GetState();
+        _shop = new ShopSystem(Content, _run, new SeededRandom(start.S0 ^ ((start.S2 << 17) | (start.S2 >> 47)) ^ ShopStreamSalt), _modifiers);
 
         // The first Dusk is the starting state; views read it through the queries, so no events are raised for it.
         StartCycle(1, raiseEvents: false);
@@ -86,6 +103,9 @@ public sealed class GameSession : IEventSink
 
     /// <summary>The profile's bestiary (BST-01). Pass the same instance to the next run's session.</summary>
     public CreatureBestiary Bestiary { get; }
+
+    /// <summary>The profile's revealed ancestries (STF-16, D-082). Pass the same instance to the next run's session.</summary>
+    public AncestryRecord Ancestry { get; }
 
     public BoardLayout Layout => Content.Layout;
 
@@ -135,7 +155,48 @@ public sealed class GameSession : IEventSink
 
     public IReadOnlyList<PlaneDef> ConvergingPlanes => _run.ConvergingPlanes.AsReadOnly();
 
-    public IReadOnlyList<UnitSnapshot> Units => _run.Units.Select(u => u.Snapshot()).ToArray();
+    public IReadOnlyList<UnitSnapshot> Units =>
+        _run.Units.Select(u => u.Snapshot(_run.CarriedBy(u.Id), _ancestry.RevealedAncestry(u))).ToArray();
+
+    /// <summary>Every item owned: staff items carried or in storage, and inn items (ITM-01).</summary>
+    public IReadOnlyList<ItemSnapshot> Items => _run.Items.Select(i => i.Snapshot()).ToArray();
+
+    /// <summary>The synergies with their counts on the board (SYN-01, SYN-03).</summary>
+    public IReadOnlyList<SynergyStatus> Synergies => _modifiers.Synergies;
+
+    /// <summary>The back rooms not in use yet (D-078).</summary>
+    public IReadOnlySet<string> LockedRooms => _run.Board.LockedZones;
+
+    /// <summary>The Dusk shop (UI-03).</summary>
+    public ShopSnapshot Shop => new(
+        _run.Shop.Staff.Select(o => o is null ? null : ViewOf(o)).ToList(),
+        _run.Shop.Items.Select(o => o is null ? null : ViewOf(o)).ToList(),
+        _run.Shop.Locked,
+        _shop.RerollCost);
+
+    /// <summary>
+    /// A unit's upgrade tree for its panel and the upgrade dialog (UI-06, UI-08): every option, chosen, available (for
+    /// the pending pick) or locked. Empty for the innkeeper.
+    /// </summary>
+    public IReadOnlyList<UpgradeOptionView> UpgradeTree(UnitId unitId)
+    {
+        if (_run.FindUnit(unitId) is not { Def.IsInnkeeper: false } unit)
+        {
+            return Array.Empty<UpgradeOptionView>();
+        }
+
+        var character = Content.Character(unit.Def.Id);
+        var build = RunState.BuildOf(unit);
+        return character.Tree.OrderBy(r => r.Rank).SelectMany(r => r.Options.Select(o => new UpgradeOptionView(
+            r.Rank,
+            o.Id,
+            o.Technique,
+            o.Mastery,
+            Content.Technique(o.Technique).Class,
+            unit.Chosen.Contains(o.Id) ? UpgradeOptionState.Chosen
+            : unit.UpgradePending && r.Rank == unit.Rank && UpgradeTrees.IsAvailable(o, build) ? UpgradeOptionState.Available
+            : UpgradeOptionState.Locked))).ToList();
+    }
 
     public IReadOnlyList<CreatureSnapshot> Creatures => _run.Creatures.Select(c => c.Snapshot()).ToArray();
 
@@ -146,7 +207,8 @@ public sealed class GameSession : IEventSink
 
     /// <summary>3 + 1 per two cycles survived, up to 9; the innkeeper does not count (section 6.4).</summary>
     public int MaxStaffOnBoard =>
-        Math.Min(Content.Balance.MaxStaffSlots, Content.Balance.BaseStaffSlots + (Cycle - 1) / 2);
+        Math.Min(Content.Balance.MaxStaffSlots, Content.Balance.BaseStaffSlots + (Cycle - 1) / 2)
+        + _modifiers.InnWide(EffectKind.BoardSlots);
 
     /// <summary>The current (or last) mist phase's cycle log, read-only (INV-12).</summary>
     public IReadOnlyList<CycleLogEntry> CycleLogEntries => _cycleLog.Entries;
@@ -255,14 +317,20 @@ public sealed class GameSession : IEventSink
     {
         ArgumentNullException.ThrowIfNull(command);
 
-        if (command is SetSpeed setSpeed)
-        {
-            return HandleSetSpeed(setSpeed);
-        }
-
         if (command is SetContentFilters filters)
         {
             return HandleSetContentFilters(filters);
+        }
+
+        // While an upgrade pick is pending, nothing else happens until it is made (STF-08, D-081).
+        if (_run.Units.Any(u => u.UpgradePending) && command is not ChooseUpgrade)
+        {
+            return CommandResult.Fail(CommandFailure.UpgradePending);
+        }
+
+        if (command is SetSpeed setSpeed)
+        {
+            return HandleSetSpeed(setSpeed);
         }
 
         if (Phase is Phase.Mist or Phase.RunOver)
@@ -270,7 +338,7 @@ public sealed class GameSession : IEventSink
             return CommandResult.Fail(CommandFailure.WrongPhase);
         }
 
-        return command switch
+        var result = command switch
         {
             PlaceUnit place => HandlePlaceUnit(place),
             BenchUnit bench => HandleBenchUnit(bench),
@@ -284,8 +352,24 @@ public sealed class GameSession : IEventSink
             RepairIntegrity repair => HandleRepairIntegrity(repair),
             DevAddStaff add => HandleDevAddStaff(add),
             DevSetConvergingPlanes planes => HandleDevSetConvergingPlanes(planes),
+            BuyOffer buy => HandleBuyOffer(buy),
+            Reroll => HandleReroll(),
+            LockShop lockShop => HandleLockShop(lockShop),
+            ChooseUpgrade choose => HandleChooseUpgrade(choose),
+            SellUnit sell => HandleSellUnit(sell),
+            EquipItem equip => HandleEquipItem(equip),
+            UnequipItem unequip => HandleUnequipItem(unequip),
+            SellItem sell => HandleSellItem(sell),
             _ => CommandResult.Fail(CommandFailure.NotSupported),
         };
+
+        // Items, the board and the roster decide synergies and effects; recount after every Dusk change (D-077).
+        if (result.Succeeded && Phase == Phase.Dusk)
+        {
+            _modifiers.Refresh(heal: true);
+        }
+
+        return result;
     }
 
     /// <summary>Why <see cref="PlaceUnit"/> would be refused, or <see cref="CommandFailure.None"/>; for the drag cursor.</summary>
@@ -393,7 +477,30 @@ public sealed class GameSession : IEventSink
         h.Add(rng.S0).Add(rng.S1).Add(rng.S2).Add(rng.S3);
 
         var ids = Ids.GetState();
-        h.Add(ids.LastUnit).Add(ids.LastCreature).Add(ids.LastFixture);
+        h.Add(ids.LastUnit).Add(ids.LastCreature).Add(ids.LastFixture).Add(ids.LastItem);
+
+        var shopRng = _shop.Random.GetState();
+        h.Add(shopRng.S0).Add(shopRng.S1).Add(shopRng.S2).Add(shopRng.S3)
+            .Add(_run.Shop.Locked).Add(_run.Shop.RerollsThisCycle).Add(_run.Rooms.Count);
+        foreach (var offer in _run.Shop.Staff)
+        {
+            h.Add(offer?.CharacterId ?? "").Add(offer?.Rank ?? 0).Add(offer?.Price ?? 0);
+        }
+
+        foreach (var offer in _run.Shop.Items)
+        {
+            h.Add(offer?.ItemId ?? "").Add(offer?.Price ?? 0);
+        }
+
+        foreach (var item in _run.Items)
+        {
+            h.Add(item.Id.Value).Add(item.Def.Id).Add(item.Carrier?.Value ?? -1).Add(item.Paid);
+        }
+
+        foreach (var revealed in Ancestry.Revealed)
+        {
+            h.Add(revealed);
+        }
 
         foreach (var plane in _run.ConvergingPlanes)
         {
@@ -405,7 +512,8 @@ public sealed class GameSession : IEventSink
             h.Add(unit.Id.Value).Add(unit.Tile?.X ?? -1).Add(unit.Tile?.Y ?? -1)
                 .Add(unit.Session?.Technique.Id ?? "").Add(unit.Session?.EndsAt ?? -1)
                 .Add(unit.Position.X).Add(unit.Position.Y).Add(unit.Health).Add((int)unit.Activity).Add(unit.Shaken)
-                .Add(unit.Engaging?.Value ?? -1).Add(unit.NextAttackAt).Add(unit.RestUntil).Add(unit.Path.Count);
+                .Add(unit.Engaging?.Value ?? -1).Add(unit.NextAttackAt).Add(unit.RestUntil).Add(unit.Path.Count)
+                .Add(unit.Rank).Add(unit.Spent).Add(unit.UpgradePending).Add(string.Join(",", unit.Chosen));
             foreach (var target in unit.Session?.Targets ?? [])
             {
                 h.Add(target.Value);
@@ -489,6 +597,27 @@ public sealed class GameSession : IEventSink
     /// <summary>For tests: the run's state, to set integrity or look at rooms.</summary>
     internal RunState RunForTests => _run;
 
+    /// <summary>For tests: the shop's draw rules (SHP-03, SHP-04).</summary>
+    internal ShopSystem ShopForTests => _shop;
+
+    /// <summary>For tests: inn-wide effects and synergy counts (ITM-04, SYN-01).</summary>
+    internal Modifiers ModifiersForTests => _modifiers;
+
+    /// <summary>For tests: working fixture effects and adjacency (FIX-03, FIX-04).</summary>
+    internal InnSense SenseForTests => _sense;
+
+    /// <summary>For tests: replaces the shop's offers with chosen ones (null for an empty slot).</summary>
+    internal void SetShopForTests(IEnumerable<StaffOffer?> staff, IEnumerable<ItemOffer?>? items = null)
+    {
+        _run.Shop.Staff.Clear();
+        _run.Shop.Staff.AddRange(staff);
+        if (items is not null)
+        {
+            _run.Shop.Items.Clear();
+            _run.Shop.Items.AddRange(items);
+        }
+    }
+
     internal void Raise(DomainEvent domainEvent) => _events.Add(domainEvent);
 
     internal void Log(string kind, string cause, EntityRef? subject = null, EntityRef? source = null, string? flavour = null) =>
@@ -557,10 +686,15 @@ public sealed class GameSession : IEventSink
         _run.ConvergingPlanes.Clear();
         _run.ConvergingPlanes.AddRange(planeIds.Select(Content.Plane));
 
+        // After the planes, so the home-plane weight sees this cycle's planes (SHP-04).
+        _shop.NewDusk();
+        _modifiers.Refresh(heal: true);
+
         if (raiseEvents)
         {
             Raise(new PhaseChanged(Time, Cycle, Phase.Dusk));
             Raise(new ConvergingPlanesDrawn(Time, Cycle, planeIds));
+            Raise(new ShopChanged(Time));
         }
     }
 
@@ -574,9 +708,11 @@ public sealed class GameSession : IEventSink
     {
         _company.EndAll();
         var studied = new HashSet<string>();
+        var tributeBonus = _modifiers.InnWide(EffectKind.Tribute);
         foreach (var creature in _run.Creatures.Where(c => !c.IsTurned))
         {
-            var tribute = (int)Math.Round(creature.Def.Tribute, MidpointRounding.AwayFromZero);
+            // Inn items and the Gambler synergy add to every tribute (ITM-06, SYN-02).
+            var tribute = Math.Max(0, (int)Math.Round(creature.Def.Tribute, MidpointRounding.AwayFromZero) + tributeBonus);
             _run.Silver += tribute;
             Raise(new TributeLeft(Time, creature.Id, tribute));
             Log("tribute.left", "dawn.calm", creature.Id.ToRef());
@@ -587,7 +723,7 @@ public sealed class GameSession : IEventSink
             }
         }
 
-        _run.Silver += Content.Balance.IncomePerCycle;
+        _run.Silver += Math.Max(0, Content.Balance.IncomePerCycle + _modifiers.InnWide(EffectKind.Income));
         Log("silver.income", "dawn.income");
         Raise(new SilverChanged(Time, _run.Silver));
 
@@ -754,6 +890,12 @@ public sealed class GameSession : IEventSink
         }
 
         RefreshSeats();
+        _modifiers.Refresh(heal: true);
+        foreach (var room in _run.Rooms)
+        {
+            room.Shields = _sense.ShieldsFor(room);
+        }
+
         _arrivals.StartMist();
         Raise(new PhaseChanged(Time, Cycle, Phase.Mist));
         Log("phase.mist", "player.began");
@@ -927,6 +1069,7 @@ public sealed class GameSession : IEventSink
         }
 
         var unit = RunState.NewUnit(Content, Ids, Content.TemplateFor(command.CharacterId));
+        unit.Spent = Content.Character(command.CharacterId).BaseCost;
         _run.Units.Add(unit);
         Raise(new UnitJoined(Time, unit.Id));
         return CommandResult.Ok;
@@ -982,7 +1125,388 @@ public sealed class GameSession : IEventSink
         Raise(new SilverChanged(Time, _run.Silver));
         return CommandResult.Ok;
     }
+
+    private int Benched => _run.Units.Count(u => !u.Def.IsInnkeeper && u.Tile is null);
+
+    private StaffOfferView ViewOf(StaffOffer offer)
+    {
+        var character = Content.Character(offer.CharacterId);
+        var owned = _run.Units.FirstOrDefault(u => u.Def.Id == offer.CharacterId);
+        var techniques = new List<string> { character.BaseTechnique };
+        if (offer.Rank > 1)
+        {
+            foreach (var optionId in character.Presets.First(p => p.Rank == offer.Rank).Choices)
+            {
+                var option = character.Tree.SelectMany(r => r.Options).First(o => o.Id == optionId);
+                if (!option.Mastery)
+                {
+                    techniques.Add(option.Technique);
+                }
+            }
+        }
+
+        var canBuy = _run.Silver >= offer.Price
+                     && (owned is null ? Benched < Content.Balance.BenchSize : owned.Rank < UpgradeTrees.MaxRank);
+        return new StaffOfferView(
+            offer,
+            character.Name,
+            owned is not null,
+            canBuy,
+            techniques.Select(t => Content.Technique(t).Class).Distinct().Order().ToList(),
+            techniques);
+    }
+
+    private ItemOfferView ViewOf(ItemOffer offer)
+    {
+        var item = Content.Item(offer.ItemId);
+        return new ItemOfferView(offer, item.Name, item.Kind, item.Rarity, item.DisplaySpot);
+    }
+
+    private void Spend(int silver)
+    {
+        _run.Silver -= silver;
+        Raise(new SilverChanged(Time, _run.Silver));
+    }
+
+    /// <summary>Buys a shop offer: a hire (STF-10), a one-rank upgrade (STF-08) or an item (ITM-02, ITM-04).</summary>
+    private CommandResult HandleBuyOffer(BuyOffer command)
+    {
+        if (Phase != Phase.Dusk)
+        {
+            return CommandResult.Fail(CommandFailure.WrongPhase);
+        }
+
+        return command.Section == ShopSection.Staff ? BuyStaff(command.Index) : BuyItem(command.Index);
+    }
+
+    private CommandResult BuyStaff(int index)
+    {
+        if (index < 0 || index >= _run.Shop.Staff.Count || _run.Shop.Staff[index] is not { } offer)
+        {
+            return CommandResult.Fail(CommandFailure.UnknownOffer);
+        }
+
+        var owned = _run.Units.FirstOrDefault(u => u.Def.Id == offer.CharacterId);
+        if (owned is not null && owned.Rank >= UpgradeTrees.MaxRank)
+        {
+            return CommandResult.Fail(CommandFailure.MaxRank);
+        }
+
+        if (owned is null && Benched >= Content.Balance.BenchSize)
+        {
+            return CommandResult.Fail(CommandFailure.BenchFull);
+        }
+
+        if (_run.Silver < offer.Price)
+        {
+            return CommandResult.Fail(CommandFailure.NotEnoughSilver);
+        }
+
+        Spend(offer.Price);
+        _run.Shop.Staff[index] = null;
+        if (owned is not null)
+        {
+            // Exactly one rank, whatever rank the offer shows, at the offer's price (STF-08, SHP-08).
+            owned.Rank++;
+            owned.RankMultiplier = Content.Balance.RankStatMultipliers[owned.Rank - 1];
+            owned.Spent += offer.Price;
+            owned.UpgradePending = true;
+            Raise(new UpgradeOffered(Time, owned.Id, owned.Rank));
+        }
+        else
+        {
+            var unit = RunState.HireUnit(Content, Ids, offer.CharacterId, offer.Rank);
+            unit.Spent = offer.Price;
+            _run.Units.Add(unit);
+            Raise(new UnitJoined(Time, unit.Id));
+            Raise(new StaffHired(Time, unit.Id, offer.CharacterId, offer.Rank, offer.Price));
+        }
+
+        Raise(new ShopChanged(Time));
+        return CommandResult.Ok;
+    }
+
+    private CommandResult BuyItem(int index)
+    {
+        if (index < 0 || index >= _run.Shop.Items.Count || _run.Shop.Items[index] is not { } offer)
+        {
+            return CommandResult.Fail(CommandFailure.UnknownOffer);
+        }
+
+        var def = Content.Item(offer.ItemId);
+        if (def.Kind == ItemKind.Staff && _run.Storage.Count() >= Content.Balance.ItemStorage)
+        {
+            return CommandResult.Fail(CommandFailure.StorageFull);
+        }
+
+        if (def.Kind == ItemKind.Inn && _run.InnItems.Count() >= Content.Balance.MaxInnItemsShown)
+        {
+            return CommandResult.Fail(CommandFailure.InnItemsFull);
+        }
+
+        if (_run.Silver < offer.Price)
+        {
+            return CommandResult.Fail(CommandFailure.NotEnoughSilver);
+        }
+
+        Spend(offer.Price);
+        _run.Shop.Items[index] = null;
+        var item = new OwnedItem(Ids.NextItem(), def, offer.Price);
+        _run.Items.Add(item);
+        if (item.IsInnItem)
+        {
+            Raise(new InnItemAdded(Time, item.Id, def.Id, def.DisplaySpot!));
+            SyncRooms();
+        }
+
+        Raise(new ItemsChanged(Time));
+        Raise(new ShopChanged(Time));
+        return CommandResult.Ok;
+    }
+
+    /// <summary>Opens or locks back rooms to match <c>RoomSlots</c> effects (ITM-06, D-078).</summary>
+    private void SyncRooms()
+    {
+        var before = _run.Rooms.Count;
+        _run.SyncRooms(_modifiers.InnWide(EffectKind.RoomSlots));
+        if (_run.Rooms.Count != before)
+        {
+            Raise(new RoomsChanged(Time, _run.Rooms.Select(r => r.Zone).ToList()));
+        }
+    }
+
+    /// <summary>Redraws every offer (SHP-05, D-080).</summary>
+    private CommandResult HandleReroll()
+    {
+        if (Phase != Phase.Dusk)
+        {
+            return CommandResult.Fail(CommandFailure.WrongPhase);
+        }
+
+        var cost = _shop.RerollCost;
+        if (_run.Silver < cost)
+        {
+            return CommandResult.Fail(CommandFailure.NotEnoughSilver);
+        }
+
+        Spend(cost);
+        _run.Shop.RerollsThisCycle++;
+        _shop.DrawAll();
+        Raise(new ShopChanged(Time));
+        return CommandResult.Ok;
+    }
+
+    private CommandResult HandleLockShop(LockShop command)
+    {
+        if (Phase != Phase.Dusk)
+        {
+            return CommandResult.Fail(CommandFailure.WrongPhase);
+        }
+
+        _run.Shop.Locked = command.Locked;
+        Raise(new ShopChanged(Time));
+        return CommandResult.Ok;
+    }
+
+    /// <summary>The pick for an upgraded unit's new rank (STF-07, STF-08, STF-17).</summary>
+    private CommandResult HandleChooseUpgrade(ChooseUpgrade command)
+    {
+        if (Phase != Phase.Dusk)
+        {
+            return CommandResult.Fail(CommandFailure.WrongPhase);
+        }
+
+        if (_run.FindUnit(command.Unit) is not { } unit)
+        {
+            return CommandResult.Fail(CommandFailure.UnknownUnit);
+        }
+
+        if (!unit.UpgradePending)
+        {
+            return CommandResult.Fail(CommandFailure.InvalidValue);
+        }
+
+        var character = Content.Character(unit.Def.Id);
+        var option = UpgradeTrees.OptionsAt(character, unit.Rank).FirstOrDefault(o => o.Id == command.OptionId);
+        if (option is null || !UpgradeTrees.IsAvailable(option, RunState.BuildOf(unit)))
+        {
+            return CommandResult.Fail(CommandFailure.OptionNotAvailable);
+        }
+
+        RunState.ApplyOption(Content, unit, character, option.Id);
+        unit.UpgradePending = false;
+        Raise(new UnitUpgraded(Time, unit.Id, unit.Rank, option.Id));
+        return CommandResult.Ok;
+    }
+
+    /// <summary>Half the silver spent on it comes back; its items go to storage (STF-09).</summary>
+    private CommandResult HandleSellUnit(SellUnit command)
+    {
+        if (Phase != Phase.Dusk)
+        {
+            return CommandResult.Fail(CommandFailure.WrongPhase);
+        }
+
+        if (_run.FindUnit(command.Unit) is not { } unit)
+        {
+            return CommandResult.Fail(CommandFailure.UnknownUnit);
+        }
+
+        if (unit.Def.IsInnkeeper)
+        {
+            return CommandResult.Fail(CommandFailure.NotStaff);
+        }
+
+        var carried = _run.CarriedBy(unit.Id);
+        if (_run.Storage.Count() + carried.Count > Content.Balance.ItemStorage)
+        {
+            return CommandResult.Fail(CommandFailure.StorageFull);
+        }
+
+        foreach (var item in carried)
+        {
+            item.Carrier = null;
+        }
+
+        if (unit.Tile is { } tile)
+        {
+            _run.Board.RemoveUnit(tile);
+        }
+
+        _run.Units.Remove(unit);
+        var refund = unit.Spent / 2;
+        _run.Silver += refund;
+        Raise(new StaffSold(Time, unit.Id, refund));
+        Raise(new SilverChanged(Time, _run.Silver));
+        if (carried.Count > 0)
+        {
+            Raise(new ItemsChanged(Time));
+        }
+
+        return CommandResult.Ok;
+    }
+
+    private CommandResult HandleEquipItem(EquipItem command)
+    {
+        if (Phase != Phase.Dusk)
+        {
+            return CommandResult.Fail(CommandFailure.WrongPhase);
+        }
+
+        if (_run.Items.FirstOrDefault(i => i.Id == command.Item) is not { IsInnItem: false } item)
+        {
+            return CommandResult.Fail(CommandFailure.UnknownItem);
+        }
+
+        if (_run.FindUnit(command.Unit) is not { } unit)
+        {
+            return CommandResult.Fail(CommandFailure.UnknownUnit);
+        }
+
+        if (unit.Def.IsInnkeeper)
+        {
+            return CommandResult.Fail(CommandFailure.NotStaff);
+        }
+
+        if (item.Carrier == unit.Id)
+        {
+            return CommandResult.Ok;
+        }
+
+        if (_run.CarriedBy(unit.Id).Count >= Content.Balance.StaffItemSlots)
+        {
+            return CommandResult.Fail(CommandFailure.SlotsFull);
+        }
+
+        item.Carrier = unit.Id;
+        Raise(new ItemsChanged(Time));
+        return CommandResult.Ok;
+    }
+
+    private CommandResult HandleUnequipItem(UnequipItem command)
+    {
+        if (Phase != Phase.Dusk)
+        {
+            return CommandResult.Fail(CommandFailure.WrongPhase);
+        }
+
+        if (_run.Items.FirstOrDefault(i => i.Id == command.Item) is not { IsInnItem: false } item)
+        {
+            return CommandResult.Fail(CommandFailure.UnknownItem);
+        }
+
+        if (item.Carrier is null)
+        {
+            return CommandResult.Ok;
+        }
+
+        if (_run.Storage.Count() >= Content.Balance.ItemStorage)
+        {
+            return CommandResult.Fail(CommandFailure.StorageFull);
+        }
+
+        item.Carrier = null;
+        Raise(new ItemsChanged(Time));
+        return CommandResult.Ok;
+    }
+
+    /// <summary>Half the price comes back (ITM-07). An inn item that opened a room cannot be sold while the room is in use.</summary>
+    private CommandResult HandleSellItem(SellItem command)
+    {
+        if (Phase != Phase.Dusk)
+        {
+            return CommandResult.Fail(CommandFailure.WrongPhase);
+        }
+
+        if (_run.Items.FirstOrDefault(i => i.Id == command.Item) is not { } item)
+        {
+            return CommandResult.Fail(CommandFailure.UnknownItem);
+        }
+
+        var lostRooms = (int)(item.Def.Effects.Where(e => e.Kind == EffectKind.RoomSlots).Sum(e => e.Amount ?? 0));
+        if (item.IsInnItem && lostRooms > 0)
+        {
+            var keep = Math.Max(0, _run.Rooms.Count - lostRooms);
+            var closing = _run.Rooms.Skip(keep).Select(r => r.Zone).ToHashSet();
+            var occupied = Layout.AllTiles().Any(t => closing.Contains(Layout.ZoneAt(t))
+                                                      && (_run.Board.UnitAt(t) is not null || _run.Board.FixtureAt(t) is not null));
+            if (occupied)
+            {
+                return CommandResult.Fail(CommandFailure.TileOccupied);
+            }
+        }
+
+        _run.Items.Remove(item);
+        var refund = item.Paid / 2;
+        _run.Silver += refund;
+        if (item.IsInnItem)
+        {
+            Raise(new InnItemRemoved(Time, item.Id));
+            SyncRooms();
+        }
+
+        Raise(new SilverChanged(Time, _run.Silver));
+        Raise(new ItemsChanged(Time));
+        return CommandResult.Ok;
+    }
 }
+
+/// <summary>Where an upgrade option stands for a unit (UI-06, UI-08).</summary>
+public enum UpgradeOptionState
+{
+    Chosen,
+    Available,
+    Locked,
+}
+
+/// <summary>One option of a unit's upgrade tree, for its panel and the upgrade dialog (UI-06, UI-08).</summary>
+public sealed record UpgradeOptionView(
+    int Rank,
+    string OptionId,
+    string TechniqueId,
+    bool Mastery,
+    StaffClass Class,
+    UpgradeOptionState State);
 
 /// <summary>One converging plane in the Dusk forecast (BST-03).</summary>
 public sealed record ForecastPlane(PlaneDef Plane, IReadOnlyList<ForecastCreature> Creatures);

@@ -112,10 +112,16 @@ internal sealed class AgitationSystem
         }).ToList();
     }
 
+    /// <summary>Ward circles (FIX-02) and the auras of carried items such as the Ward Charm (ITM-06).</summary>
     private double WardMultiplier(Creature creature) =>
         _sense.Working(EffectKind.AgitationRate)
             .Where(w => InnSense.DistanceToTiles(creature.Position, w.Fixture.Tiles) <= (w.Effect.Radius ?? 0))
-            .Aggregate(1.0, (m, w) => m * (w.Effect.Multiplier ?? 1));
+            .Aggregate(1.0, (m, w) => m * (w.Effect.Multiplier ?? 1))
+        * _run.StaffOnTheFloor
+            .Where(u => !u.IsFallen && u.Activity != UnitActivity.InRoom)
+            .SelectMany(u => u.Effects.Where(e => e.Kind == EffectKind.Aura).Select(e => (Unit: u, Effect: e)))
+            .Where(a => a.Unit.Position.DistanceTo(creature.Position) <= (a.Effect.Radius ?? 0))
+            .Aggregate(1.0, (m, a) => m * (a.Effect.Multiplier ?? 1));
 
     private CreatureState StateFor(double agitation) =>
         agitation >= 100 ? CreatureState.Turned

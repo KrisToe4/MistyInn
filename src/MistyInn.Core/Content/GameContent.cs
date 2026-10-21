@@ -34,6 +34,7 @@ public sealed class GameContent
     private readonly Dictionary<string, StaffDef> _characters;
     private readonly Dictionary<string, TechniqueDef> _techniques;
     private readonly Dictionary<string, FixtureDef> _fixtures;
+    private readonly Dictionary<string, ItemDef> _items;
 
     private GameContent(ContentSet set, BoardLayout layout)
     {
@@ -44,6 +45,9 @@ public sealed class GameContent
         _characters = set.Staff.Characters.ToDictionary(c => c.Id);
         _techniques = set.Techniques.ToDictionary(t => t.Id);
         _fixtures = set.Fixtures.ToDictionary(f => f.Id);
+        _items = set.Items.ToDictionary(i => i.Id);
+        DisplaySpots = (set.Inn.DisplaySpots ?? new Dictionary<string, IReadOnlyList<int>>())
+            .ToDictionary(e => e.Key, e => new Tile(e.Value[0], e.Value[1]));
 
         var keeper = set.Staff.Innkeeper;
         StartingUnits = new[] { new UnitTemplate(keeper.Id, keeper.Name, IsInnkeeper: true, keeper.Stats, Array.Empty<string>()) }
@@ -77,6 +81,11 @@ public sealed class GameContent
     public IReadOnlyList<FixtureDef> Fixtures => Set.Fixtures;
 
     public IReadOnlyList<FlavourDef> Flavour => Set.Flavour;
+
+    public IReadOnlyList<SynergyDef> Synergies => Set.Synergies;
+
+    /// <summary>Where inn items are shown, by spot name (ITM-04, ART-17, D-078).</summary>
+    public IReadOnlyDictionary<string, Tile> DisplaySpots { get; }
 
     public IReadOnlyList<string> UnlockedPlanes => Set.Balance.UnlockedPlanes;
 
@@ -117,6 +126,9 @@ public sealed class GameContent
 
     public TechniqueDef Technique(string id) =>
         _techniques.TryGetValue(id, out var technique) ? technique : throw new KeyNotFoundException($"Unknown technique '{id}'.");
+
+    public ItemDef Item(string id) =>
+        _items.TryGetValue(id, out var item) ? item : throw new KeyNotFoundException($"Unknown item '{id}'.");
 
     public FixtureDef Fixture(string id) =>
         _fixtures.TryGetValue(id, out var fixture) ? fixture : throw new KeyNotFoundException($"Unknown fixture '{id}'.");

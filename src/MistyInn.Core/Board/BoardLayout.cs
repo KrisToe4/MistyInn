@@ -54,7 +54,7 @@ public sealed class BoardLayout
     /// <summary>Every zone that has at least one walkable tile, in map order.</summary>
     public IReadOnlyList<string> ZoneIds { get; }
 
-    /// <summary>The back rooms, each its own zone with one door, in map order of their doors (BRD-01, BRD-03).</summary>
+    /// <summary>The back rooms, each its own zone with one door, in zone ID order (BRD-01, BRD-03).</summary>
     public IReadOnlyList<RoomLayout> Rooms { get; }
 
     public bool Contains(Tile tile) => tile.X >= 0 && tile.Y >= 0 && tile.X < Width && tile.Y < Height;
@@ -144,6 +144,8 @@ public sealed class BoardLayout
             rooms.Add(new RoomLayout(zone, door, tiles.AsReadOnly()));
         }
 
+        // Zone order (room-1, room-2, room-3), so the rooms in use are always the first ones (BRD-01, D-078).
+        rooms.Sort((a, b) => string.CompareOrdinal(a.Zone, b.Zone));
         return rooms.AsReadOnly();
     }
 

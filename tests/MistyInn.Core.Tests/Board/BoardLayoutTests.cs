@@ -37,8 +37,8 @@ public class BoardLayoutTests
     {
         Assert.That(Layout.Rooms.Select(r => (r.Zone, r.Door)), Is.EqualTo(new[]
         {
-            ("room-1", new Tile(9, 9)), ("room-2", new Tile(9, 12)),
-        }));
+            ("room-1", new Tile(9, 9)), ("room-2", new Tile(9, 12)), ("room-3", new Tile(20, 9)),
+        }), "in zone order; room-3 is the annex that a RoomSlots item opens (D-078)");
         Assert.That(Layout.KindAt(new Tile(9, 9)), Is.EqualTo(TileKind.RoomDoor));
         Assert.That(Layout.Rooms[0].Tiles, Has.Count.EqualTo(6));
         Assert.That(Layout.Rooms[0].Tiles.All(t => Layout.ZoneAt(t) == "room-1"), Is.True);
@@ -65,8 +65,12 @@ public class BoardLayoutTests
     [Property("Requirement", "BRD-01")]
     public void InnFloorIsFourteenByTen()
     {
-        var floor = Layout.AllTiles().Where(t => Layout.KindAt(t) == TileKind.Floor).ToList();
+        // The annex room-3 (D-078) is a spare room slot outside the 14 x 10 inn, opened only by a RoomSlots item.
+        var floor = Layout.AllTiles().Where(t => Layout.KindAt(t) == TileKind.Floor && Layout.ZoneAt(t) != "room-3").ToList();
+        var annex = Layout.AllTiles().Where(t => Layout.ZoneAt(t) == "room-3" && Layout.KindAt(t) == TileKind.Floor).ToList();
 
+        Assert.That(annex, Has.Count.EqualTo(6));
+        Assert.That(annex.All(t => t.X > 20), Is.True, "outside the inn's east wall");
         Assert.That(floor.Min(t => t.X), Is.EqualTo(6));
         Assert.That(floor.Max(t => t.X), Is.EqualTo(19));
         Assert.That(floor.Min(t => t.Y), Is.EqualTo(4));

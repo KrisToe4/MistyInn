@@ -12,6 +12,7 @@ public sealed class InnBoard
     private readonly HashSet<Tile> _blocked = new();
     private readonly Dictionary<Tile, UnitId> _units = new();
     private readonly Dictionary<Tile, FixtureId> _fixtures = new();
+    private readonly HashSet<string> _lockedZones = new();
 
     public InnBoard(BoardLayout layout)
     {
@@ -24,7 +25,11 @@ public sealed class InnBoard
     public bool IsWalkable(Tile tile) => BoardLayout.IsWalkableKind(Layout.KindAt(tile)) && !_blocked.Contains(tile);
 
     /// <summary>True for inn floor tiles that nothing blocks: where staff may stand (BRD-02).</summary>
-    public bool IsPlaceableFloor(Tile tile) => Layout.KindAt(tile) == TileKind.Floor && !_blocked.Contains(tile);
+    public bool IsPlaceableFloor(Tile tile) =>
+        Layout.KindAt(tile) == TileKind.Floor && !_blocked.Contains(tile) && !_lockedZones.Contains(Layout.ZoneAt(tile));
+
+    /// <summary>The back rooms not in use yet (D-078): shut, and left out of the reachability rule.</summary>
+    public IReadOnlySet<string> LockedZones => _lockedZones;
 
     /// <summary>Fixtures never go off the floor, on the door, or on the two tiles in front of it (BRD-05).</summary>
     public bool IsFixtureForbidden(Tile tile) =>
@@ -61,7 +66,7 @@ public sealed class InnBoard
         }
 
         var reachedZones = ZonesReachableFromDoor(blocking);
-        return Layout.ZoneIds.Any(zone => !reachedZones.Contains(zone));
+        return Layout.ZoneIds.Any(zone => !reachedZones.Contains(zone) && !_lockedZones.Contains(zone));
     }
 
     /// <summary>The zones a creature could reach from the front door, optionally with more tiles blocked.</summary>
@@ -146,6 +151,23 @@ public sealed class InnBoard
     internal void RemoveUnit(Tile tile) => _units.Remove(tile);
 
     internal void Block(Tile tile) => _blocked.Add(tile);
+
+    /// <summary>Shuts a room that is not in use: its door blocks movement and nothing may be placed inside (D-078).</summary>
+    internal void LockRoom(RoomLayout room)
+    {
+        if (_lockedZones.Add(room.Zone))
+        {
+            _blocked.Add(room.Door);
+        }
+    }
+
+    internal void UnlockRoom(RoomLayout room)
+    {
+        if (_lockedZones.Remove(room.Zone))
+        {
+            _blocked.Remove(room.Door);
+        }
+    }
 
     internal void Unblock(Tile tile) => _blocked.Remove(tile);
 

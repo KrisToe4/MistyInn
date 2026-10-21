@@ -52,13 +52,25 @@ internal sealed class CompanySystem
         StartRoomVisits(now);
     }
 
-    /// <summary>An attack on an occupied room's door ends the session before the blow lands (CMP-05).</summary>
+    /// <summary>
+    /// An attack on an occupied room's door ends the session before the blow lands (CMP-05), unless a Ward circle by
+    /// the door shields this session from the first attack (FIX-03, D-079).
+    /// </summary>
     public void Interrupt(Room room, double now)
     {
-        if (room.InSession)
+        if (!room.InSession)
         {
-            Leave(room, now, interrupted: true);
+            return;
         }
+
+        if (room.Shields > 0)
+        {
+            room.Shields--;
+            _sink.Log("company.shielded", "ward.adjacent", room.Guest?.ToRef(), room.Companion?.ToRef());
+            return;
+        }
+
+        Leave(room, now, interrupted: true);
     }
 
     /// <summary>Dawn: every room empties (CYC-03).</summary>

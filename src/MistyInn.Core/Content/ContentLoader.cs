@@ -18,9 +18,10 @@ public static class ContentLoader
     public const string Items = "items.json";
     public const string Fixtures = "fixtures.json";
     public const string Flavour = "flavour.json";
+    public const string Synergies = "synergies.json";
 
     public static IReadOnlyList<string> FileNames { get; } =
-        [Balance, Inn, Planes, Creatures, Techniques, Staff, Items, Fixtures, Flavour];
+        [Balance, Inn, Planes, Creatures, Techniques, Staff, Items, Fixtures, Flavour, Synergies];
 
     public static JsonSerializerOptions Options { get; } = new()
     {
@@ -72,12 +73,13 @@ public static class ContentLoader
         var items = Read<List<ItemDef>>(Items);
         var fixtures = Read<List<FixtureDef>>(Fixtures);
         var flavour = Read<List<FlavourDef>>(Flavour);
+        var synergies = Read<List<SynergyDef>>(Synergies);
 
         if (errors.Count > 0)
         {
             throw new ContentException(errors);
         }
 
-        return new ContentSet(balance!, inn!, planes!, creatures!, techniques!, staff!, items!, fixtures!, flavour!);
+        return new ContentSet(balance!, inn!, planes!, creatures!, techniques!, staff!, items!, fixtures!, flavour!, synergies!);
     }
 }

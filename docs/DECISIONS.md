@@ -82,6 +82,13 @@ proposed details were approved with SDD v1.0 (2026-10-20). **Proposed** marks a 
 | D-074 | A debug dev panel for staff and planes | Accepted | 2026-10-20 | ARC-11, PLN-03 |
 | D-075 | Content filters in Core change only what is shown | Accepted | 2026-10-20 | RAT-09, SET-04, CMP-06, DAT-06, INV-02 |
 | D-076 | Older tests run on sturdy content | Accepted | 2026-10-20 | TST-01, INV-08, AGT-14 |
+| D-077 | Synergies: data file, all staff on the board, one origin synergy per plane | Accepted | 2026-10-20 | SYN-01..03, DAT-01, DAT-03 |
+| D-078 | A locked annex room for RoomSlots; display spots in inn.json | Accepted | 2026-10-20 | BRD-01, BRD-03, ITM-04, ITM-06, ART-17 |
+| D-079 | Adjacency effects through an adjacentTo parameter | Accepted | 2026-10-20 | FIX-03, FIX-04, DAT-03, CMP-05 |
+| D-080 | Shop details: own random stream, offers, rerolls and item weights | Accepted | 2026-10-20 | SHP-02..06, SHP-08, ITM-04, INV-02 |
+| D-081 | Ranks, the pending pick, selling and the starting staff's value | Accepted | 2026-10-20 | STF-06, STF-08, STF-09, STF-10, ARC-11 |
+| D-082 | Revealed ancestries live outside the session | Accepted | 2026-10-20 | STF-15, STF-16, MET-01 |
+| D-083 | Items: instance IDs, slots, storage and how each prototype effect applies | Accepted | 2026-10-20 | ITM-01..07, DAT-03 |
 
 ---
 
@@ -928,3 +935,97 @@ proposed details were approved with SDD v1.0 (2026-10-20). **Proposed** marks a 
   (`sturdy: false`). No value in `data/` changed for this (AGT-14). One step 4 tribute test now turns its creature in
   the last 3 s, so it cannot reach anyone.
 - **Requirement IDs affected:** TST-01, INV-08, AGT-14.
+
+## D-077 Synergies: data file, all staff on the board, one origin synergy per plane
+- **Status:** Accepted (recipients and origins chosen by the human before step 6)
+- **Date / step:** 2026-10-20, step 6
+- **Context:** SYN-02 gives example bonuses but not who receives them, nor origin synergies for every plane.
+- **Decision:** `data/synergies.json` (DAT-01) lists each synergy with a class or an origin and its tiers; only the
+  highest tier reached applies. Personal effects (`Stat`, `Soothe`, `Aura`, `Radius`) go to **every staff member on
+  the board** (the human's answer), not only the members; other kinds (`Tribute`) are inn-wide. Each plane has an origin
+  synergy (×1.5 soothe with that plane's creatures at 2, ×1.75 at 4), plus Mortal (+10/+25 % health). Because bonuses
+  go to all staff, an origin synergy helps every staff member with that plane's creatures. Synergies are recounted
+  after every Dusk change and fixed for the whole mist from the board at Begin the Mist. The Entertainer reach bonus
+  applies to Song and Dance from beside the stage.
+- **Alternatives considered:** Members only; only the two origin synergies SYN-02 names.
+- **Requirement IDs affected:** SYN-01, SYN-02, SYN-03, DAT-01, DAT-03.
+
+## D-078 A locked annex room for RoomSlots; display spots in inn.json
+- **Status:** Accepted (the human chose the annex and fixed spots before step 6)
+- **Date / step:** 2026-10-20, step 6
+- **Context:** Spare Keys gives +1 room, but `inn.json` had only two rooms; inn items name display spots that the layout
+  did not define.
+- **Decision:** `inn.json` gains `room-3`, a walled annex east of the lounge with its door in the lounge wall at
+  (20,9). Back rooms are ordered by zone ID; the first `rooms` + `RoomSlots` are open, the rest locked: a locked
+  room's door blocks movement, nothing may be placed inside, Company never uses it and BRD-03 ignores it. An inn item
+  that opened a room cannot be sold while a unit or fixture stands in that room (`TileOccupied`). `inn.json` also gains
+  `displaySpots` (name → [x, y]); all six spots are wall tiles (front door, bar, shop counter, innkeeper behind the bar,
+  hearth on the kitchen wall, rooms). The view shows a labelled box coloured by rarity at each spot, stacked when
+  several items share one. `maxInnItemsShown` (12) is the most inn items the player can own.
+- **Alternatives considered:** Carving room-3 from the kitchen; spots that follow the hearth and the innkeeper.
+- **Requirement IDs affected:** BRD-01, BRD-03, ITM-04, ITM-06, ART-17.
+
+## D-079 Adjacency effects through an adjacentTo parameter
+- **Status:** Accepted (the human chose the mechanism and both examples before step 6)
+- **Date / step:** 2026-10-20, step 6
+- **Context:** FIX-03 has two examples but no effect kind or data shape for adjacency.
+- **Decision:** Effects take an optional `adjacentTo` parameter: a fixture ID or `RoomDoor`. The effect works only while
+  its fixture touches (8 neighbours) a working fixture of that ID, or a room door in use. Data: the Lantern has
+  `Radius` +1 next to the Stage (the stage's one extra zone becomes two), and the Ward circle has `Blocks` 1 next to a
+  room door: the session inside ignores the first door attack of each mist (logged `company.shielded`). A `Blocks`
+  effect with `adjacentTo` does not make a fixture a barricade. No new effect kind; adjacency between units is not
+  used yet.
+- **Alternatives considered:** A new `Adjacent` effect kind (an SDD change); only the Lantern example.
+- **Requirement IDs affected:** FIX-03, FIX-04, DAT-03, CMP-05.
+
+## D-080 Shop details: own random stream, offers, rerolls and item weights
+- **Status:** Accepted
+- **Date / step:** 2026-10-20, step 6
+- **Context:** Section 13.1 leaves the draw mechanics, the command shape and item odds open.
+- **Decision:** The shop draws from its own `SeededRandom`, seeded once from the run's starting random state (without
+  drawing from it), so shopping and rerolls never change how a mist plays out; step 8 saves its state with the run.
+  Each Dusk draws after the planes (for the home-plane weight): a rank by the cycle's odds, then a character by weight.
+  `BuyOffer(section, index)` replaces ARC-10's `BuyOffer(offerIndex)`. A reroll fills every slot with new offers, bought
+  slots included. The lock keeps the offers (empty slots stay empty) for one Dusk, then clears. Items are drawn by
+  rarity weight (`shop.itemWeights`: Common 3, Rare 2, Cursed 1); an inn item already owned is not offered again;
+  staff items can repeat. `ShopOdds` and `PlaneWeight` effects are not applied yet (no content uses them).
+- **Alternatives considered:** Drawing from the run's stream (every reroll would change the mist).
+- **Requirement IDs affected:** SHP-02, SHP-03, SHP-04, SHP-05, SHP-06, SHP-08, ITM-04, INV-02.
+
+## D-081 Ranks, the pending pick, selling and the starting staff's value
+- **Status:** Accepted (the multiplier and the pending rule are the human's answers before step 6)
+- **Date / step:** 2026-10-20, step 6
+- **Context:** STF-06 says ranks multiply "the base stats"; STF-08 does not say what happens before the pick.
+- **Decision:** A rank multiplies health, attack and soothe; attack interval, range, armour and speed stay at base.
+  After buying an upgrade offer the unit is one rank higher with `UpgradePending`; until `ChooseUpgrade`, every command
+  except `ChooseUpgrade` and `SetContentFilters` is refused with `UpgradePending`. Starting characters count as hired
+  at ★1 for their base cost, so selling one returns half of it (0 for a base cost of 1); dev-panel characters too.
+  Hiring with a full bench is refused (`BenchFull`); upgrades work with a full bench. Selling a unit whose items do not
+  fit in storage is refused (`StorageFull`). New reasons: `UnknownOffer`, `MaxRank`, `UpgradePending`,
+  `OptionNotAvailable`, `UnknownItem`, `SlotsFull`, `StorageFull`, `InnItemsFull`, `NotStaff`.
+- **Alternatives considered:** Multiplying every stat; a pick that can wait while other commands work.
+- **Requirement IDs affected:** STF-06, STF-08, STF-09, STF-10, ARC-11.
+
+## D-082 Revealed ancestries live outside the session
+- **Status:** Accepted (the human's answer before step 6)
+- **Date / step:** 2026-10-20, step 6
+- **Context:** STF-16 keeps reveals in the profile, which arrives in step 8.
+- **Decision:** `AncestryRecord` (character IDs) is passed into `GameSession`, like the bestiary (D-066); `GameRoot`
+  keeps one instance across runs in memory, and step 8 saves it. A reveal happens the first time the character starts
+  a service session on, or strikes, a creature of its ancestral plane; it raises `AncestryRevealed` and logs
+  `ancestry.revealed` with the plane. Hidden ancestry counts only for the shop weight.
+- **Requirement IDs affected:** STF-15, STF-16, MET-01.
+
+## D-083 Items: instance IDs, slots, storage and how each prototype effect applies
+- **Status:** Accepted
+- **Date / step:** 2026-10-20, step 6
+- **Context:** ITM-01 to ITM-07 need owned-item identity and a rule for each prototype effect.
+- **Decision:** Owned items get an `ItemId` (ARC-13; `IdAllocatorState.LastItem`). Staff items are in storage (8) or
+  carried (2 slots); the innkeeper carries none. Effects: `Stat` with a technique applies to that technique only
+  (Brass Knuckles, Lute); `Soothe` with a technique or plane filters likewise; `Aura` slows agitation near the carrier
+  (Ward Charm); `ArrivalAgitation` changes a plane's creatures on arrival, never to 100 (Drowned Bell); `Tribute` adds
+  to every tribute (Innkeeper's Ledger); `RerollCost` changes the reroll price, never below 0 (Loaded Coin); `CountsAs`
+  gives a fixture the other fixture's effects (Ember in a Jar); `RoomSlots` opens rooms (D-078); `BoardSlots` adds to the
+  staff limit and `Stat` with `target: Innkeeper` changes the innkeeper (Cursed Crown). Inn items work from purchase;
+  every item sells for half its price.
+- **Requirement IDs affected:** ITM-01, ITM-02, ITM-03, ITM-04, ITM-05, ITM-06, ITM-07, DAT-03.

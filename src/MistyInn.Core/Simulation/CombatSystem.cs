@@ -24,6 +24,7 @@ internal sealed class CombatSystem
     private readonly BestiaryRecorder _bestiary;
     private readonly CreatureBehaviourSystem _behaviour;
     private readonly CompanySystem _company;
+    private readonly AncestryObserver _ancestry;
     private readonly IReadOnlyList<Tile> _walls;
     private readonly Dictionary<CreatureId, Target> _targets = new();
 
@@ -34,8 +35,10 @@ internal sealed class CombatSystem
         InnDamage damage,
         BestiaryRecorder bestiary,
         CreatureBehaviourSystem behaviour,
-        CompanySystem company)
+        CompanySystem company,
+        AncestryObserver ancestry)
     {
+        _ancestry = ancestry;
         _content = content;
         _run = run;
         _sink = sink;
@@ -270,7 +273,7 @@ internal sealed class CombatSystem
 
     private IEnumerable<Target> Barricades(Creature creature) =>
         _run.PlacedFixtures
-            .Where(f => !f.IsBroken && f.Def.Effects.Any(e => e.Kind == EffectKind.Blocks))
+            .Where(f => !f.IsBroken && f.Def.Effects.Any(e => e.Kind == EffectKind.Blocks && e.AdjacentTo is null))
             .OrderBy(f => InnSense.DistanceToTiles(creature.Position, f.Tiles))
             .ThenBy(f => f.Id.Value)
             .Select(f => new Target($"fixture:{f.Id.Value}", Fixture: f));
@@ -338,7 +341,7 @@ internal sealed class CombatSystem
         switch (target)
         {
             case { Unit: { } unit }:
-                HurtUnit(unit, Math.Max(1, attack - unit.Stats.Armour), creature, now);
+                HurtUnit(unit, Math.Max(1, attack - unit.Armour), creature, now);
                 break;
             case { Creature: { } victim }:
                 HurtCreature(victim, Math.Max(1, attack - victim.Def.Combat.Armour), creature, now);
@@ -421,6 +424,7 @@ internal sealed class CombatSystem
     private void HitTurned(Creature creature, double damage, Unit by, double now)
     {
         creature.Health -= damage;
+        _ancestry.Observe(by, creature.Def);
         Landed(by.Id.ToRef(), creature.Id.ToRef(), damage, creature.Position, now);
         if (creature.Health > 0)
         {
@@ -469,7 +473,7 @@ internal sealed class CombatSystem
         unit.Activity = UnitActivity.Fighting;
         unit.Engaging = target.Id;
 
-        if (unit.Position.DistanceTo(target.Position) <= Math.Max(unit.Stats.Range, technique.Range))
+        if (unit.Position.DistanceTo(target.Position) <= Math.Max(unit.Stats.Range, unit.RangeOf(technique)))
         {
             unit.ClearPath();
             if (now >= unit.NextAttackAt)
@@ -481,7 +485,7 @@ internal sealed class CombatSystem
                     target.GrappledBy = unit.Id;
                 }
 
-                HitTurned(target, Math.Max(1, unit.Attack + technique.AttackBonus - target.Def.Combat.Armour), unit, now);
+                HitTurned(target, Math.Max(1, unit.AttackWith(technique) - target.Def.Combat.Armour), unit, now);
             }
 
             return;

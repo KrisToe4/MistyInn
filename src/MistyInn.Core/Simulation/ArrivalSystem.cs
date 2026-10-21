@@ -20,11 +20,13 @@ internal sealed class ArrivalSystem
     private readonly IEventSink _sink;
     private readonly CreatureBehaviourSystem _behaviour;
     private readonly BestiaryRecorder _bestiary;
+    private readonly Modifiers _modifiers;
 
     public ArrivalSystem(
         GameContent content, RunState run, IRandomSource random, IdAllocator ids, IEventSink sink,
-        CreatureBehaviourSystem behaviour, BestiaryRecorder bestiary)
+        CreatureBehaviourSystem behaviour, BestiaryRecorder bestiary, Modifiers modifiers)
     {
+        _modifiers = modifiers;
         _content = content;
         _run = run;
         _random = random;
@@ -87,6 +89,12 @@ internal sealed class ArrivalSystem
         var plane = _run.ConvergingPlanes[_random.NextInt(0, _run.ConvergingPlanes.Count)];
         var def = _content.Creature(PickWeighted(plane.Creatures).Creature);
         var creature = new Creature(_ids.NextCreature(), def, _content.GateFor(plane.Id));
+        var arrival = _modifiers.InnWide(EffectKind.ArrivalAgitation, plane.Id);
+        if (arrival != 0)
+        {
+            // Inn items such as the Drowned Bell (ITM-06); a creature never arrives already turned.
+            creature.Agitation = Math.Clamp(creature.Agitation + arrival, 0, 99);
+        }
 
         _run.Creatures.Add(creature);
         _sink.Raise(new CreatureArrived(_sink.Time, creature.Id, def.Id, plane.Id));

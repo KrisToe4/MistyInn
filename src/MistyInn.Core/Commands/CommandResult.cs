@@ -48,6 +48,33 @@ public enum CommandFailure
 
     /// <summary>The bench has no room for another staff member (section 6.4).</summary>
     BenchFull,
+
+    /// <summary>The shop slot is empty or does not exist (SHP-02).</summary>
+    UnknownOffer,
+
+    /// <summary>The owned character is already ★5 (STF-08).</summary>
+    MaxRank,
+
+    /// <summary>An upgrade pick must be made first (STF-08, D-081).</summary>
+    UpgradePending,
+
+    /// <summary>The option is not in the tree at the new rank, or not available after the earlier picks (STF-17).</summary>
+    OptionNotAvailable,
+
+    /// <summary>The command names an item the player does not own, or the wrong kind of item.</summary>
+    UnknownItem,
+
+    /// <summary>The staff member already carries as many items as it has slots (ITM-02).</summary>
+    SlotsFull,
+
+    /// <summary>Item storage is full (ITM-02).</summary>
+    StorageFull,
+
+    /// <summary>No more inn items can be shown in the inn (ITM-04).</summary>
+    InnItemsFull,
+
+    /// <summary>The innkeeper cannot be sold or carry staff items (ESC-06).</summary>
+    NotStaff,
 }
 
 /// <summary>The outcome of <see cref="GameSession.Execute"/>.</summary>

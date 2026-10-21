@@ -14,8 +14,9 @@ namespace MistyInn.UI;
 /// Placeholder HUD: cycle, phase and time to dawn (CYC-02), silver, supplies and integrity (BRD-06), the forecast with
 /// what the bestiary knows (CYC-01, BST-03), the bench and the fixture storage to drag from (CAM-13), the build menu
 /// (FIX-05, FIX-06), Begin the Mist, speed controls (SCP-13), Continue and integrity repairs at Dawn (CYC-04, BRD-07),
-/// the run-over panel (RUN-03), the selection line (CAM-12), the pause menu (CYC-10) and, in debug builds only, the dev
-/// panel (D-074). Built in code; the UI pass (step 9) replaces it with designed screens.
+/// the run-over panel (RUN-03), the selection line (CAM-12), the pause menu (CYC-10), the shop and staff-and-items tabs
+/// beside the build menu (UI-03), the upgrade dialog (UI-08) and, in debug builds only, the dev panel (D-074). Built in
+/// code; the UI pass (step 9) replaces it with designed screens.
 /// </summary>
 public partial class Hud : CanvasLayer
 {
@@ -33,6 +34,9 @@ public partial class Hud : CanvasLayer
     private VBoxContainer _storageList = null!;
     private PanelContainer _buildPanel = null!;
     private VBoxContainer _buildList = null!;
+    private ShopPanel _shop = null!;
+    private StaffItemsPanel _staffItems = null!;
+    private UpgradeDialog _upgrade = null!;
     private Button _beginMist = null!;
     private Button _continue = null!;
     private HBoxContainer _speedBar = null!;
@@ -80,6 +84,22 @@ public partial class Hud : CanvasLayer
 
     public event Action<ContentFilters>? FiltersChanged;
 
+    public event Action<ShopSection, int>? BuyOfferPressed;
+
+    public event Action? RerollPressed;
+
+    public event Action<bool>? LockToggled;
+
+    public event Action<UnitId, string>? ChooseUpgradePressed;
+
+    public event Action<UnitId>? SellUnitPressed;
+
+    public event Action<ItemId, UnitId>? EquipPressed;
+
+    public event Action<ItemId>? UnequipPressed;
+
+    public event Action<ItemId>? SellItemPressed;
+
     public bool IsPauseMenuOpen => _pauseMenu.Visible;
 
     public override void _Ready()
@@ -108,15 +128,33 @@ public partial class Hud : CanvasLayer
         _storageList = new VBoxContainer();
         benchBox.AddChild(_storageList);
 
+        // One panel, three tabs: the random shop, the fixed build menu (FIX-05) and staff and items (UI-03).
         _buildPanel = new PanelContainer();
         AddChild(_buildPanel);
         _buildPanel.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.TopRight, Control.LayoutPresetMode.Minsize, 16);
         _buildPanel.GrowHorizontal = Control.GrowDirection.Begin;
-        var buildBox = new VBoxContainer();
-        _buildPanel.AddChild(buildBox);
-        AddLabel(buildBox, 16).Text = Tr("Build menu");
+        var tabs = new TabContainer();
+        _buildPanel.AddChild(tabs);
+
+        _shop = new ShopPanel { Name = Tr("Shop") };
+        tabs.AddChild(_shop);
+        _shop.BuyPressed += (section, index) => BuyOfferPressed?.Invoke(section, index);
+        _shop.RerollPressed += () => RerollPressed?.Invoke();
+        _shop.LockToggled += locked => LockToggled?.Invoke(locked);
+
+        var buildBox = new VBoxContainer { Name = Tr("Build menu") };
+        tabs.AddChild(buildBox);
         _buildList = new VBoxContainer();
         buildBox.AddChild(_buildList);
+
+        var staffScroll = new ScrollContainer { Name = Tr("Staff and items"), CustomMinimumSize = new Vector2(420, 360) };
+        tabs.AddChild(staffScroll);
+        _staffItems = new StaffItemsPanel();
+        staffScroll.AddChild(_staffItems);
+        _staffItems.SellUnitPressed += id => SellUnitPressed?.Invoke(id);
+        _staffItems.EquipPressed += (item, unit) => EquipPressed?.Invoke(item, unit);
+        _staffItems.UnequipPressed += item => UnequipPressed?.Invoke(item);
+        _staffItems.SellItemPressed += item => SellItemPressed?.Invoke(item);
 
         var actions = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
         AddChild(actions);
@@ -151,6 +189,9 @@ public partial class Hud : CanvasLayer
         AddChild(_pauseMenu);
         _runOver = BuildRunOver();
         AddChild(_runOver);
+        _upgrade = new UpgradeDialog();
+        AddChild(_upgrade);
+        _upgrade.ChoosePressed += (unit, option) => ChooseUpgradePressed?.Invoke(unit, option);
 
         _devPanel = new PanelContainer { Visible = false };
         AddChild(_devPanel);
@@ -220,6 +261,13 @@ public partial class Hud : CanvasLayer
         RefreshBench(session.Units);
         RefreshStorage(session.Fixtures);
         BuildMenuOnce(session);
+        if (dusk)
+        {
+            _shop.Refresh(session);
+            _staffItems.Refresh(session);
+        }
+
+        _upgrade.Refresh(session);
     }
 
     public void ShowMessage(string text, double seconds = 4)
@@ -313,7 +361,7 @@ public partial class Hud : CanvasLayer
     private void RefreshBench(IReadOnlyList<UnitSnapshot> units)
     {
         var benched = units.Where(u => u.IsOnBench).ToList();
-        var signature = string.Join(",", benched.Select(u => u.Id.Value));
+        var signature = string.Join(",", benched.Select(u => $"{u.Id.Value}:{u.Rank}"));
         if (signature == _benchSignature)
         {
             return;
@@ -327,7 +375,7 @@ public partial class Hud : CanvasLayer
 
         foreach (var unit in benched)
         {
-            var button = AddButton(_benchList, unit.Name);
+            var button = AddButton(_benchList, $"{unit.Name} ★{unit.Rank}");
             var id = unit.Id;
             button.ButtonDown += () => BenchDragStarted?.Invoke(id);
         }

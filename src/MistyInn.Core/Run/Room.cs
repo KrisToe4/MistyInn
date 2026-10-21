@@ -35,6 +35,9 @@ internal sealed class Room
 
     public bool IsTaken => Companion is not null;
 
+    /// <summary>Door attacks that will not end the session this mist: Ward circles by the door (FIX-03, D-079).</summary>
+    public int Shields { get; set; }
+
     /// <summary>The door is closed on a session (CMP-04); only then can a turned creature attack it (CMP-05).</summary>
     public bool InSession => EndsAt is not null;
 

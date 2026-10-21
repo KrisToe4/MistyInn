@@ -3,8 +3,8 @@
 
 | | |
 |---|---|
-| **Version** | 1.8 (approved) |
-| **Supersedes** | 1.7 |
+| **Version** | 1.9 (approved) |
+| **Supersedes** | 1.8 |
 | **Audience** | LLM-based coding agents and the human developer |
 | **Genre** | Dark roguelike autobattler: prepare the inn, then survive the mist |
 | **Engine** | Godot 4.7.2 (.NET build) |
@@ -76,6 +76,7 @@ step starts.
 
 | Version | Change | Reason |
 |---|---|---|
+| 1.9 | ARC-10, ARC-11: shop and item commands (`BuyOffer(section, index)`, `Reroll`, `LockShop`, `ChooseUpgrade`, `SellUnit`, `EquipItem`, `UnequipItem`, `SellItem`) and their refusal reasons. DAT-03: the optional `adjacentTo` parameter. BRD-01, SIM-04: a locked annex `room-3` and inn-item display spots in `inn.json`. FIX-03: adjacency rules and the two prototype examples. STF-06: a rank multiplies health, attack and soothe. STF-08: a pending pick blocks every other command. STF-09: starting staff count as hired for their base cost. STF-10: the D-065 note removed. STF-16: revealed ancestries are kept outside the session until the profile saves them. SHP-02, SHP-05, SHP-06: the shop's own random stream, rerolls refill every slot, the lock lasts one Dusk, item rarity weights. ITM-02, ITM-04: no staff items for the innkeeper; at most 12 inn items, never offered twice. SYN-01, SYN-02: bonuses go to every staff member on the board; one origin synergy per plane. SAV-01: the shop's random state and owned items are saved | Step 6 report (D-077 to D-083) |
 | 1.8 | BRD-01: each back room is its own zone with a `RoomDoor` tile. BRD-06: integrity loses 25 % of fixture and door damage, and walls take damage directly. BRD-07: fixtures repair automatically and for free at Dawn; integrity costs 1 silver per 5 points. ESC-01: Prey does not target the innkeeper. ESC-06: the innkeeper strikes back from its post. CMP-04: one room session per guest per cycle; doors have health. STF-01: `prefers` and `refuses` lists. Section 6.4: `combat` and `company` tuning. ARC-11: development-only commands, and `SetContentFilters` in every phase | Step 5 report (D-069 to D-076) |
 | 1.7 | INV-12: the cycle log records causes and turning points, not every step of agitation. STF-10: until step 6 adds ranks, each unit knows only its ★1 base technique | Step 4 report (D-065 to D-068) |
 | 1.6 | FIX-02: Shadowed alcove (`Darkness`) and Ledger desk (`Order`). STF-02: Cards also answers `Order`, Tales also answers `Darkness`. AGI-08: `Cold` is the draught within 3 tiles of the front door during the mist. RUN-01: the base fixtures and supplies start in storage (`balance.json`). FIX-01: a fixture has a shape (tile offsets, rotated in 90° steps) and seats; every fixture blocks movement | Step 4 questions (D-060 to D-063) |
@@ -338,13 +339,14 @@ MistyInn/                            (repository root, also the Godot project ro
 
 ## 5.2 Commands and domain events
 
-- **ARC-10** Commands are immutable records, for example `BuyOffer(offerIndex)`, `ChooseUpgrade(unitId, nodeId)`,
-  `Reroll`, `LockShop`, `PlaceUnit(unitId, tile)`, `BenchUnit(unitId)`, `SellUnit(unitId)`,
-  `EquipItem(itemId, unitId)`, `UnequipItem(itemId)`, `BuildFixture(fixtureId)`,
+- **ARC-10** Commands are immutable records, for example `BuyOffer(section, index)`, `ChooseUpgrade(unitId, optionId)`,
+  `Reroll`, `LockShop(locked)`, `PlaceUnit(unitId, tile)`, `BenchUnit(unitId)`, `SellUnit(unitId)`,
+  `EquipItem(itemId, unitId)`, `UnequipItem(itemId)`, `SellItem(itemId)`, `BuildFixture(fixtureId)`,
   `PlaceFixture(fixtureId, tile, rotation)`, `BuySupplies(kind, amount)`, `Repair(target)`, `BeginMist`,
   `ContinueFromDawn`, `SetSpeed(multiplier)`, `StartRun(seed)`.
 - **ARC-11** `Execute` returns a `CommandResult` (success, or a reason code such as `WrongPhase`, `NotEnoughSilver`,
-  `TileBlocked`, `BoardFull`). A command that is not valid changes nothing. During the mist phase only `SetSpeed` is
+  `TileBlocked`, `BoardFull`, `UnknownOffer`, `MaxRank`, `UpgradePending`, `OptionNotAvailable`, `SlotsFull`,
+  `StorageFull`, `InnItemsFull`). A command that is not valid changes nothing. During the mist phase only `SetSpeed` is
   accepted (`SCP-13`); `SetContentFilters` is accepted in every phase (`SET-04`). Development-only commands
   (`DevAddStaff`, `DevSetConvergingPlanes`) exist for the debug dev panel and are never sent by a release build (D-074).
 - **ARC-12** Core raises domain events (`PhaseChanged`, `CreatureArrived`, `ServiceStarted`, `AgitationChanged`,
@@ -370,7 +372,7 @@ MistyInn/                            (repository root, also the Godot project ro
 - **SIM-04** The inn's grid, zones and mist gates are defined in data (`data/inn.json`). The inn view builds its tiles
   and gates from that data at run time, so the two cannot disagree; a test checks that the board comes from `inn.json`
   (`TST-07`). If hand-built inn art adds markers later (step 10), a test that the markers and the data agree comes with
-  it.
+  it. `inn.json` also names the inn items' display spots (`displaySpots`: name to tile, `ITM-04`).
 
 ## 5.4 Scene tree (target)
 
@@ -645,20 +647,22 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
 ## 11.2 Ranks and upgrade trees
 
 - **STF-06** Characters have **five ranks**, ★1 to ★5. Each rank above ★1 gives one upgrade pick, either a new
-  technique or the mastery of one the character already knows (`STF-17`), and multiplies the base stats by that
-  rank's multiplier from data. A ★5 character has its base technique and four picks.
+  technique or the mastery of one the character already knows (`STF-17`), and multiplies the base health, attack and
+  soothe by that rank's multiplier from data (attack interval, range, armour and speed stay at base, D-081). A ★5
+  character has its base technique and four picks.
 - **STF-07** Each character has an **upgrade tree**: for each of ranks ★2 to ★5, two or three options, each a new
   technique or a mastery. Options come from the main class or from **one second class**; a tree spans **at most two
   classes**. An option may require an earlier choice, so the tree can branch.
 - **STF-08** **Upgrading**: buying a shop offer of a character the player already owns raises the owned character by
   **exactly one rank**, whatever rank the offer shows. The player then picks one option for the new rank
-  (`ChooseUpgrade`). The price paid is the offer's price, so upgrading from a high-rank offer costs more for the same
-  single rank (`SHP-08`). Offers of an owned ★5 character cannot be bought.
-- **STF-09** Selling a character returns half the silver spent on it, rounded down. Its items go to storage
-  (`ITM-02`).
+  (`ChooseUpgrade`). Until the pick is made, every other command except `SetContentFilters` is refused
+  (`UpgradePending`, D-081). The price paid is the offer's price, so upgrading from a high-rank offer costs more for the
+  same single rank (`SHP-08`). Offers of an owned ★5 character cannot be bought.
+- **STF-09** Selling a character returns half the silver spent on it, rounded down; a starting character counts as
+  hired at ★1 for its base cost. Its items go to storage (`ITM-02`); a sale whose items would not fit is refused.
 - **STF-10** **Hiring** a character the player does not own gives that character at the offer's rank with its
   **preset build** for that rank (techniques predetermined in data). Later upgrades continue up the tree from that
-  build. Until step 6 adds ranks, each unit knows only its character's ★1 base technique (D-065).
+  build. Hiring needs a free place on the bench; upgrades do not.
 - **STF-17** **Mastery** makes a known technique stronger by the mastery values in its data (for example ×1.5 soothe
   and +1 capacity, or +3 attack for a Fighter technique). Each technique can be mastered once. An option is
   **available** when its requirement (if any) was chosen, and its technique is not known yet (a new technique) or is
@@ -683,7 +687,8 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
   ancestry. Ancestry counts for the home-plane shop weight (`SHP-04`) from the start, even while hidden.
 - **STF-16** Ancestry is **revealed by observation**: the first time the character soothes or fights a creature of
   its ancestral plane during the mist phase, the link is revealed, shown on the character's panel and recorded in the
-  cycle log. The reveal is kept in the profile across runs (`MET-01`). A revealed ancestry gives a ×1.25 soothe bonus
+  cycle log. The reveal is kept in the profile across runs (`MET-01`); the session receives the revealed ancestries
+  from outside, like the bestiary (D-082). A revealed ancestry gives a ×1.25 soothe bonus
   with creatures of that plane and counts as that plane's origin for synergies (`SYN-01`). Before it is revealed it
   has no effect except the shop weight.
 
@@ -721,7 +726,9 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
   Kitchen, Lounge, Stage, **Rooms** (two back rooms at the start) and Cellar door. Each back room is its own zone
   (`room-1`, `room-2`) with one door, a `RoomDoor` tile in that zone: walkable, never built on, closed during a
   session (D-069). The layout is defined in `data/inn.json` (`SIM-04`). Inn items may add rooms (`ITM-06`), from a
-  fixed set of extra room slots in the layout.
+  fixed set of extra room slots in the layout: the prototype has one, the annex `room-3` east of the lounge. Rooms open
+  in zone order; a room not open yet is locked: its door blocks movement, nothing may be placed inside, Company does
+  not use it and `BRD-03` ignores it (D-078).
 - **BRD-02** During Dusk, the player places units and fixtures on free floor tiles by drag and drop. Some fixtures
   belong to a zone (the bar counter in the Bar, the stage in the Stage zone); some techniques need a fixture to work
   (Drink needs a bar counter, Food a table, Cards a card table, `STF-02`).
@@ -762,9 +769,11 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
   | Barricade | Blocks a tile; absorbs damage; turned creatures attack it to pass |
   | Salt line | Turned creatures of one plane (chosen when placed) cannot cross it |
 
-- **FIX-03** **Adjacency** effects apply to fixtures and units next to each other (8 neighbours), for example a Ward
-  circle next to a room door protects the session inside from interruption by the first attack, or a Lantern next
-  to the Stage doubles the stage's reach.
+- **FIX-03** **Adjacency** effects apply to fixtures and units next to each other (8 neighbours). An effect with an
+  `adjacentTo` parameter (a fixture ID, or `RoomDoor`) works only while its fixture touches a working fixture of that
+  type, or a door of a room in use (`DAT-03`). Prototype examples: a Ward circle next to a room door protects the
+  session inside from interruption by the first attack of each mist (`Blocks`), and a Lantern next to the Stage
+  doubles the stage's extra reach (`Radius` +1 zone) (D-079).
 - **FIX-04** Fixture effects are applied by Core systems reading the board's modifiers, never by code that checks for
   a specific fixture ID.
 - **FIX-05** **The build menu** is a fixed catalogue: every unlocked fixture, always available at a fixed price,
@@ -781,8 +790,10 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
 - **SHP-01** **Silver** is the run's only currency. It is earned from the base income each cycle and from tributes
   (`CRE-05`), and spent in the shop, the build menu (`FIX-05`) and on Dawn repairs. Silver never goes below zero; a
   purchase that would do so is refused. Silver exists only inside a run and can never be bought (`SCP-27`).
-- **SHP-02** Each Dusk the shop shows **3 staff offers** and **3 item offers**, drawn with the run's RNG. A staff
-  offer is a character at a rank (`STF-10`); an item offer is a staff item or an inn item (section 13.2).
+- **SHP-02** Each Dusk the shop shows **3 staff offers** and **3 item offers**, drawn with the shop's own random stream,
+  seeded from the run's seed, so shopping never changes how a mist plays out (`INV-02`, D-080). A staff offer is a
+  character at a rank (`STF-10`); an item offer is a staff item or an inn item (section 13.2), drawn by rarity weight
+  (`balance.json` `shop.itemWeights`).
 - **SHP-03** **Rank odds** grow over the run (tuning values in `data/balance.json`):
 
   | Cycles | ★1 | ★2 | ★3 | ★4 | ★5 |
@@ -800,10 +811,11 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
 
   The multipliers stack. The same weights apply to rerolls. Owned ★5 characters are not drawn. Characters already
   showing in the current offers are not drawn twice.
-- **SHP-05** **Reroll** redraws every offer not yet bought. The first reroll in a cycle costs 2, and each further
+- **SHP-05** **Reroll** fills every slot with new offers, including slots already bought. The first reroll in a cycle costs 2, and each further
   reroll in the same cycle costs 1 more. The cost resets at each Dusk. `RerollCost` effects from items and inn items
   lower it, down to 0 (`DAT-03`).
-- **SHP-06** **Lock** keeps the current offers for the next Dusk instead of a new draw.
+- **SHP-06** **Lock** keeps the current offers (bought slots stay empty) for the next Dusk instead of a new draw; the
+  lock then clears.
 - **SHP-07** Any character can be offered: one never hired, one who died, or one the player owns (an upgrade offer,
   `STF-08`).
 - **SHP-08** **Prices**: a staff offer costs the character's base cost + 2 per rank above ★1. Item prices come from
@@ -816,12 +828,14 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
   Rare, Cursed), a price, effects (`DAT-03`), optional class tags, and for inn items a display model and a display
   spot.
 - **ITM-02** **Staff items** are carried by a staff member, with **two slots** each. During Dusk they can be moved
-  freely between staff and **storage** (up to 8 items). Their effects apply to the carrier.
+  freely between staff and **storage** (up to 8 items). Their effects apply to the carrier. The innkeeper carries
+  none.
 - **ITM-03** **Class tags** on a staff item count the carrier as having that class **for synergy calculations only**
   (`SYN-01`). A tag never gives a technique and never changes what the carrier can do.
 - **ITM-04** **Inn items** apply across the whole run from the moment they are bought: to staff, creatures, the shop
   (for example cheaper rerolls), the economy or the board. They replace the relics of other roguelikes. Each one is
-  **shown in the inn** at its display spot (a cursed bell over the door, a ledger on the bar), up to 12 (`INV-05`).
+  **shown in the inn** at its display spot (a cursed bell over the door, a ledger on the bar), up to 12 (`INV-05`): a
+  thirteenth cannot be bought. An inn item already owned is not offered again.
 - **ITM-05** **Cursed** items have a strong upside and a real downside.
 - **ITM-06** Prototype items, for example:
 
@@ -846,11 +860,14 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
 - **SYN-01** A synergy is a bonus for having enough **distinct characters on the board** (the bench does not count)
   with one class, or of one origin. A character counts for a class through its techniques (`STF-03`) or a class tag on
   an item it carries (`ITM-03`), and for an origin through its plane-born origin, the Mortal Realm, or a revealed
-  ancestry (`STF-16`). Class thresholds are 2, 4 and 6; origin thresholds are 2 and 4.
+  ancestry (`STF-16`). Class thresholds are 2, 4 and 6; origin thresholds are 2 and 4. Only the highest threshold
+  reached applies. Its effects go to **every staff member on the board**, or to the inn for inn-wide kinds such as
+  `Tribute`; synergies are counted when the mist begins and hold until Dawn (D-077). Synergies are data
+  (`data/synergies.json`).
 - **SYN-02** Prototype synergies, for example: **Companion/Server** (2/4/6): +10/+25/+50 % soothe for Company, Food
   and Drink; **Gambler** (2/4): tributes +1/+3 silver; **Fighter** (2/4/6): +2/+4/+7 armour; **Entertainer** (2/4):
-  Song and Dance reach one/two more zones; **Drowned** (2): Drowned staff soothe Drowned creatures ×1.5; **Mortal**
-  (2/4): +10/+25 % health.
+  Song and Dance reach one/two more zones from beside the stage; **one origin synergy per plane** (2/4): staff soothe
+  that plane's creatures ×1.5/×1.75 (for example **Drowned**); **Mortal** (2/4): +10/+25 % health.
 - **SYN-03** Synergy effects use the same effect kinds as items and fixtures (`DAT-03`). The setup UI shows active and
   nearly-active synergies (`UI-03`).
 
@@ -1018,8 +1035,9 @@ This section is the only place that sets what content is allowed. Agents shall n
   `Income`, `ShopOdds`, `Supplies`, `Blocks`, `PlaneBarrier`, `Aura`, `RerollCost` (shop rerolls cost more or less),
   `RoomSlots` (more or fewer rooms), `Provides` (a fixture gives an appetite to a number of seats or tiles), `Enables`
   (a technique needs this fixture to work, with its seats), `Emits` (a fixture gives off `Light`, `Noise`, `Heat` or
-  `Cold` within a radius) and `CountsAs` (one fixture also counts as another, for example a hearth as a lantern). A new
-  kind in any of these sets is an SDD change.
+  `Cold` within a radius) and `CountsAs` (one fixture also counts as another, for example a hearth as a lantern). Any
+  fixture effect may take an `adjacentTo` parameter (`FIX-03`); a `Blocks` effect with `adjacentTo` does not make its
+  fixture a barricade. A new kind in any of these sets is an SDD change.
 - **DAT-04** The content validator runs at load time and in the tests. It rejects: duplicate IDs, references to IDs
   that do not exist (including an ancestry plane), unknown kinds, values out of range, staff or companions without `"adult": true`, creatures with a
   `Company` appetite without `"sapient": true` and `"adult": true`, flavour text without its `filterSafe` and
@@ -1037,8 +1055,9 @@ This section is the only place that sets what content is allowed. Agents shall n
 
 - **SAV-01** The run is saved automatically when the player leaves Dawn (`CYC-04`), to `user://saves/run.json`. The
   save holds the seed, the RNG state, the cycle, silver, integrity, supplies, the board (units, fixtures, their damage),
-  the bench, each character's rank, techniques, tree choices, items and status, item storage, inn items, the
-  locked shop, unlocked planes for the run, and the content version.
+  the bench, each character's rank, techniques, tree choices, silver spent, items and status, item storage, inn items,
+  the shop's offers, lock and reroll count, the shop's random state (`SHP-02`), unlocked planes for the run, the ID
+  counters, and the content version.
 - **SAV-02** The profile (`user://saves/profile.json`) holds Mist Essence, unlocks, the bestiary, revealed ancestries,
   statistics and the content note acknowledgement. It is saved at every Dawn (the bestiary and ancestries) and when a
   run ends or an unlock is bought.
@@ -1106,7 +1125,7 @@ acceptance criteria and a demo. After each step the human builds, tests, plays t
 
 **Common preamble** (put before every step prompt):
 
-> You are implementing Misty Inn from SDD v1.8. Work **only** on the step below; do not start later steps. Read
+> You are implementing Misty Inn from SDD v1.9. Work **only** on the step below; do not start later steps. Read
 > sections 0, 2, 17 and 22 and the sections the step lists first. Apply the invariants (section 2) and the agent
 > rules (section 22). If anything is ambiguous, contradictory or missing, **stop and ask** before writing code. Do not
 > run builds, tests, Godot or git: list the exact commands for the human and mark results NOT RUN. Finish with the
@@ -1445,7 +1464,7 @@ regenerate it whenever the SDD changes.
 | ARC-03 | Core state is changed only by `Tick` and `Execute` | 5.1 |
 | ARC-04 | Each Core system is a class with explicit dependencies passed to its constructor and... | 5.1 |
 | ARC-05 | A whole mist phase can be simulated in Core without the engine, faster than real time... | 5.1 |
-| ARC-10 | Commands are immutable records, for example `BuyOffer(offerIndex)`,... | 5.2 |
+| ARC-10 | Commands are immutable records, for example `BuyOffer(section, index)`,... | 5.2 |
 | ARC-11 | `Execute` returns a `CommandResult` (success, or a reason code such as `WrongPhase`,... | 5.2 |
 | ARC-12 | Core raises domain events (`PhaseChanged`, `CreatureArrived`, `ServiceStarted`,... | 5.2 |
 | ARC-13 | Every entity has a stable integer ID issued by Core (`UnitId`, `CreatureId`, `FixtureId`) | 5.2 |
@@ -1505,7 +1524,7 @@ regenerate it whenever the SDD changes.
 | STF-06 | Characters have five ranks, ★1 to ★5 | 11.2 |
 | STF-07 | Each character has an upgrade tree: for each of ranks ★2 to ★5, two or three options,... | 11.2 |
 | STF-08 | Upgrading: buying a shop offer of a character the player already owns raises the owned... | 11.2 |
-| STF-09 | Selling a character returns half the silver spent on it, rounded down | 11.2 |
+| STF-09 | Selling a character returns half the silver spent on it, rounded down; a starting... | 11.2 |
 | STF-10 | Hiring a character the player does not own gives that character at the offer's rank... | 11.2 |
 | STF-17 | Mastery makes a known technique stronger by the mastery values in its data (for... | 11.2 |
 | STF-11 | A fallen staff member is wounded or dead at Dawn (`ESC-09`) | 11.3 |
@@ -1529,16 +1548,16 @@ regenerate it whenever the SDD changes.
 | BRD-07 | At Dawn, every fixture and room door is repaired automatically and for free | 12.1 |
 | FIX-01 | A fixture (`data/fixtures.json`) has an ID, a name, a shape (tile offsets from its... | 12.2 |
 | FIX-02 | Prototype fixtures: | 12.2 |
-| FIX-03 | Adjacency effects apply to fixtures and units next to each other (8 neighbours), for... | 12.2 |
+| FIX-03 | Adjacency effects apply to fixtures and units next to each other (8 neighbours) | 12.2 |
 | FIX-04 | Fixture effects are applied by Core systems reading the board's modifiers, never by... | 12.2 |
 | FIX-05 | The build menu is a fixed catalogue: every unlocked fixture, always available at a... | 12.2 |
 | FIX-06 | Supplies (`Drink`, `Food`) are bought in bundles from the build menu at Dusk and used... | 12.2 |
 | SHP-01 | Silver is the run's only currency | 13.1 |
-| SHP-02 | Each Dusk the shop shows 3 staff offers and 3 item offers, drawn with the run's RNG | 13.1 |
+| SHP-02 | Each Dusk the shop shows 3 staff offers and 3 item offers, drawn with the shop's own... | 13.1 |
 | SHP-03 | Rank odds grow over the run (tuning values in `data/balance.json`): | 13.1 |
 | SHP-04 | Draw weights: each character's chance to be drawn is multiplied by: - Pity: ×1.5 if... | 13.1 |
-| SHP-05 | Reroll redraws every offer not yet bought | 13.1 |
-| SHP-06 | Lock keeps the current offers for the next Dusk instead of a new draw | 13.1 |
+| SHP-05 | Reroll fills every slot with new offers, including slots already bought | 13.1 |
+| SHP-06 | Lock keeps the current offers (bought slots stay empty) for the next Dusk instead of a... | 13.1 |
 | SHP-07 | Any character can be offered: one never hired, one who died, or one the player owns... | 13.1 |
 | SHP-08 | Prices: a staff offer costs the character's base cost + 2 per rank above ★1 | 13.1 |
 | SHP-09 | Unspent silver carries over between cycles, but never between runs | 13.1 |
