@@ -16,7 +16,9 @@ public sealed record ContentSet(
     IReadOnlyList<ItemDef> Items,
     IReadOnlyList<FixtureDef> Fixtures,
     IReadOnlyList<FlavourDef> Flavour,
-    IReadOnlyList<SynergyDef> Synergies);
+    IReadOnlyList<SynergyDef> Synergies,
+    IReadOnlyList<OmenDef> Omens,
+    IReadOnlyList<UnlockDef> Unlocks);
 
 /// <summary><c>balance.json</c>: the tuning values of section 6.4 and the run's starting set-up.</summary>
 /// <param name="PlanesPerCycle">Converging planes for cycles 1, 2, 3...; the last entry repeats; 0 means all unlocked.</param>
@@ -58,6 +60,8 @@ public sealed record BalanceDef(
     double FixtureSoothe,
     AgitationBalanceDef Agitation,
     BestiaryBalanceDef Bestiary,
+    OmenBalanceDef Omens,
+    EssenceDef Essence,
     CombatBalanceDef Combat,
     CompanyBalanceDef Company,
     ShopDef Shop,
@@ -86,6 +90,18 @@ public sealed record AgitationBalanceDef(
     double LikesStrength = 0.5,
     double ColdRadius = 3,
     double ReseekAfterSeconds = 8);
+
+/// <summary>When omens come (OMN-01).</summary>
+/// <param name="FromCycle">The first cycle that may have an omen.</param>
+/// <param name="Chance">The chance of an omen at a Dusk from <paramref name="FromCycle"/>, 0 to 1.</param>
+/// <param name="ConvergenceChance">The chance on the Convergence, the last cycle (RUN-02).</param>
+public sealed record OmenBalanceDef(int FromCycle = 2, double Chance = 0.6, double ConvergenceChance = 1);
+
+/// <summary>
+/// The Mist Essence formula (MET-02): cycles survived × <paramref name="PerCycleSurvived"/> + creatures kept occupied ÷
+/// <paramref name="OccupiedPerPoint"/> (rounded down) + <paramref name="WinBonus"/> if the run was won.
+/// </summary>
+public sealed record EssenceDef(int PerCycleSurvived = 2, int OccupiedPerPoint = 5, int WinBonus = 10);
 
 /// <summary>The combat and damage tuning of section 10 and BRD-06 (D-070).</summary>
 /// <param name="GuardRadius">Fighters engage turned creatures in their zone or within this many tiles of their post (ESC-07).</param>
@@ -349,3 +365,17 @@ public sealed record SynergyTierDef(int Count, IReadOnlyList<EffectDef> Effects)
 
 /// <summary><c>flavour.json</c> (DAT-06). Both flags are required.</summary>
 public sealed record FlavourDef(string Id, string Context, string Text, bool? FilterSafe, bool? BloodSafe);
+
+/// <summary>
+/// <c>omens.json</c> (OMN-01 to OMN-03): a one-cycle event drawn by <paramref name="Weight"/>. Its effects use the DAT-03
+/// kinds and apply to the whole inn. A <c>PlaneWeight</c> effect without a plane goes to one converging plane, drawn
+/// with the omen (D-087).
+/// </summary>
+public sealed record OmenDef(string Id, string Name, string Description, double Weight, IReadOnlyList<EffectDef> Effects);
+
+/// <summary>
+/// <c>unlocks.json</c> (MET-03): something bought with Mist Essence on the title screen. <paramref name="Target"/> is the
+/// plane, character, item or fixture it unlocks (none for <see cref="UnlockKind.StartingStaff"/>); content that is the
+/// target of an unlock is locked until it is bought. <paramref name="Name"/> defaults to the target's name.
+/// </summary>
+public sealed record UnlockDef(string Id, UnlockKind Kind, int Cost, string? Target = null, string? Name = null);

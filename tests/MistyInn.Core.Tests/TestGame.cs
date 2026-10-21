@@ -15,9 +15,10 @@ internal static class TestGame
     /// <summary>
     /// The real content, with an innkeeper and an inn that cannot be brought down (step 5 added combat). Tests of the
     /// cycle, arrivals and service run on it so that a turned creature cannot end their run early; combat tests use
-    /// the real values (<c>sturdy: false</c>).
+    /// the real values (<c>sturdy: false</c>). Like every <see cref="ContentWith"/> content it has no omens and locks
+    /// nothing (D-093); the roguelike tests add them back.
     /// </summary>
-    public static GameContent Sturdy { get; } = Toughen(GameContent.Default.Set);
+    public static GameContent Sturdy { get; } = Toughen(Plain(GameContent.Default.Set));
 
     public static GameSession NewSession(ulong seed = 1, GameContent? content = null, GameSessionLimits? limits = null) =>
         new(new SeededRandom(seed), limits, content ?? Sturdy);
@@ -43,8 +44,8 @@ internal static class TestGame
     }
 
     /// <summary>
-    /// The real content (the built-in copy of <c>data/</c>) with other starting staff, tuning values or content, made
-    /// sturdy unless <paramref name="sturdy"/> is false.
+    /// The real content (the built-in copy of <c>data/</c>) with no omens and nothing locked (D-093), then other
+    /// starting staff, tuning values or content, made sturdy unless <paramref name="sturdy"/> is false.
     /// </summary>
     public static GameContent ContentWith(
         IReadOnlyList<string>? startingStaff = null,
@@ -52,7 +53,7 @@ internal static class TestGame
         bool sturdy = true,
         Func<ContentSet, ContentSet>? set = null)
     {
-        var s = GameContent.Default.Set;
+        var s = Plain(GameContent.Default.Set);
         if (set is not null)
         {
             s = set(s);
@@ -67,6 +68,9 @@ internal static class TestGame
         s = s with { Balance = b };
         return sturdy ? Toughen(s) : GameContent.Create(s);
     }
+
+    /// <summary>The content without omens or unlocks, so a cycle plays out as it did before step 7 (D-093).</summary>
+    public static ContentSet Plain(ContentSet set) => set with { Omens = [], Unlocks = [] };
 
     /// <summary>A creature with changed values, for content tests.</summary>
     public static ContentSet WithCreature(ContentSet set, string id, Func<CreatureDef, CreatureDef> change) =>

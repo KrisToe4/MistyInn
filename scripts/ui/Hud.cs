@@ -14,7 +14,7 @@ namespace MistyInn.UI;
 /// Placeholder HUD: cycle, phase and time to dawn (CYC-02), silver, supplies and integrity (BRD-06), the forecast with
 /// what the bestiary knows (CYC-01, BST-03), the bench and the fixture storage to drag from (CAM-13), the build menu
 /// (FIX-05, FIX-06), Begin the Mist, speed controls (SCP-13), Continue and integrity repairs at Dawn (CYC-04, BRD-07),
-/// the run-over panel (RUN-03), the selection line (CAM-12), the pause menu (CYC-10), the shop and staff-and-items tabs
+/// the run end panel (RUN-04), the selection line (CAM-12), the pause menu (CYC-10), the shop and staff-and-items tabs
 /// beside the build menu (UI-03), the upgrade dialog (UI-08) and, in debug builds only, the dev panel (D-074). Built in
 /// code; the UI pass (step 9) replaces it with designed screens.
 /// </summary>
@@ -44,6 +44,7 @@ public partial class Hud : CanvasLayer
     private HBoxContainer _repairBar = null!;
     private Button _repairAll = null!;
     private Control _runOver = null!;
+    private Label _runOverTitle = null!;
     private Label _runOverText = null!;
     private PanelContainer _devPanel = null!;
     private VBoxContainer _devList = null!;
@@ -76,7 +77,8 @@ public partial class Hud : CanvasLayer
     /// <summary>Spend up to this much silver on integrity (BRD-07).</summary>
     public event Action<int>? RepairPressed;
 
-    public event Action? NewRunPressed;
+    /// <summary>Back to the title screen: from the run end panel, or quitting the run from the pause menu (CYC-10).</summary>
+    public event Action? TitlePressed;
 
     public event Action<string>? DevAddStaffPressed;
 
@@ -236,7 +238,12 @@ public partial class Hud : CanvasLayer
             _ => Tr("The run is over"),
         };
 
-        var status = $"{Tr("Cycle")} {session.Cycle}  ·  {phase}";
+        var status = $"{Tr("Cycle")} {session.Cycle}/{session.RunLength}  ·  {phase}";
+        if (session.IsConvergence)
+        {
+            status += $"  ·  {Tr("the Convergence")}";
+        }
+
         if (session.Phase == Phase.Mist)
         {
             var speed = session.Speed == 0 ? Tr("paused") : $"{session.Speed}×";
@@ -297,9 +304,10 @@ public partial class Hud : CanvasLayer
 
     public void ShowPauseMenu(bool open) => _pauseMenu.Visible = open;
 
-    /// <summary>The run is lost (RUN-03): says why, and offers a new run.</summary>
-    public void ShowRunOver(string text)
+    /// <summary>The run is over (RUN-02, RUN-03): says how it ended and what it earned, and returns to the title (RUN-04).</summary>
+    public void ShowRunOver(string title, string text)
     {
+        _runOverTitle.Text = title;
         _runOverText.Text = text;
         _runOver.Visible = true;
     }
@@ -332,7 +340,14 @@ public partial class Hud : CanvasLayer
     /// <summary>The forecast (BST-03): each converging plane and what is known of the creatures it may send.</summary>
     private string Forecast(GameSession session)
     {
-        var lines = new List<string> { Tr("The mist parts toward:") };
+        var lines = new List<string>();
+        if (session.Omen is { } omen)
+        {
+            var plane = omen.SurgePlane is { } id ? $" ({session.Content.Plane(id).Name})" : "";
+            lines.Add($"{Tr("Omen")}: {omen.Def.Name}{plane}. {omen.Def.Description}");
+        }
+
+        lines.Add(session.IsConvergence ? Tr("The Convergence: every gate opens.") : Tr("The mist parts toward:"));
         foreach (var plane in session.Forecast)
         {
             var creatures = plane.Creatures.Select(c =>
@@ -429,7 +444,8 @@ public partial class Hud : CanvasLayer
         }
 
         _buildMenuBuilt = true;
-        foreach (var fixture in session.Content.Fixtures)
+        // Locked fixtures stay out until Mist Essence unlocks them (MET-03).
+        foreach (var fixture in session.BuildMenu)
         {
             var id = fixture.Id;
             AddButton(_buildList, $"{fixture.Name}  ({fixture.Cost})").Pressed += () => BuildPressed?.Invoke(id);
@@ -494,13 +510,12 @@ public partial class Hud : CanvasLayer
         center.AddChild(panel);
         var box = new VBoxContainer();
         panel.AddChild(box);
-        var title = AddLabel(box, 26);
-        title.Text = Tr("The inn has fallen");
-        title.HorizontalAlignment = HorizontalAlignment.Center;
+        _runOverTitle = AddLabel(box, 26);
+        _runOverTitle.HorizontalAlignment = HorizontalAlignment.Center;
         _runOverText = AddLabel(box, 18);
         _runOverText.HorizontalAlignment = HorizontalAlignment.Center;
 
-        AddButton(box, Tr("New run")).Pressed += () => NewRunPressed?.Invoke();
+        AddButton(box, Tr("Return to the title screen")).Pressed += () => TitlePressed?.Invoke();
         AddButton(box, Tr("Quit")).Pressed += () => QuitPressed?.Invoke();
         return center;
     }
@@ -521,8 +536,8 @@ public partial class Hud : CanvasLayer
 
         var resume = AddButton(box, Tr("Resume"));
         resume.Pressed += () => ResumePressed?.Invoke();
-        var quit = AddButton(box, Tr("Quit (the current cycle is lost)"));
-        quit.Pressed += () => QuitPressed?.Invoke();
+        var quit = AddButton(box, Tr("Quit to title (the run is lost and earns no Essence)"));
+        quit.Pressed += () => TitlePressed?.Invoke();
         return center;
     }
 

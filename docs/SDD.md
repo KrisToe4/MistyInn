@@ -3,8 +3,8 @@
 
 | | |
 |---|---|
-| **Version** | 1.12 (approved) |
-| **Supersedes** | 1.11 |
+| **Version** | 1.13 (approved) |
+| **Supersedes** | 1.12 |
 | **Audience** | LLM-based coding agents and the human developer |
 | **Genre** | Dark roguelike autobattler: prepare the inn, then survive the mist |
 | **Engine** | Godot 4.7.2 (.NET build) |
@@ -76,6 +76,7 @@ step starts.
 
 | Version | Change | Reason |
 |---|---|---|
+| 1.13 | RUN-02: the last cycle opens every unlocked plane and the run is won at once at its Dawn. RUN-04: a run left from the pause menu earns nothing. CRE-05: a satisfied guest still walking out at dawn pays nothing more. OMN-01: omens draw from their own random stream. OMN-02: the prototype ships Blood Moon, Surge and Feast Night; Thick Mist, Drought and Wanderers move to the backlog. OMN-03: the kinds an omen may use, and a Surge's plane drawn with the omen. MET-02: who counts as kept occupied and which cycles count as survived. MET-03: what starts locked, the starting-staff choice, and the winnability check. DAT-03: `Tribute` takes an amount or a multiplier; what `ArrivalRate` and `PlaneWeight` do. SAV-01: the omens' random state and the cycle's omen are saved. Section 6.4: omen and Essence tuning. Section 24: the three omens | Step 7 report (D-086 to D-094) |
 | 1.12 | CRE-08: a guest with floor Company is not satisfied until it has had its room session, so Company comes first (`CMP-04`); a leaving guest is no longer shown as served | Step 6c report (D-085) |
 | 1.11 | New CRE-08: a guest whose agitation stays at 0 for 5 s (`balance.json`) is **satisfied**: it pays its tribute at once (with item and synergy bonuses), walks out of the front door and dissolves, and counts as served for the bestiary. CRE-05: a satisfied guest is gone by Dawn and pays nothing more. CAM-10: no panning at the screen edges. Section 6.4: the satisfaction time. New step 6c | The human's review of step 6b |
 | 1.10 | Basic service and moving staff. AGI-05: `Alcohol` replaces the `Drink` and `Food` appetites. New AGI-11: any staff member or the innkeeper can give **basic service** (food and drink) to any creature seated at a table, at ×0.3 of a craved appetite, with no supplies; the Food technique gives it at ×0.6. AGI-06, AGI-07, FIX-06, RUN-01: only `Drink` supplies, used by the Drink technique for `Alcohol`. STF-02: Drink answers `Alcohol`; Food is better basic service. STF-04: each staff member's placed tile is its **home**; fighters (bouncers) and companions stay there, everyone else walks to guests and fixtures to serve and drifts home when idle; the main class decides for two-class characters. ESC-06: the innkeeper walks to tables to give basic service. ESC-07: fighters guard from their home. CAM-10: dragging the left mouse button on open ground pans the camera. UI-06: a selected creature shows its appetites as the bestiary reveals them, and a debug-only toggle shows everything. CRE-04, FIX-02, section 6.4, Appendix E: updated to match. New step 6b | The human's review of step 6 play: in cycle 1 most guests could not be soothed at all, and one turning set off the rest |
@@ -409,11 +410,13 @@ Main (Node3D, GameRoot.cs)
   in storage, to be placed at the first Dusk (`balance.json`: a bar counter, two tables, a hearth and a lantern; 6
   Drink), and no items.
 - **RUN-02** A run is **won** by surviving the last cycle (`RunLength`, default 10). The last cycle is the
-  **Convergence**: every unlocked plane opens at once and arrivals are faster.
+  **Convergence**: every unlocked plane opens at once, whatever the planes-per-cycle table says, and arrivals are
+  faster (×0.6). The run is won at once when the Convergence's dawn breaks with the inn still standing; there is no
+  Dawn phase after it (D-090).
 - **RUN-03** A run is **lost** at once when the innkeeper falls (`ESC-06`), or at the end of a mist phase if the inn's
   integrity is 0 (`BRD-06`).
 - **RUN-04** When a run ends, the player earns **Mist Essence** (`MET-02`), keeps everything the bestiary learned
-  (`BST-04`), and returns to the title screen.
+  (`BST-04`), and returns to the title screen. A run left from the pause menu earns no Essence.
 
 ## 6.2 Cycle phases
 
@@ -466,6 +469,8 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
 | Staff item slots | 2 per staff member |
 | Rooms | 2 at the start |
 | Combat (`combat`) | guard radius 4; violence within 4 tiles for 2 s; blood within 4 tiles; wound chance 70 %; Shaken soothe ×0.8; Grapple ×1.5 attack interval; integrity share 25 %; walls ×1.0; 5 integrity per silver (D-070, D-073) |
+| Omens (`omens`) | from cycle 2; chance 60 %, 100 % on the Convergence (`OMN-01`) |
+| Mist Essence (`essence`) | 2 per cycle survived; 1 per 5 creatures kept occupied; 10 for a win (`MET-02`) |
 | Company (`company`) | room after 8 s of floor company; session 25 s; rest 10 s; room soothe ×3; preferred guest ×1.5; violence interrupts within 4 tiles; door health 40 (D-071) |
 
 ---
@@ -512,7 +517,8 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
   walks to the best match it can reach (`AGI-05`). With no match it takes a free seat at a table, where anyone can bring
   it basic service (`AGI-11`), or wanders the common room if every table seat is taken.
 - **CRE-05** At dawn, a creature that has not turned leaves a **tribute** (silver, by its tribute value) and
-  dissolves. A turned creature dissolves with no tribute. A satisfied creature (`CRE-08`) has already paid and left.
+  dissolves. A turned creature dissolves with no tribute. A satisfied creature (`CRE-08`) has already paid and left;
+  one still walking out when dawn breaks pays nothing more and simply dissolves (D-094).
 - **CRE-06** Creatures act only through the simulation's rules; the player never commands them (`SCP-25`).
 - **CRE-07** Every creature that can take part in the Company service is sapient and adult (`RAT-01`); the data has
   `"sapient": true` and `"adult": true`, and the validator checks both (`DAT-04`).
@@ -906,12 +912,15 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
 ## 14.1 Omens
 
 - **OMN-01** Each Dusk from cycle 2, Core may draw one omen (`data/omens.json`), by weight, with a 60 % chance (100 %
-  on the Convergence). The forecast shows it.
-- **OMN-02** Prototype omens: **Blood Moon** (all creatures arrive at +20 agitation), **Thick Mist** (arrivals −30 %,
-  but creatures are hidden until they reach the door), **Surge** (one plane sends double), **Drought** (no supplies in
-  the build menu this cycle), **Feast Night** (tributes +50 %, arrivals +30 %), **Wanderers** (the shop shows one
-  extra staff offer at +1 rank).
-- **OMN-03** An omen's effect uses the same effect kinds (`DAT-03`) and lasts one cycle.
+  on the Convergence; `balance.json` `omens`). The forecast shows it. Omens draw from their own random stream, seeded
+  from the run's seed like the shop's, so they never change the planes, arrivals or Dawn rolls (D-088).
+- **OMN-02** Prototype omens: **Blood Moon** (all creatures arrive at +20 agitation), **Surge** (one converging plane
+  sends twice as many creatures; the others send as many as before) and **Feast Night** (tributes ×1.5, arrivals
+  ×1.3). Thick Mist, Drought and Wanderers wait in the backlog (section 24) until effect kinds exist for them (D-086).
+- **OMN-03** An omen's effects use the effect kinds of `DAT-03`, limited to the inn-wide `ArrivalAgitation`,
+  `ArrivalRate`, `PlaneWeight`, `Tribute`, `Income` and `RerollCost`, and last one cycle. An omen's `PlaneWeight` may
+  leave out its plane: one converging plane is drawn with the omen, and the forecast names it. The cycle log records
+  the omen when the mist begins (`INV-12`, D-087).
 
 ## 14.2 The bestiary
 
@@ -930,10 +939,14 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
 - **MET-01** The profile (`SAV-02`) keeps Mist Essence, unlocks, the bestiary, revealed ancestries and run statistics
   across runs.
 - **MET-02** Mist Essence at the end of a run = cycles survived × 2 + creatures kept occupied until dawn ÷ 5 (rounded
-  down) + 10 if won.
+  down) + 10 if won (`balance.json` `essence`). Creatures kept occupied are guests satisfied during a mist (`CRE-08`)
+  and creatures not turned at dawn, each counted once. The cycle the inn fell in does not count as survived (D-090).
 - **MET-03** Essence buys unlocks on the title screen: new planes, new characters in the shop pool, new items in the
   shop pool, new fixtures in the build menu, and a choice of starting staff. Unlocks never make the base game
-  unwinnable without them.
+  unwinnable without them. `data/unlocks.json` lists them with their costs; anything an unlock names is locked until
+  it is bought, and takes effect from the next run. With the starting-staff unlock, New Run picks as many distinct
+  unlocked characters as the default starting staff, at ★1. The validator rejects locking a starting plane, character
+  or fixture, and checks that every appetite of the starting planes' creatures can still be answered (D-089).
 
 ---
 
@@ -1068,7 +1081,9 @@ This section is the only place that sets what content is allowed. Agents shall n
   (a technique needs this fixture to work, with its seats), `Emits` (a fixture gives off `Light`, `Noise`, `Heat` or
   `Cold` within a radius) and `CountsAs` (one fixture also counts as another, for example a hearth as a lantern). Any
   fixture effect may take an `adjacentTo` parameter (`FIX-03`); a `Blocks` effect with `adjacentTo` does not make its
-  fixture a barricade. A new kind in any of these sets is an SDD change.
+  fixture a barricade. `Tribute` takes an amount, a multiplier or both (round(base × multipliers) + amounts);
+  `ArrivalRate` multiplies the arrival rate; `PlaneWeight` weights how many creatures one plane sends (D-087). A new
+  kind in any of these sets is an SDD change.
 - **DAT-04** The content validator runs at load time and in the tests. It rejects: duplicate IDs, references to IDs
   that do not exist (including an ancestry plane), unknown kinds, values out of range, staff or companions without `"adult": true`, creatures with a
   `Company` appetite without `"sapient": true` and `"adult": true`, flavour text without its `filterSafe` and
@@ -1087,8 +1102,9 @@ This section is the only place that sets what content is allowed. Agents shall n
 - **SAV-01** The run is saved automatically when the player leaves Dawn (`CYC-04`), to `user://saves/run.json`. The
   save holds the seed, the RNG state, the cycle, silver, integrity, supplies, the board (units, fixtures, their damage),
   the bench, each character's rank, techniques, tree choices, silver spent, items and status, item storage, inn items,
-  the shop's offers, lock and reroll count, the shop's random state (`SHP-02`), unlocked planes for the run, the ID
-  counters, and the content version.
+  the shop's offers, lock and reroll count, the shop's random state (`SHP-02`), the omens' random state and the cycle's
+  omen (`OMN-01`), the creatures kept occupied so far (`MET-02`), unlocked planes for the run, the ID counters, and the
+  content version.
 - **SAV-02** The profile (`user://saves/profile.json`) holds Mist Essence, unlocks, the bestiary, revealed ancestries,
   statistics and the content note acknowledgement. It is saved at every Dawn (the bestiary and ancestries) and when a
   run ends or an unlock is bought.
@@ -1156,7 +1172,7 @@ acceptance criteria and a demo. After each step the human builds, tests, plays t
 
 **Common preamble** (put before every step prompt):
 
-> You are implementing Misty Inn from SDD v1.12. Work **only** on the step below; do not start later steps. Read
+> You are implementing Misty Inn from SDD v1.13. Work **only** on the step below; do not start later steps. Read
 > sections 0, 2, 17 and 22 and the sections the step lists first. Apply the invariants (section 2) and the agent
 > rules (section 22). If anything is ambiguous, contradictory or missing, **stop and ask** before writing code. Do not
 > run builds, tests, Godot or git: list the exact commands for the human and mark results NOT RUN. Finish with the
@@ -1401,6 +1417,8 @@ Ideas that are **not** in scope for the prototype. Adding one is an SDD change.
 
 - A second floor with guest rooms (`Rest` appetite) and stairs as a choke point.
 - A technique or item that brings a turned creature back to Menacing.
+- The omens Thick Mist (arrivals −30 %, creatures hidden until they reach the door), Drought (no supplies in the build
+  menu) and Wanderers (one extra staff offer at +1 rank), with effect kinds of their own (D-086).
 - More classes (for example a ward-keeping class, or a class that repairs fixtures during the mist).
 - Named regular creatures with their own story across runs.
 - Staff relationships (synergies between specific pairs).
@@ -1636,8 +1654,8 @@ regenerate it whenever the SDD changes.
 | SYN-02 | Prototype synergies, for example: Companion/Server (2/4/6): +10/+25/+50 % soothe for... | 13.3 |
 | SYN-03 | Synergy effects use the same effect kinds as items and fixtures (`DAT-03`) | 13.3 |
 | OMN-01 | Each Dusk from cycle 2, Core may draw one omen (`data/omens.json`), by weight, with a... | 14.1 |
-| OMN-02 | Prototype omens: Blood Moon (all creatures arrive at +20 agitation), Thick Mist... | 14.1 |
-| OMN-03 | An omen's effect uses the same effect kinds (`DAT-03`) and lasts one cycle | 14.1 |
+| OMN-02 | Prototype omens: Blood Moon (all creatures arrive at +20 agitation), Surge (one... | 14.1 |
+| OMN-03 | An omen's effects use the effect kinds of `DAT-03`, limited to the inn-wide... | 14.1 |
 | BST-01 | The bestiary (in the profile) has an entry for every creature, with four reveal... | 14.2 |
 | BST-02 | Reveal progress comes from observation during the mist phase: seeing a creature... | 14.2 |
 | BST-03 | The Dusk forecast shows, for each creature the converging planes may send, what the... | 14.2 |

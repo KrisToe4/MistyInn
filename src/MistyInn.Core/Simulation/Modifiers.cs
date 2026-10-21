@@ -21,8 +21,8 @@ public sealed record SynergyStatus(
 }
 
 /// <summary>
-/// Gathers the effects that items, inn items and synergies put on units and on the inn (ITM-02 to ITM-04, SYN-01 to
-/// SYN-03), by effect kind (FIX-04). Personal kinds (<c>Stat</c>, <c>Soothe</c>, <c>Aura</c>, <c>Radius</c>) go on
+/// Gathers the effects that items, inn items, synergies and the cycle's omen put on units and on the inn (ITM-02 to
+/// ITM-04, SYN-01 to SYN-03, OMN-03), by effect kind (FIX-04). Personal kinds (<c>Stat</c>, <c>Soothe</c>, <c>Aura</c>, <c>Radius</c>) go on
 /// units; every other kind is inn-wide (D-077).
 /// </summary>
 internal sealed class Modifiers
@@ -90,11 +90,23 @@ internal sealed class Modifiers
     public int InnWide(EffectKind kind, string? plane = null) =>
         (int)Math.Round(InnWideEffects(kind).Where(e => e.Plane is null || e.Plane == plane).Sum(e => e.Amount ?? 0));
 
-    /// <summary>Inn-wide effects from inn items, carried staff items and active synergies.</summary>
+    /// <summary>
+    /// The product of the multipliers of an inn-wide effect kind (for example <c>Tribute</c>, <c>ArrivalRate</c>), 1 if
+    /// there are none; effects that name a plane count only for that plane (D-087).
+    /// </summary>
+    public double InnWideMultiplier(EffectKind kind, string? plane = null) =>
+        InnWideEffects(kind).Where(e => e.Plane is null || e.Plane == plane).Aggregate(1.0, (m, e) => m * (e.Multiplier ?? 1));
+
+    /// <summary>A converging plane's arrival weight: the product of the <c>PlaneWeight</c> effects that name it (D-087).</summary>
+    public double PlaneWeight(string plane) =>
+        InnWideEffects(EffectKind.PlaneWeight).Where(e => e.Plane == plane).Aggregate(1.0, (m, e) => m * (e.Multiplier ?? 1));
+
+    /// <summary>Inn-wide effects from inn items, carried staff items, active synergies and the cycle's omen.</summary>
     public IEnumerable<EffectDef> InnWideEffects(EffectKind kind) =>
         _run.InnItems.SelectMany(i => i.Def.Effects)
             .Concat(_run.Items.Where(i => i.Carrier is not null).SelectMany(i => i.Def.Effects))
             .Concat(ActiveSynergyEffects())
+            .Concat(_run.OmenEffects)
             .Where(e => e.Kind == kind && !IsPersonal(kind));
 
     /// <summary>The classes a character counts for in synergies: its techniques' and its items' tags (STF-03, ITM-03).</summary>

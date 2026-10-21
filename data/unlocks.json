@@ -1,0 +1,15 @@
+[
+  { "id": "unlock-gearbound-ruin", "kind": "Plane", "target": "gearbound-ruin", "cost": 15 },
+  { "id": "unlock-pale-court", "kind": "Plane", "target": "pale-court", "cost": 15 },
+  { "id": "unlock-staff-04", "kind": "Character", "target": "staff-04", "cost": 8 },
+  { "id": "unlock-staff-08", "kind": "Character", "target": "staff-08", "cost": 8 },
+  { "id": "unlock-staff-12", "kind": "Character", "target": "staff-12", "cost": 8 },
+  { "id": "unlock-staff-15", "kind": "Character", "target": "staff-15", "cost": 8 },
+  { "id": "unlock-ward-charm", "kind": "Item", "target": "ward-charm", "cost": 6 },
+  { "id": "unlock-ember-in-a-jar", "kind": "Item", "target": "ember-in-a-jar", "cost": 6 },
+  { "id": "unlock-cursed-crown", "kind": "Item", "target": "cursed-crown", "cost": 6 },
+  { "id": "unlock-ledger-desk", "kind": "Fixture", "target": "ledger-desk", "cost": 6 },
+  { "id": "unlock-ward-circle", "kind": "Fixture", "target": "ward-circle", "cost": 6 },
+  { "id": "unlock-salt-line", "kind": "Fixture", "target": "salt-line", "cost": 6 },
+  { "id": "unlock-starting-staff", "kind": "StartingStaff", "name": "Choose your starting staff", "cost": 10 }
+]

@@ -39,9 +39,26 @@ internal sealed class ArrivalSystem
     /// <summary>Game seconds of the next arrival attempt.</summary>
     public double NextArrivalSeconds { get; private set; }
 
-    /// <summary>The cycle's average arrival interval (section 6.4).</summary>
-    public double IntervalSeconds =>
-        _content.Balance.BaseArrivalIntervalSeconds * Math.Pow(_content.Balance.ArrivalIntervalPerCycle, _run.Cycle - 1);
+    /// <summary>
+    /// The cycle's average arrival interval (section 6.4): ×0.92 per cycle, ×0.6 on the Convergence (RUN-02), divided by
+    /// the <c>ArrivalRate</c> multipliers and by the planes' mean <c>PlaneWeight</c>, so a plane at weight 2 sends twice
+    /// as many creatures while the others send as many as before (D-087).
+    /// </summary>
+    public double IntervalSeconds
+    {
+        get
+        {
+            var b = _content.Balance;
+            var interval = b.BaseArrivalIntervalSeconds * Math.Pow(b.ArrivalIntervalPerCycle, _run.Cycle - 1);
+            if (_run.Cycle == b.RunLength)
+            {
+                interval *= b.ConvergenceArrivalMultiplier;
+            }
+
+            var meanWeight = _run.ConvergingPlanes.Count == 0 ? 1 : _run.ConvergingPlanes.Average(p => _modifiers.PlaneWeight(p.Id));
+            return interval / _modifiers.InnWideMultiplier(EffectKind.ArrivalRate) / meanWeight;
+        }
+    }
 
     public void StartMist() => NextArrivalSeconds = SampleInterval();
 
@@ -78,6 +95,31 @@ internal sealed class ArrivalSystem
         return choices[^1];
     }
 
+    /// <summary>
+    /// The plane an arrival comes from: uniform, or by <c>PlaneWeight</c> when an effect (a Surge) weights one (D-087).
+    /// </summary>
+    internal PlaneDef PickPlane()
+    {
+        var planes = _run.ConvergingPlanes;
+        var weights = planes.Select(p => _modifiers.PlaneWeight(p.Id)).ToList();
+        if (weights.All(w => w == 1))
+        {
+            return planes[_random.NextInt(0, planes.Count)];
+        }
+
+        var roll = _random.NextDouble() * weights.Sum();
+        for (var i = 0; i < planes.Count; i++)
+        {
+            roll -= weights[i];
+            if (roll < 0)
+            {
+                return planes[i];
+            }
+        }
+
+        return planes[^1];
+    }
+
     private void TrySpawn(double now)
     {
         if (_run.Creatures.Count >= _content.Balance.MaxCreatures)
@@ -86,7 +128,7 @@ internal sealed class ArrivalSystem
             return;
         }
 
-        var plane = _run.ConvergingPlanes[_random.NextInt(0, _run.ConvergingPlanes.Count)];
+        var plane = PickPlane();
         var def = _content.Creature(PickWeighted(plane.Creatures).Creature);
         var creature = new Creature(_ids.NextCreature(), def, _content.GateFor(plane.Id));
         var arrival = _modifiers.InnWide(EffectKind.ArrivalAgitation, plane.Id);

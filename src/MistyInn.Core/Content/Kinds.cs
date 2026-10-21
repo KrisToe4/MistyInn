@@ -131,6 +131,25 @@ public enum EffectTarget
     Creatures,
 }
 
+/// <summary>What an unlock opens up (MET-03).</summary>
+public enum UnlockKind
+{
+    /// <summary>A plane joins the planes a run can draw (PLN-02).</summary>
+    Plane,
+
+    /// <summary>A character joins the shop pool.</summary>
+    Character,
+
+    /// <summary>An item joins the shop pool.</summary>
+    Item,
+
+    /// <summary>A fixture joins the build menu.</summary>
+    Fixture,
+
+    /// <summary>The player chooses the starting staff at New Run (D-089).</summary>
+    StartingStaff,
+}
+
 public enum ItemKind
 {
     /// <summary>Carried by a staff member (ITM-02).</summary>

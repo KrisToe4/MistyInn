@@ -33,6 +33,8 @@ public static partial class ContentValidator
         private readonly HashSet<string> _creatureIds = new();
         private readonly HashSet<string> _techniqueIds = new();
         private readonly HashSet<string> _fixtureIds = new();
+        private readonly HashSet<string> _itemIds = new();
+        private readonly HashSet<string> _characterIds = new();
         private readonly Dictionary<string, TechniqueDef> _techniques = new();
         private BoardLayout? _layout;
 
@@ -46,7 +48,8 @@ public static partial class ContentValidator
                 | Missing(_set.Creatures, "creatures.json") | Missing(_set.Techniques, "techniques.json")
                 | Missing(_set.Staff, "staff.json") | Missing(_set.Items, "items.json")
                 | Missing(_set.Fixtures, "fixtures.json") | Missing(_set.Flavour, "flavour.json")
-                | Missing(_set.Synergies, "synergies.json"))
+                | Missing(_set.Synergies, "synergies.json") | Missing(_set.Omens, "omens.json")
+                | Missing(_set.Unlocks, "unlocks.json"))
             {
                 return;
             }
@@ -62,6 +65,8 @@ public static partial class ContentValidator
             Flavour();
             Synergies();
             Balance();
+            Omens();
+            Unlocks();
         }
 
         private bool Missing(object? value, string file)
@@ -113,10 +118,13 @@ public static partial class ContentValidator
 
             var staffIds = new HashSet<string>();
             if (_set.Staff.Innkeeper is { } keeper) Id("staff.json", keeper.Id, staffIds);
-            foreach (var s in _set.Staff.Characters ?? []) Id("staff.json", s.Id, staffIds);
+            foreach (var s in _set.Staff.Characters ?? [])
+            {
+                Id("staff.json", s.Id, staffIds);
+                if (s.Id is not null) _characterIds.Add(s.Id);
+            }
 
-            var itemIds = new HashSet<string>();
-            foreach (var i in _set.Items) Id("items.json", i.Id, itemIds);
+            foreach (var i in _set.Items) Id("items.json", i.Id, _itemIds);
 
             var flavourIds = new HashSet<string>();
             foreach (var f in _set.Flavour) Id("flavour.json", f.Id, flavourIds);
@@ -560,6 +568,10 @@ public static partial class ContentValidator
 
             if (b.Bestiary is null || b.Bestiary.StudiedPoints < 1)
                 Error($"{where}: bestiary.studiedPoints must be at least 1 (BST-02).");
+            if (b.Omens is null || b.Omens.FromCycle < 1 || b.Omens.Chance is < 0 or > 1 || b.Omens.ConvergenceChance is < 0 or > 1)
+                Error($"{where}: omens needs fromCycle of at least 1 and chances from 0 to 1 (OMN-01).");
+            if (b.Essence is null || b.Essence.PerCycleSurvived < 0 || b.Essence.OccupiedPerPoint < 1 || b.Essence.WinBonus < 0)
+                Error($"{where}: essence needs perCycleSurvived and winBonus of at least 0 and occupiedPerPoint of at least 1 (MET-02).");
 
             if (_layout is not null && b.Rooms > _layout.Rooms.Count)
                 Error($"{where}: rooms is {b.Rooms}, but inn.json has {_layout.Rooms.Count} back rooms (BRD-01).");
@@ -607,16 +619,26 @@ public static partial class ContentValidator
             }
         }
 
-        private void Effect(string where, EffectDef e)
+        /// <summary>The inn-wide kinds an omen may use (OMN-03): an omen has no fixture or carrier to put the others on.</summary>
+        private static readonly EffectKind[] OmenKinds =
+        [
+            EffectKind.ArrivalAgitation, EffectKind.ArrivalRate, EffectKind.PlaneWeight, EffectKind.Tribute,
+            EffectKind.Income, EffectKind.RerollCost,
+        ];
+
+        private void Effect(string where, EffectDef e, bool omen = false)
         {
             bool Has(object? value) => value is not null;
 
             var ok = e.Kind switch
             {
                 EffectKind.AgitationRate or EffectKind.Soothe or EffectKind.ArrivalRate => Has(e.Multiplier),
-                EffectKind.ArrivalAgitation or EffectKind.Radius or EffectKind.BoardSlots or EffectKind.Tribute
+                EffectKind.ArrivalAgitation or EffectKind.Radius or EffectKind.BoardSlots
                     or EffectKind.Income or EffectKind.Supplies or EffectKind.RerollCost or EffectKind.RoomSlots => Has(e.Amount),
-                EffectKind.PlaneWeight => Has(e.Plane) && Has(e.Multiplier),
+                EffectKind.Tribute => Has(e.Amount) || Has(e.Multiplier),
+
+                // An omen's PlaneWeight may leave the plane out: one converging plane is drawn with the omen (D-087).
+                EffectKind.PlaneWeight => (Has(e.Plane) || omen) && Has(e.Multiplier),
                 EffectKind.Stat => Has(e.Stat) && (Has(e.Amount) || Has(e.Multiplier)),
                 EffectKind.ShopOdds => Has(e.Amount) || Has(e.Multiplier),
                 EffectKind.Blocks or EffectKind.PlaneBarrier => true,
@@ -638,6 +660,115 @@ public static partial class ContentValidator
             if (e.Kind == EffectKind.Emits && e.Trigger is not (TriggerKind.Light or TriggerKind.Noise or TriggerKind.Heat or TriggerKind.Cold))
                 Error($"{where}: a fixture can only give off Light, Noise, Heat or Cold.");
             if (e.Radius is < 0 || e.Seats is < 1 || e.Zones is < 0) Error($"{where}: a {e.Kind} effect has an out-of-range value.");
+            if (e.Kind is EffectKind.ArrivalRate or EffectKind.PlaneWeight or EffectKind.Tribute && e.Multiplier is <= 0)
+                Error($"{where}: a {e.Kind} multiplier must be above 0.");
+            if (omen && (!OmenKinds.Contains(e.Kind) || e.AdjacentTo is not null || e.Target is not null))
+                Error($"{where}: an omen can only use {string.Join(", ", OmenKinds)}, with no adjacentTo or target (OMN-03).");
+        }
+
+        private void Omens()
+        {
+            var ids = new HashSet<string>();
+            foreach (var omen in _set.Omens)
+            {
+                Id("omens.json", omen.Id, ids);
+                var where = $"omens.json: omen '{omen.Id}'";
+                if (string.IsNullOrWhiteSpace(omen.Name) || string.IsNullOrWhiteSpace(omen.Description))
+                    Error($"{where} needs a name and a description (CYC-01).");
+                if (omen.Weight <= 0) Error($"{where}: weight must be above 0 (OMN-01).");
+                if (omen.Effects is null || omen.Effects.Count == 0) Error($"{where} has no effects.");
+                foreach (var effect in omen.Effects ?? []) Effect(where, effect, omen: true);
+            }
+        }
+
+        /// <summary>
+        /// MET-03: every unlock names something that exists, nothing is locked twice, and the base game stays winnable:
+        /// the starting planes, staff and fixtures are never locked, and every appetite of the starting planes'
+        /// creatures can still be answered by a technique of an unlocked character or by an unlocked fixture.
+        /// </summary>
+        private void Unlocks()
+        {
+            var ids = new HashSet<string>();
+            var targets = new HashSet<(UnlockKind, string)>();
+            var b = _set.Balance;
+            foreach (var u in _set.Unlocks)
+            {
+                Id("unlocks.json", u.Id, ids);
+                var where = $"unlocks.json: unlock '{u.Id}'";
+                if (u.Cost < 0) Error($"{where}: cost cannot be negative.");
+                if (u.Kind == UnlockKind.StartingStaff)
+                {
+                    if (u.Target is not null) Error($"{where}: a StartingStaff unlock has no target.");
+                    if (string.IsNullOrWhiteSpace(u.Name)) Error($"{where}: a StartingStaff unlock needs a name.");
+                    if (!targets.Add((u.Kind, ""))) Error($"{where}: only one StartingStaff unlock is allowed.");
+                    continue;
+                }
+
+                if (u.Target is not { } target)
+                {
+                    Error($"{where} needs a target.");
+                    continue;
+                }
+
+                var known = u.Kind switch
+                {
+                    UnlockKind.Plane => _planeIds.Contains(target),
+                    UnlockKind.Character => _characterIds.Contains(target),
+                    UnlockKind.Item => _itemIds.Contains(target),
+                    UnlockKind.Fixture => _fixtureIds.Contains(target),
+                    _ => false,
+                };
+                if (!known) Error($"{where}: unknown {u.Kind} '{target}'.");
+                if (!targets.Add((u.Kind, target))) Error($"{where}: '{target}' is already locked by another unlock.");
+
+                var starting = u.Kind switch
+                {
+                    UnlockKind.Plane => b.UnlockedPlanes?.Contains(target) == true,
+                    UnlockKind.Character => b.StartingStaff?.Contains(target) == true,
+                    UnlockKind.Fixture => b.StartingFixtures?.Contains(target) == true,
+                    _ => false,
+                };
+                if (starting) Error($"{where}: '{target}' is part of every run's start and cannot be locked (MET-03).");
+            }
+
+            Winnable(targets);
+        }
+
+        private void Winnable(HashSet<(UnlockKind Kind, string Target)> locked)
+        {
+            if (_set.Balance.UnlockedPlanes is null || _set.Staff.Characters is null)
+            {
+                return;
+            }
+
+            var answered = new HashSet<Appetite>();
+            foreach (var character in _set.Staff.Characters.Where(c => !locked.Contains((UnlockKind.Character, c.Id))))
+            {
+                var techniques = new[] { character.BaseTechnique }
+                    .Concat((character.Tree ?? []).SelectMany(r => r.Options ?? []).Select(o => o.Technique));
+                foreach (var id in techniques)
+                {
+                    if (id is not null && _techniques.TryGetValue(id, out var technique))
+                    {
+                        answered.UnionWith(technique.Answers ?? []);
+                    }
+                }
+            }
+
+            foreach (var fixture in _set.Fixtures.Where(f => !locked.Contains((UnlockKind.Fixture, f.Id))))
+            {
+                answered.UnionWith((fixture.Effects ?? []).Where(e => e.Kind == EffectKind.Provides && e.Appetite is not null)
+                    .Select(e => e.Appetite!.Value));
+            }
+
+            var basePlanes = _set.Balance.UnlockedPlanes.ToHashSet();
+            foreach (var creature in _set.Creatures.Where(c => basePlanes.Contains(c.PlaneId)))
+            {
+                foreach (var appetite in (creature.Appetites ?? []).Where(a => !answered.Contains(a.Appetite)))
+                {
+                    Error($"unlocks.json: nothing unlocked at the start answers {appetite.Appetite} for '{creature.Id}' (MET-03).");
+                }
+            }
         }
     }
 }

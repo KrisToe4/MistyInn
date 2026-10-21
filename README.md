@@ -30,6 +30,10 @@ guests to the back rooms. Step 6 adds the shop: hire staff at a rank, buy them a
 from their tree, give them items, buy inn items that show in the inn, and build synergies from classes and origins.
 Step 6b makes every guest soothable a little: anyone, the innkeeper included, brings food and drink to guests at
 tables, runners walk the floor to serve, and fighters stay by the door as bouncers.
+Step 7 adds the roguelike layer: the game opens on a title screen; a run is ten cycles and ends in the Convergence,
+when every gate opens; omens (Blood Moon, Surge, Feast Night) change some nights; and each run earns Mist Essence,
+spent on the title screen to unlock planes, characters, items, fixtures and a choice of starting staff. Until saves
+arrive in step 8, the bestiary, Essence and unlocks last only while the game is open.
 
 ## Design documents
 
@@ -65,6 +69,7 @@ dotnet test MistyInn.sln
 
 | Input | Action |
 |---|---|
+| Title screen | New Run (optional seed; starting staff once unlocked), Bestiary, Unlocks (spend Mist Essence), Quit |
 | Drag a name from the bench onto the floor | Place a staff member (Dusk) |
 | Drag a placed unit | Move it; drop it on the bench to bench it (Dusk) |
 | Right-click a placed unit | Bench it (Dusk) |
@@ -83,7 +88,7 @@ dotnet test MistyInn.sln
 | Pause, 1×, 2×, 4× buttons | Mist speed |
 | Repair buttons (Dawn) | Repair integrity, 1 silver per 5 points; fixtures repair for free |
 | Dev panel (right, debug builds) | Add any character to the bench and choose the converging planes (Dusk), try the content filters, show hidden creature info |
-| Esc | Pause menu |
+| Esc | Pause menu (Quit to title ends the run without Essence) |
 
 ## Layout
 
@@ -94,10 +99,10 @@ Directory.Build.props  Shared build settings for Core and the tests
 .editorconfig          Code style
 icon.svg               Project icon
 data/                  Game content as JSON: balance, inn map (with display spots), planes, creatures, staff,
-                       techniques, items, fixtures, flavour, synergies (placeholder roster; edit freely, the
-                       validator checks it)
-scenes/                Main.tscn and the inn, unit and UI scenes (placeholder art)
-scripts/               Godot node scripts: GameRoot, camera, board, units, UI
+                       techniques, items, fixtures, flavour, synergies, omens, unlocks (placeholder roster; edit
+                       freely, the validator checks it)
+scenes/                Title.tscn (the main scene), Main.tscn (a run) and the inn, unit and UI scenes (placeholder art)
+scripts/               Godot node scripts: GameRoot, camera, board, units, UI, the in-memory player profile
 src/MistyInn.Core/     Engine-free game rules (no Godot reference)
 tests/MistyInn.Core.Tests/  NUnit tests for Core
 docs/                  SDD (and earlier versions), decisions, progress

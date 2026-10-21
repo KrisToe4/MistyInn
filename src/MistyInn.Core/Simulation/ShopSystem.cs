@@ -57,9 +57,10 @@ internal sealed class ShopSystem
         return weight;
     }
 
-    /// <summary>Owned ★5 characters and characters already showing are not drawn (SHP-04).</summary>
+    /// <summary>Owned ★5 characters, characters already showing and locked characters are not drawn (SHP-04, MET-03).</summary>
     public bool CanBeDrawn(StaffDef character, IReadOnlySet<string> showing) =>
-        !showing.Contains(character.Id) && _run.Units.FirstOrDefault(u => u.Def.Id == character.Id) is not { Rank: >= UpgradeTrees.MaxRank };
+        !showing.Contains(character.Id) && !_run.Start.LockedCharacters.Contains(character.Id)
+        && _run.Units.FirstOrDefault(u => u.Def.Id == character.Id) is not { Rank: >= UpgradeTrees.MaxRank };
 
     /// <summary>Each Dusk: a locked shop keeps its offers once, otherwise everything is drawn anew; the reroll cost resets.</summary>
     public void NewDusk()
@@ -134,12 +135,12 @@ internal sealed class ShopSystem
         return new StaffOffer(character.Id, rank, PriceOf(character, rank));
     }
 
-    /// <summary>Items weighted by rarity; an inn item already owned is not offered again (D-080).</summary>
+    /// <summary>Items weighted by rarity; an inn item already owned and a locked item are not offered (D-080, MET-03).</summary>
     private ItemOffer? DrawItem(IReadOnlySet<string> showing)
     {
         var owned = _run.InnItems.Select(i => i.Def.Id).ToHashSet();
         var candidates = _content.Items
-            .Where(i => !showing.Contains(i.Id) && !owned.Contains(i.Id) && Tuning.ItemWeights[i.Rarity] > 0)
+            .Where(i => !showing.Contains(i.Id) && !owned.Contains(i.Id) && !_run.Start.LockedItems.Contains(i.Id) && Tuning.ItemWeights[i.Rarity] > 0)
             .ToList();
         if (candidates.Count == 0)
         {

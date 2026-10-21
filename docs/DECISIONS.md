@@ -91,6 +91,15 @@ proposed details were approved with SDD v1.0 (2026-10-20). **Proposed** marks a 
 | D-083 | Items: instance IDs, slots, storage and how each prototype effect applies | Accepted | 2026-10-20 | ITM-01..07, DAT-03 |
 | D-084 | Basic service, runners and homes: implementation details | Accepted | 2026-10-21 | AGI-05, AGI-11, STF-04, ESC-06, CRE-04, CAM-10, UI-06 |
 | D-085 | Satisfied guests: implementation details | Accepted | 2026-10-21 | CRE-05, CRE-08, BST-02, CAM-10 |
+| D-086 | Omens: ship only the three that fit the effect kinds | Accepted | 2026-10-21 | OMN-01..03, DAT-01 |
+| D-087 | Omen effects: multipliers, the Surge plane and arrival weights | Accepted | 2026-10-21 | OMN-02, OMN-03, DAT-03, RUN-02, INV-12 |
+| D-088 | Omens draw from their own random stream | Accepted | 2026-10-21 | OMN-01, INV-02, SAV-01 |
+| D-089 | Unlocks: placeholder set, locked content and the starting-staff choice | Accepted | 2026-10-21 | MET-03, RUN-01, PLN-02, FIX-05, SHP-04, DAT-01, DAT-04 |
+| D-090 | Run end: the Convergence, winning and Mist Essence | Accepted | 2026-10-21 | RUN-02..04, MET-02, CYC-10 |
+| D-091 | The meta profile lives outside the session, in memory until step 8 | Accepted | 2026-10-21 | MET-01, SAV-02, BST-04, STF-16 |
+| D-092 | A placeholder title screen and run end panel | Accepted | 2026-10-21 | UI-01, UI-10, CYC-10, RUN-04, TST-12 |
+| D-093 | Earlier tests run without omens or locks | Accepted | 2026-10-21 | TST-01, INV-08 |
+| D-094 | A guest still walking out at dawn pays nothing more | Accepted | 2026-10-21 | CRE-05, CRE-08, MET-02 |
 
 ---
 
@@ -1072,3 +1081,131 @@ proposed details were approved with SDD v1.0 (2026-10-20). **Proposed** marks a 
   - One step 4 Dawn test sets `satisfiedAfterSeconds` very high so its served guest stays until Dawn; no `data/`
     value changed for it (AGT-14).
 - **Requirement IDs affected:** CRE-05, CRE-08, CMP-04, BST-02, CAM-10.
+
+## D-086 Omens: ship only the three that fit the effect kinds
+- **Status:** Accepted (the human's answer before step 7)
+- **Date / step:** 2026-10-21, step 7
+- **Context:** OMN-02 lists six prototype omens and OMN-03 says an omen uses the DAT-03 effect kinds. Blood Moon
+  (`ArrivalAgitation`), Surge (`PlaneWeight`) and Feast Night (`Tribute`, `ArrivalRate`) fit. Thick Mist (creatures
+  hidden until the door), Drought (no supplies in the build menu) and Wanderers (one extra staff offer at +1 rank) fit
+  no kind.
+- **Decision:** `data/omens.json` has Blood Moon, Surge and Feast Night, each at weight 1. Thick Mist, Drought and
+  Wanderers wait until the SDD adds kinds for them. `balance.json` `omens`: from cycle 2, chance 0.6, 1.0 on the
+  Convergence (OMN-01).
+- **Alternatives considered:** New effect kinds now (an SDD change to DAT-03); a separate closed set of omen rules.
+- **Requirement IDs affected:** OMN-01, OMN-02, OMN-03, DAT-01.
+
+## D-087 Omen effects: multipliers, the Surge plane and arrival weights
+- **Status:** Accepted (2026-10-21)
+- **Date / step:** 2026-10-21, step 7
+- **Context:** DAT-03 names `ArrivalRate`, `PlaneWeight` and `Tribute`, but no step had used the first two, and
+  `Tribute` took only an amount. "One plane sends double" names no plane.
+- **Decision:**
+  - `Tribute` takes an amount or a multiplier: a tribute is round(base × multipliers) + amounts, never below 0.
+  - `ArrivalRate` multiplies the arrival rate: the cycle's interval is divided by the product of the multipliers.
+  - `PlaneWeight` weights one plane's arrivals. The plane an arrival comes from is drawn by weight (uniform, with the
+    old single `NextInt` draw, when every weight is 1), and the interval is divided by the mean weight of the
+    converging planes, so a plane at ×2 sends twice as many creatures and the others send as many as before.
+  - In an omen only, `PlaneWeight` may leave the plane out: one converging plane is drawn with the omen, and the
+    forecast names it.
+  - An omen may use only the inn-wide kinds `ArrivalAgitation`, `ArrivalRate`, `PlaneWeight`, `Tribute`, `Income` and
+    `RerollCost`, with no `adjacentTo` or `target`; its effects join the inn-wide effects for that cycle only.
+  - The cycle log records `omen` (cause `omen.<id>`) and `convergence` when the mist begins (INV-12).
+- **Alternatives considered:** A Surge sending extra creatures from its plane on top of the normal stream; a fixed
+  plane per Surge in the data.
+- **Requirement IDs affected:** OMN-02, OMN-03, DAT-03, RUN-02, INV-12.
+
+## D-088 Omens draw from their own random stream
+- **Status:** Accepted (2026-10-21)
+- **Date / step:** 2026-10-21, step 7
+- **Context:** INV-02 needs a seeded run to replay; the omen draw happens at every Dusk.
+- **Decision:** Like the shop (D-080), omens draw from their own `SeededRandom`, seeded once from the run's starting
+  state with its own salt, so the chance roll, the omen and the Surge plane never shift the planes, arrivals or Dawn
+  rolls. Step 8 saves this stream's state with the run, next to the shop's.
+- **Alternatives considered:** Drawing from the run's stream.
+- **Requirement IDs affected:** OMN-01, INV-02, SAV-01.
+
+## D-089 Unlocks: placeholder set, locked content and the starting-staff choice
+- **Status:** Accepted (the human chose placeholder data from the agent before step 7; the values are tuning)
+- **Date / step:** 2026-10-21, step 7
+- **Context:** MET-03 lists what Essence buys but not what starts locked, the costs, or how the starting-staff choice
+  works.
+- **Decision:**
+  - `data/unlocks.json` (closed kinds `Plane`, `Character`, `Item`, `Fixture`, `StartingStaff`): the Gearbound Ruin and
+    the Pale Court (15 each); Staff 04, 08, 12 and 15, one per main class (8 each); Ward Charm, Ember in a Jar and
+    Cursed Crown (6 each); Ledger desk, Ward circle and Salt line (6 each); choosing the starting staff (10).
+  - Content that is the target of an unlock is locked until bought: locked characters and items are never drawn by the
+    shop, locked fixtures are not in the build menu (`BuildFixture` is refused with `Locked`), and locked planes are
+    not drawn. Bought plane unlocks join `unlockedPlanes` in `planes.json` order. Unlocks take effect from the next run.
+  - With the `StartingStaff` unlock, New Run picks as many distinct unlocked characters as the default starting staff
+    (two), at ★1. The default staff are always allowed.
+  - The validator keeps the base game winnable (MET-03): the starting planes, staff and fixtures can never be locked,
+    and every appetite of the starting planes' creatures must be answered by a technique of an unlocked character or
+    by an unlocked fixture's `Provides`.
+  - Unlocks are bought on the title screen through `MetaProfile.Buy`, outside any session; a refused purchase changes
+    nothing.
+- **Alternatives considered:** Locking more of the roster; choosing any characters, locked or not.
+- **Requirement IDs affected:** MET-03, RUN-01, PLN-02, FIX-05, SHP-04, DAT-01, DAT-04.
+
+## D-090 Run end: the Convergence, winning and Mist Essence
+- **Status:** Accepted (counting satisfied guests is the human's answer before step 7; the rest accepted 2026-10-21)
+- **Date / step:** 2026-10-21, step 7
+- **Context:** RUN-02, RUN-04 and MET-02 do not say when a won run ends, which cycles count as survived, or how
+  satisfied guests (CRE-08) count.
+- **Decision:**
+  - The last cycle (`runLength`) is the Convergence: it opens every unlocked plane whatever `planesPerCycle` says, and
+    its arrival interval is ×0.6 (`convergenceArrivalMultiplier`).
+  - Dawn of the last cycle ends the run at once as won (`RunEndReason.Survived`, logged `run.won`); there is no Dawn
+    phase and no cycle 11.
+  - Cycles survived: the run length if won; otherwise the cycles before the one the inn fell in.
+  - Creatures kept occupied: each guest satisfied during a mist, and each creature not turned at dawn (a satisfied
+    guest still walking out is not counted twice). Banished and turned creatures do not count.
+  - Essence = cycles survived × 2 + occupied ÷ 5 (rounded down) + 10 if won (`balance.json` `essence`). It goes to the
+    profile when the run ends, with the run statistics (runs, wins, best cycles, occupied, Essence earned).
+  - A run left from the pause menu (Quit to title) earns nothing; until step 8 there is no run save to come back to.
+- **Alternatives considered:** Showing a last Dawn before the win; counting only creatures calm at dawn.
+- **Requirement IDs affected:** RUN-02, RUN-03, RUN-04, MET-02, CYC-10.
+
+## D-091 The meta profile lives outside the session, in memory until step 8
+- **Status:** Accepted (2026-10-21)
+- **Date / step:** 2026-10-21, step 7
+- **Context:** MET-01 keeps Essence, unlocks and statistics across runs; saving the profile is step 8.
+- **Decision:** Core's `MetaProfile` holds Essence, the unlock IDs bought and the run statistics. Like the bestiary
+  (D-066) and the ancestry record (D-082) it is passed to each `GameSession`. The game keeps one of each, with the
+  loaded content, in a static `PlayerProfile` that the title screen and the game scene share; it is lost when the game
+  closes until step 8 saves it.
+- **Alternatives considered:** Saving a profile file now (step 8's work).
+- **Requirement IDs affected:** MET-01, SAV-02, BST-04, STF-16.
+
+## D-092 A placeholder title screen and run end panel
+- **Status:** Accepted (the human's answer before step 7)
+- **Date / step:** 2026-10-21, step 7
+- **Context:** Step 7 asks for the title screen's Unlocks and Bestiary pages; the title screen itself (UI-01) is step 9.
+- **Decision:** `scenes/Title.tscn` is now the main scene, built in code by `TitleScreen.cs`: New Run (optional seed;
+  starting staff once unlocked), Bestiary, Unlocks and Quit, with Essence and run statistics. Continue and Settings
+  come with step 8. The HUD's run end panel shows win or loss and its cause, cycles survived, guests kept occupied,
+  Essence earned and bestiary progress, and returns to the title. The pause menu's Quit goes to the title (CYC-10).
+  For the smoke run, the user argument `--new-run` (after `++`) makes the title open a run at once.
+- **Alternatives considered:** Opening the pages from the HUD until step 9.
+- **Requirement IDs affected:** UI-01, UI-10, CYC-10, RUN-04, TST-12.
+
+## D-093 Earlier tests run without omens or locks
+- **Status:** Accepted (2026-10-21)
+- **Date / step:** 2026-10-21, step 7
+- **Context:** Omens change arrivals and tributes from cycle 2, and the unlocks take four characters, three items and
+  three fixtures out of the shop and the build menu; many earlier tests play several cycles or use locked content.
+- **Decision:** Like D-076, the shared test content (`TestGame.Sturdy`, `ContentWith`, `Scenario`) has no omens and
+  locks nothing (`TestGame.Plain`); the step 7 tests add the real omens and unlocks back. No earlier test changed, and
+  no `data/` value was changed for a test (AGT-14).
+- **Alternatives considered:** Rewriting the earlier tests around omens.
+- **Requirement IDs affected:** TST-01, INV-08.
+
+## D-094 A guest still walking out at dawn pays nothing more
+- **Status:** Accepted (the human asked for the fix after step 7)
+- **Date / step:** 2026-10-21, after step 7 (a step 6c defect)
+- **Context:** CRE-05 says a satisfied guest pays nothing more at Dawn, but Dawn paid a tribute to every creature not
+  turned, so a satisfied guest that had not reached the front door when dawn broke was paid twice.
+- **Decision:** Dawn's tribute, study progress and occupied count skip guests that are leaving. They have already paid,
+  been studied and been counted when they were satisfied (CRE-08, D-085, D-090). They still dissolve at dawn.
+- **Alternatives considered:** None; this is the behaviour CRE-05 already requires.
+- **Requirement IDs affected:** CRE-05, CRE-08, MET-02.

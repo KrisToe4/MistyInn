@@ -1,16 +1,44 @@
 using MistyInn.Core.Board;
 using MistyInn.Core.Content;
 using MistyInn.Core.Entities;
+using MistyInn.Core.Meta;
 
 namespace MistyInn.Core.Run;
+
+/// <summary>
+/// What the profile decides about a new run (RUN-01, MET-03): the starting staff and what is unlocked. Locked
+/// characters, items and fixtures stay out of the shop and the build menu for the whole run.
+/// </summary>
+internal sealed record RunStart(
+    IReadOnlyList<string> StartingStaff,
+    IReadOnlyList<string> Planes,
+    IReadOnlySet<string> LockedCharacters,
+    IReadOnlySet<string> LockedItems,
+    IReadOnlySet<string> LockedFixtures)
+{
+    public static RunStart For(GameContent content, MetaProfile profile, IReadOnlyList<string>? startingStaff)
+    {
+        IReadOnlySet<string> Locked(UnlockKind kind) =>
+            content.Unlocks.Where(u => u.Kind == kind && !profile.Owns(u.Id)).Select(u => u.Target!).ToHashSet();
+
+        return new RunStart(
+            startingStaff ?? content.Balance.StartingStaff,
+            profile.UnlockedPlanes(content),
+            Locked(UnlockKind.Character),
+            Locked(UnlockKind.Item),
+            Locked(UnlockKind.Fixture));
+    }
+}
 
 /// <summary>The state of the current run (ARC-01). Owned by <see cref="GameSession"/>; changed only by its systems.</summary>
 internal sealed class RunState
 {
-    public RunState(GameContent content, IdAllocator ids)
+    public RunState(GameContent content, IdAllocator ids, RunStart start)
     {
         Board = new InnBoard(content.Layout);
-        Units = content.StartingUnits.Select(def => NewUnit(content, ids, def)).ToList();
+        Start = start;
+        Units = content.StartingUnits.Take(1).Concat(start.StartingStaff.Select(content.TemplateFor))
+            .Select(def => NewUnit(content, ids, def)).ToList();
         foreach (var unit in Units.Where(u => !u.Def.IsInnkeeper))
         {
             // A starting character counts as hired at ★1 for its base cost, so selling it returns something (D-081).
@@ -19,7 +47,7 @@ internal sealed class RunState
 
         Silver = content.Balance.StartingSilver;
         Integrity = content.Balance.Integrity;
-        UnlockedPlanes = content.UnlockedPlanes.ToList();
+        UnlockedPlanes = start.Planes.ToList();
         _content = content;
         Rooms = new List<Room>();
         SyncRooms(0);
@@ -35,6 +63,9 @@ internal sealed class RunState
     }
 
     private readonly GameContent _content;
+
+    /// <summary>What the profile unlocked for this run (MET-03).</summary>
+    public RunStart Start { get; }
 
     public int Cycle { get; set; }
 
@@ -125,8 +156,20 @@ internal sealed class RunState
     /// <summary>Creature types already given Studied progress this cycle, at Dawn or by leaving satisfied (BST-02).</summary>
     public HashSet<string> StudiedThisCycle { get; } = new();
 
-    /// <summary>Why the run ended, once it has (RUN-03).</summary>
+    /// <summary>Why the run ended, once it has (RUN-02, RUN-03).</summary>
     public RunEndReason? EndReason { get; set; }
+
+    /// <summary>The run's result and Essence, once it has ended (RUN-04, MET-02).</summary>
+    public RunSummary? Summary { get; set; }
+
+    /// <summary>This cycle's omen, or null (OMN-01); it lasts one cycle (OMN-03).</summary>
+    public OmenDef? Omen { get; set; }
+
+    /// <summary>The omen's effects as they apply this cycle, with a Surge's plane filled in (D-087).</summary>
+    public List<EffectDef> OmenEffects { get; } = new();
+
+    /// <summary>Guests kept occupied this run: satisfied during a mist, or calm at dawn (MET-02, D-090).</summary>
+    public int CreaturesOccupied { get; set; }
 
     public static Unit NewUnit(GameContent content, IdAllocator ids, UnitTemplate def) =>
         new(ids.NextUnit(), def, def.TechniqueIds.Select(content.Technique).ToList(), content.Balance.RankStatMultipliers[0]);

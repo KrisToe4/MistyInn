@@ -12,11 +12,11 @@ public enum Phase
     /// <summary>Aftermath: untimed; the player moves on to the next Dusk (CYC-04).</summary>
     Dawn,
 
-    /// <summary>The run is over (RUN-03): nothing more happens in this session.</summary>
+    /// <summary>The run is over, won or lost (RUN-02, RUN-03): nothing more happens in this session.</summary>
     RunOver,
 }
 
-/// <summary>Why a run was lost (RUN-03).</summary>
+/// <summary>Why a run ended: won by surviving the last cycle (RUN-02), or lost (RUN-03).</summary>
 public enum RunEndReason
 {
     /// <summary>The innkeeper fell (ESC-06).</summary>
@@ -24,6 +24,9 @@ public enum RunEndReason
 
     /// <summary>The inn's integrity was 0 at the end of the mist (BRD-06).</summary>
     InnDestroyed,
+
+    /// <summary>The inn survived the Convergence, the last cycle: the run is won (RUN-02).</summary>
+    Survived,
 }
 
 /// <summary>

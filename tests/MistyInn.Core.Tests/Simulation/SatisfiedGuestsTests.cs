@@ -83,6 +83,33 @@ public class SatisfiedGuestsTests
     }
 
     [Test]
+    [Property("Requirement", "CRE-05")]
+    [Property("Requirement", "CRE-08")]
+    [Property("Requirement", "MET-02")]
+    public void AGuestStillWalkingOutAtDawnPaysNothingMore()
+    {
+        // When does the warm guest start to leave? Then end the same mist half a second later, before it reaches the door.
+        var (first, firstId) = WarmGuest();
+        first.RunUntil(() => first.Creature(firstId).IsLeaving, 60);
+        var satisfiedAt = first.Session.Time.TotalSeconds;
+
+        var s = new Scenario(balance: b => b with { MistDurationSeconds = satisfiedAt + 0.5, ArrivalStopBeforeDawnSeconds = 0 });
+        s.Place("hearth", new Tile(12, 7));
+        s.Begin();
+        var id = s.Spawn("creature-03", new Tile(12, 10));
+        s.RunUntilCollecting(() => s.Creature(id).IsLeaving, 60);
+        var silver = s.Session.Silver;
+
+        s.Session.RunMistToDawn();
+        s.Collect();
+
+        Assert.That(s.Events.OfType<CreatureDissolved>().Any(d => d.Creature == id), Is.True, "still walking out when dawn broke");
+        Assert.That(s.Events.OfType<TributeLeft>().Count(t => t.Creature == id), Is.EqualTo(1), "paid once, when it was satisfied");
+        Assert.That(s.Session.Silver, Is.EqualTo(silver + s.Content.Balance.IncomePerCycle), "only the cycle's income at Dawn");
+        Assert.That(s.Session.RunForTests.CreaturesOccupied, Is.EqualTo(1), "counted once (D-090)");
+    }
+
+    [Test]
     [Property("Requirement", "CRE-08")]
     [Property("Requirement", "ITM-06")]
     public void ASatisfiedGuestPaysTheSameBonusesAsAtDawn()

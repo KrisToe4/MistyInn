@@ -50,6 +50,8 @@
 	"reseekAfterSeconds": 8
   },
   "bestiary": { "studiedPoints": 3 },
+  "omens": { "fromCycle": 2, "chance": 0.6, "convergenceChance": 1.0 },
+  "essence": { "perCycleSurvived": 2, "occupiedPerPoint": 5, "winBonus": 10 },
   "combat": {
 	"guardRadius": 4,
 	"integrityShare": 0.25,

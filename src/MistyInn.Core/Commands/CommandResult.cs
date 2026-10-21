@@ -75,6 +75,9 @@ public enum CommandFailure
 
     /// <summary>The innkeeper cannot be sold or carry staff items (ESC-06).</summary>
     NotStaff,
+
+    /// <summary>It has not been unlocked with Mist Essence yet (MET-03).</summary>
+    Locked,
 }
 
 /// <summary>The outcome of <see cref="GameSession.Execute"/>.</summary>

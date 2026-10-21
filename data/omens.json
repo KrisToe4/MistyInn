@@ -1,0 +1,17 @@
+[
+  {
+    "id": "blood-moon", "name": "Blood Moon", "weight": 1,
+    "description": "A red moon hangs over the clearing. Every creature arrives on edge.",
+    "effects": [ { "kind": "ArrivalAgitation", "amount": 20 } ]
+  },
+  {
+    "id": "surge", "name": "Surge", "weight": 1,
+    "description": "One gate pours out twice as many guests tonight.",
+    "effects": [ { "kind": "PlaneWeight", "multiplier": 2 } ]
+  },
+  {
+    "id": "feast-night", "name": "Feast Night", "weight": 1,
+    "description": "The mist smells of roasting meat. More guests come, and they pay half again.",
+    "effects": [ { "kind": "Tribute", "multiplier": 1.5 }, { "kind": "ArrivalRate", "multiplier": 1.3 } ]
+  }
+]

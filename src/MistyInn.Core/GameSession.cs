@@ -5,6 +5,7 @@ using MistyInn.Core.Content;
 using MistyInn.Core.Entities;
 using MistyInn.Core.Events;
 using MistyInn.Core.Logging;
+using MistyInn.Core.Meta;
 using MistyInn.Core.Randomness;
 using MistyInn.Core.Run;
 using MistyInn.Core.Simulation;
@@ -13,8 +14,9 @@ namespace MistyInn.Core;
 
 /// <summary>
 /// The single entry point into Core (ARC-01). It holds the run, and its state changes only through <see cref="Tick"/>
-/// and <see cref="Execute"/> (ARC-03); everything else is a read-only query. A new run is a new session; the bestiary
-/// and the ancestry record passed in outlive it (BST-04, STF-16).
+/// and <see cref="Execute"/> (ARC-03); everything else is a read-only query. A new run is a new session; the bestiary,
+/// the ancestry record and the meta profile passed in outlive it (BST-04, STF-16, MET-01). The profile decides what is
+/// unlocked (MET-03) and receives the run's Mist Essence when it ends (RUN-04).
 /// </summary>
 public sealed class GameSession : IEventSink
 {
@@ -31,6 +33,9 @@ public sealed class GameSession : IEventSink
 
     /// <summary>Mixed into the run's starting random state to seed the shop's own stream (D-080).</summary>
     private const ulong ShopStreamSalt = 0x5348_4F50_5354_524DUL;
+
+    /// <summary>Mixed into the run's starting random state to seed the omens' own stream (D-088).</summary>
+    private const ulong OmenStreamSalt = 0x4F4D_454E_5354_524DUL;
 
     private static readonly int[] AllowedSpeeds = [0, 1, 2, 4];
 
@@ -49,6 +54,7 @@ public sealed class GameSession : IEventSink
     private readonly AncestryObserver _ancestry;
     private readonly Modifiers _modifiers;
     private readonly ShopSystem _shop;
+    private readonly IRandomSource _omenRandom;
 
     // Real time owed to the simulation, in TimeSpan ticks × StepsPerSecond, so whole steps are exact integers.
     private long _owed;
@@ -59,7 +65,9 @@ public sealed class GameSession : IEventSink
         GameSessionLimits? limits = null,
         GameContent? content = null,
         CreatureBestiary? bestiary = null,
-        AncestryRecord? ancestry = null)
+        AncestryRecord? ancestry = null,
+        MetaProfile? profile = null,
+        IReadOnlyList<string>? startingStaff = null)
     {
         ArgumentNullException.ThrowIfNull(random);
 
@@ -71,7 +79,13 @@ public sealed class GameSession : IEventSink
         Content = content ?? GameContent.Default;
         Bestiary = bestiary ?? new CreatureBestiary();
         Ancestry = ancestry ?? new AncestryRecord();
-        _run = new RunState(Content, Ids);
+        Profile = profile ?? new MetaProfile();
+        if (startingStaff is not null && Profile.CheckStartingStaff(Content, startingStaff) is { } problem)
+        {
+            throw new ArgumentException(problem, nameof(startingStaff));
+        }
+
+        _run = new RunState(Content, Ids, RunStart.For(Content, Profile, startingStaff));
 
         var wanderTiles = _run.Board.WalkableTilesIn(Content.WanderZones);
         if (wanderTiles.Count == 0)
@@ -95,6 +109,9 @@ public sealed class GameSession : IEventSink
         var start = random.GetState();
         _shop = new ShopSystem(Content, _run, new SeededRandom(start.S0 ^ ((start.S2 << 17) | (start.S2 >> 47)) ^ ShopStreamSalt), _modifiers);
 
+        // The omens' own stream, the same way, so an omen never shifts the planes, arrivals or Dawn rolls (D-088).
+        _omenRandom = new SeededRandom(start.S1 ^ ((start.S3 << 29) | (start.S3 >> 35)) ^ OmenStreamSalt);
+
         // The first Dusk is the starting state; views read it through the queries, so no events are raised for it.
         StartCycle(1, raiseEvents: false);
     }
@@ -106,6 +123,26 @@ public sealed class GameSession : IEventSink
 
     /// <summary>The profile's revealed ancestries (STF-16, D-082). Pass the same instance to the next run's session.</summary>
     public AncestryRecord Ancestry { get; }
+
+    /// <summary>The profile's Essence, unlocks and statistics (MET-01). Pass the same instance to the next run's session.</summary>
+    public MetaProfile Profile { get; }
+
+    /// <summary>The run's last cycle (RUN-02).</summary>
+    public int RunLength => Content.Balance.RunLength;
+
+    /// <summary>The last cycle is the Convergence: every unlocked plane opens and arrivals are faster (RUN-02).</summary>
+    public bool IsConvergence => Cycle == RunLength;
+
+    /// <summary>This cycle's omen and its effects as they apply, or null (OMN-01, CYC-01).</summary>
+    public OmenView? Omen => _run.Omen is { } omen
+        ? new OmenView(omen, _run.OmenEffects.FirstOrDefault(e => e.Kind == EffectKind.PlaneWeight)?.Plane, _run.OmenEffects.ToList())
+        : null;
+
+    /// <summary>How the run ended and the Essence it earned, once it has (RUN-04, MET-02).</summary>
+    public RunSummary? Summary => _run.Summary;
+
+    /// <summary>The fixtures the build menu offers this run: every fixture not locked (FIX-05, MET-03).</summary>
+    public IReadOnlyList<FixtureDef> BuildMenu => Content.Fixtures.Where(f => !_run.Start.LockedFixtures.Contains(f.Id)).ToList();
 
     public BoardLayout Layout => Content.Layout;
 
@@ -127,7 +164,7 @@ public sealed class GameSession : IEventSink
 
     public double MaxIntegrity => Content.Balance.Integrity;
 
-    /// <summary>Why the run ended, or null while it goes on (RUN-03).</summary>
+    /// <summary>Why the run ended, or null while it goes on (RUN-02, RUN-03).</summary>
     public RunEndReason? EndReason => _run.EndReason;
 
     /// <summary>The content filters in force (SET-04). They change what is shown, never what happens (CMP-06).</summary>
@@ -479,6 +516,14 @@ public sealed class GameSession : IEventSink
         var ids = Ids.GetState();
         h.Add(ids.LastUnit).Add(ids.LastCreature).Add(ids.LastFixture).Add(ids.LastItem);
 
+        var omenRng = _omenRandom.GetState();
+        h.Add(omenRng.S0).Add(omenRng.S1).Add(omenRng.S2).Add(omenRng.S3)
+            .Add(_run.Omen?.Id ?? "").Add(_run.CreaturesOccupied).Add(_run.Summary?.EssenceEarned ?? -1);
+        foreach (var effect in _run.OmenEffects)
+        {
+            h.Add((int)effect.Kind).Add(effect.Plane ?? "");
+        }
+
         var shopRng = _shop.Random.GetState();
         h.Add(shopRng.S0).Add(shopRng.S1).Add(shopRng.S2).Add(shopRng.S3)
             .Add(_run.Shop.Locked).Add(_run.Shop.RerollsThisCycle).Add(_run.Rooms.Count);
@@ -604,6 +649,12 @@ public sealed class GameSession : IEventSink
     /// <summary>For tests: inn-wide effects and synergy counts (ITM-04, SYN-01).</summary>
     internal Modifiers ModifiersForTests => _modifiers;
 
+    /// <summary>For tests: the arrival interval and plane pick (RUN-02, D-087).</summary>
+    internal ArrivalSystem ArrivalsForTests => _arrivals;
+
+    /// <summary>For tests: draws this Dusk's omen again as if it were <paramref name="cycle"/> (OMN-01).</summary>
+    internal void DrawOmenForTests(int cycle) => DrawOmen(cycle);
+
     /// <summary>For tests: working fixture effects and adjacency (FIX-03, FIX-04).</summary>
     internal InnSense SenseForTests => _sense;
 
@@ -631,7 +682,10 @@ public sealed class GameSession : IEventSink
 
     void IEventSink.EndRun(RunEndReason reason) => EndRun(reason);
 
-    /// <summary>The run is lost (RUN-03): nothing more happens in this session.</summary>
+    /// <summary>
+    /// The run is won or lost (RUN-02, RUN-03): nothing more happens in this session. The cycle the inn fell in does not
+    /// count as survived. The Essence earned (MET-02) and the statistics go to the profile at once (RUN-04).
+    /// </summary>
     private void EndRun(RunEndReason reason)
     {
         if (_run.Phase == Phase.RunOver)
@@ -639,11 +693,27 @@ public sealed class GameSession : IEventSink
             return;
         }
 
+        var won = reason == RunEndReason.Survived;
+        var survived = won ? Cycle : Cycle - 1;
+        var essence = MetaProfile.EssenceFor(Content.Balance.Essence, survived, _run.CreaturesOccupied, won);
+        var summary = new RunSummary(reason, survived, _run.CreaturesOccupied, essence);
         _run.Phase = Phase.RunOver;
         _run.EndReason = reason;
-        Raise(new RunEnded(Time, reason));
-        Log("run.lost", reason == RunEndReason.InnkeeperFell ? "innkeeper.fell" : "integrity.zero");
+        _run.Summary = summary;
+        Profile.Record(summary);
+        Raise(new RunEnded(Time, reason, summary));
+        Log(won ? "run.won" : "run.lost", reason switch
+        {
+            RunEndReason.InnkeeperFell => "innkeeper.fell",
+            RunEndReason.InnDestroyed => "integrity.zero",
+            _ => "convergence.survived",
+        });
     }
+
+    /// <summary>A guest's tribute: its own, times the <c>Tribute</c> multipliers (an omen), plus the bonuses (ITM-06, SYN-02, D-087).</summary>
+    private int TributeOf(Creature creature) =>
+        Math.Max(0, (int)Math.Round(creature.Def.Tribute * _modifiers.InnWideMultiplier(EffectKind.Tribute), MidpointRounding.AwayFromZero)
+                    + _modifiers.InnWide(EffectKind.Tribute));
 
     private double MistSeconds => _steps / (double)StepsPerSecond;
 
@@ -698,8 +768,9 @@ public sealed class GameSession : IEventSink
                 continue;
             }
 
-            var tribute = Math.Max(0, (int)Math.Round(creature.Def.Tribute, MidpointRounding.AwayFromZero) + _modifiers.InnWide(EffectKind.Tribute));
+            var tribute = TributeOf(creature);
             _run.Silver += tribute;
+            _run.CreaturesOccupied++;
             Raise(new CreatureSatisfied(Time, creature.Id, tribute));
             Raise(new TributeLeft(Time, creature.Id, tribute));
             Raise(new SilverChanged(Time, _run.Silver));
@@ -731,13 +802,15 @@ public sealed class GameSession : IEventSink
         _steps = 0;
         _owed = 0;
 
-        var count = PlaneDraw.CountFor(cycle, Content.Balance, _run.UnlockedPlanes.Count);
+        // The Convergence opens every unlocked plane at once (RUN-02).
+        var count = cycle == RunLength ? _run.UnlockedPlanes.Count : PlaneDraw.CountFor(cycle, Content.Balance, _run.UnlockedPlanes.Count);
         var planeIds = PlaneDraw.Draw(Random, _run.UnlockedPlanes, count, _run.PreviousPlaneSet);
         _run.PreviousPlaneSet = planeIds;
         _run.ConvergingPlanes.Clear();
         _run.ConvergingPlanes.AddRange(planeIds.Select(Content.Plane));
+        DrawOmen(cycle);
 
-        // After the planes, so the home-plane weight sees this cycle's planes (SHP-04).
+        // After the planes and the omen, so the home-plane weight sees this cycle's planes (SHP-04).
         _shop.NewDusk();
         _modifiers.Refresh(heal: true);
 
@@ -745,7 +818,54 @@ public sealed class GameSession : IEventSink
         {
             Raise(new PhaseChanged(Time, Cycle, Phase.Dusk));
             Raise(new ConvergingPlanesDrawn(Time, Cycle, planeIds));
+            if (_run.Omen is { } omen)
+            {
+                Raise(new OmenDrawn(Time, Cycle, omen.Id));
+            }
+
             Raise(new ShopChanged(Time));
+        }
+    }
+
+    /// <summary>
+    /// Each Dusk from cycle 2: an omen by weight, with a 60 % chance (100 % on the Convergence), for this cycle only
+    /// (OMN-01, OMN-03). A <c>PlaneWeight</c> effect without a plane goes to one converging plane (a Surge, D-087). The
+    /// omens draw from their own stream (D-088).
+    /// </summary>
+    private void DrawOmen(int cycle)
+    {
+        _run.Omen = null;
+        _run.OmenEffects.Clear();
+        var tuning = Content.Balance.Omens;
+        if (cycle < tuning.FromCycle || Content.Omens.Count == 0)
+        {
+            return;
+        }
+
+        var chance = cycle == RunLength ? tuning.ConvergenceChance : tuning.Chance;
+        if (_omenRandom.NextDouble() >= chance)
+        {
+            return;
+        }
+
+        var roll = _omenRandom.NextDouble() * Content.Omens.Sum(o => o.Weight);
+        var omen = Content.Omens[^1];
+        foreach (var candidate in Content.Omens)
+        {
+            roll -= candidate.Weight;
+            if (roll < 0)
+            {
+                omen = candidate;
+                break;
+            }
+        }
+
+        _run.Omen = omen;
+        foreach (var effect in omen.Effects)
+        {
+            _run.OmenEffects.Add(effect.Kind == EffectKind.PlaneWeight && effect.Plane is null
+                ? effect with { Plane = _run.ConvergingPlanes[_omenRandom.NextInt(0, _run.ConvergingPlanes.Count)].Id }
+                : effect);
         }
     }
 
@@ -758,12 +878,13 @@ public sealed class GameSession : IEventSink
     private void BreakDawn()
     {
         _company.EndAll();
-        var tributeBonus = _modifiers.InnWide(EffectKind.Tribute);
-        foreach (var creature in _run.Creatures.Where(c => !c.IsTurned))
+        // A satisfied guest still walking out has already paid and been counted, so it pays nothing more (CRE-05, D-094).
+        foreach (var creature in _run.Creatures.Where(c => !c.IsTurned && !c.IsLeaving))
         {
-            // Inn items and the Gambler synergy add to every tribute (ITM-06, SYN-02).
-            var tribute = Math.Max(0, (int)Math.Round(creature.Def.Tribute, MidpointRounding.AwayFromZero) + tributeBonus);
+            // Inn items, the Gambler synergy and a Feast Night add to every tribute (ITM-06, SYN-02, OMN-02).
+            var tribute = TributeOf(creature);
             _run.Silver += tribute;
+            _run.CreaturesOccupied++;
             Raise(new TributeLeft(Time, creature.Id, tribute));
             Log("tribute.left", "dawn.calm", creature.Id.ToRef());
 
@@ -831,6 +952,13 @@ public sealed class GameSession : IEventSink
         if (_run.Integrity <= 0)
         {
             EndRun(RunEndReason.InnDestroyed);
+            return;
+        }
+
+        // Surviving the Convergence wins the run at once (RUN-02, D-090).
+        if (Cycle >= RunLength)
+        {
+            EndRun(RunEndReason.Survived);
             return;
         }
 
@@ -950,6 +1078,18 @@ public sealed class GameSession : IEventSink
         _arrivals.StartMist();
         Raise(new PhaseChanged(Time, Cycle, Phase.Mist));
         Log("phase.mist", "player.began");
+
+        // The omen and the Convergence change arrivals and tributes all mist long; the log says so (INV-12).
+        if (_run.Omen is { } omen)
+        {
+            Log("omen", $"omen.{omen.Id}");
+        }
+
+        if (IsConvergence)
+        {
+            Log("convergence", "run.last-cycle");
+        }
+
         return CommandResult.Ok;
     }
 
@@ -974,6 +1114,11 @@ public sealed class GameSession : IEventSink
         if (Content.Fixtures.FirstOrDefault(f => f.Id == command.FixtureDefId) is not { } def)
         {
             return CommandResult.Fail(CommandFailure.UnknownFixture);
+        }
+
+        if (_run.Start.LockedFixtures.Contains(def.Id))
+        {
+            return CommandResult.Fail(CommandFailure.Locked);
         }
 
         if (_run.Silver < def.Cost)

@@ -1,5 +1,6 @@
 using MistyInn.Core.Content;
 using MistyInn.Core.Entities;
+using MistyInn.Core.Meta;
 using MistyInn.Core.Run;
 
 namespace MistyInn.Core.Events;
@@ -40,8 +41,8 @@ public sealed record RoomSessionStarted(TimeSpan At, string Room, UnitId Compani
 /// <summary>A room session ended; <paramref name="Interrupted"/> when its door was attacked (CMP-05).</summary>
 public sealed record RoomSessionEnded(TimeSpan At, string Room, bool Interrupted) : DomainEvent(At);
 
-/// <summary>The run was lost (RUN-03). Nothing more happens in this session.</summary>
-public sealed record RunEnded(TimeSpan At, RunEndReason Reason) : DomainEvent(At);
+/// <summary>The run was won or lost (RUN-02, RUN-03), with what it earned (RUN-04). Nothing more happens in this session.</summary>
+public sealed record RunEnded(TimeSpan At, RunEndReason Reason, RunSummary Summary) : DomainEvent(At);
 
 /// <summary>A staff member joined the run and sits on the bench (D-074, and the shop from step 6).</summary>
 public sealed record UnitJoined(TimeSpan At, UnitId Unit) : DomainEvent(At);

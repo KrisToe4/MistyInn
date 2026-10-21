@@ -85,6 +85,12 @@ public sealed class GameContent
 
     public IReadOnlyList<SynergyDef> Synergies => Set.Synergies;
 
+    /// <summary>The omens a Dusk may draw (OMN-01).</summary>
+    public IReadOnlyList<OmenDef> Omens => Set.Omens;
+
+    /// <summary>What Mist Essence can buy on the title screen (MET-03).</summary>
+    public IReadOnlyList<UnlockDef> Unlocks => Set.Unlocks;
+
     /// <summary>Where inn items are shown, by spot name (ITM-04, ART-17, D-078).</summary>
     public IReadOnlyDictionary<string, Tile> DisplaySpots { get; }
 
@@ -130,6 +136,31 @@ public sealed class GameContent
 
     public ItemDef Item(string id) =>
         _items.TryGetValue(id, out var item) ? item : throw new KeyNotFoundException($"Unknown item '{id}'.");
+
+    public OmenDef Omen(string id) =>
+        Omens.FirstOrDefault(o => o.Id == id) ?? throw new KeyNotFoundException($"Unknown omen '{id}'.");
+
+    public UnlockDef Unlock(string id) =>
+        Unlocks.FirstOrDefault(u => u.Id == id) ?? throw new KeyNotFoundException($"Unknown unlock '{id}'.");
+
+    /// <summary>An unlock's name as shown: its own, or its target's (MET-03).</summary>
+    public string UnlockName(UnlockDef unlock)
+    {
+        ArgumentNullException.ThrowIfNull(unlock);
+        if (unlock.Name is { } name)
+        {
+            return name;
+        }
+
+        return unlock.Kind switch
+        {
+            UnlockKind.Plane => Plane(unlock.Target!).Name,
+            UnlockKind.Character => Character(unlock.Target!).Name,
+            UnlockKind.Item => Item(unlock.Target!).Name,
+            UnlockKind.Fixture => Fixture(unlock.Target!).Name,
+            _ => unlock.Id,
+        };
+    }
 
     public FixtureDef Fixture(string id) =>
         _fixtures.TryGetValue(id, out var fixture) ? fixture : throw new KeyNotFoundException($"Unknown fixture '{id}'.");

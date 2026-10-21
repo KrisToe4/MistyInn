@@ -13,8 +13,8 @@ using MistyInn.Core.Entities;
 using MistyInn.Core.Events;
 using MistyInn.Core.Randomness;
 using MistyInn.Core.Run;
-using MistyInn.Data;
 using MistyInn.Fixtures;
+using MistyInn.Profile;
 using MistyInn.UI;
 using MistyInn.Units;
 
@@ -25,11 +25,13 @@ namespace MistyInn;
 /// the views (ARC-12) and places the views from Core's positions (SIM-03). Player input becomes commands (ARC-10):
 /// dragging staff and fixtures onto tiles at Dusk (CAM-13), the build menu (FIX-05), selection in the mist (CAM-12),
 /// speed and the pause menu (SCP-13, CYC-10), integrity repairs at Dawn (BRD-07) and the debug dev panel (D-074).
-/// Hits flash, and fallen units leave a blood mark unless the Blood filter is on (RAT-05, RAT-09).
+/// Hits flash, and fallen units leave a blood mark unless the Blood filter is on (RAT-05, RAT-09). The run starts from
+/// the title screen's request with the shared profile (RUN-01, MET-03), and ends on the run end panel, which returns to
+/// the title screen (RUN-04).
 /// </summary>
 public partial class GameRoot : Node3D
 {
-    /// <summary>The run's seed; 0 picks a random one (RUN-01).</summary>
+    /// <summary>The run's seed when the title screen gives none; 0 picks a random one (RUN-01).</summary>
     [Export] public long Seed { get; set; }
 
     [Export] public InnView Inn { get; set; } = null!;
@@ -59,11 +61,6 @@ public partial class GameRoot : Node3D
     private readonly List<string> _fellTonight = new();
     private readonly List<string> _diedTonight = new();
 
-    // The bestiary outlives the run and the scene (BST-04, D-066); step 8 saves it in the profile.
-    private static readonly CreatureBestiary Bestiary = new();
-
-    // Revealed ancestries are kept across runs too (STF-16, D-082); step 8 saves them in the profile.
-    private static readonly AncestryRecord Ancestry = new();
     private GameSession _session = null!;
     private UnitId? _dragging;
     private Vector2? _pendingSelect;
@@ -79,24 +76,26 @@ public partial class GameRoot : Node3D
 
     public override void _Ready()
     {
-        GameContent content;
-        try
-        {
-            content = LoadContent();
-        }
-        catch (ContentException e)
+        if (PlayerProfile.TryContent(out var error) is not { } content)
         {
             // Debug builds stop with a clear message (DAT-04).
-            GD.PushError(e.Message);
-            Hud.ShowFatal($"{Tr("The game data in res://data/ is invalid")}:\n\n{e.Message}");
+            Hud.ShowFatal($"{Tr("The game data in res://data/ is invalid")}:\n\n{error?.Message}");
             SetProcess(false);
             SetProcessInput(false);
             SetProcessUnhandledInput(false);
             return;
         }
 
-        var seed = Seed != 0 ? (ulong)Seed : (ulong)System.Random.Shared.NextInt64(1, long.MaxValue);
-        _session = new GameSession(new SeededRandom(seed), content: content, bestiary: Bestiary, ancestry: Ancestry);
+        // The profile outlives the run and the scene (BST-04, STF-16, MET-01, D-091); step 8 saves it.
+        var request = PlayerProfile.TakePendingRun();
+        var seed = request?.Seed ?? (Seed != 0 ? (ulong)Seed : (ulong)System.Random.Shared.NextInt64(1, long.MaxValue));
+        _session = new GameSession(
+            new SeededRandom(seed),
+            content: content,
+            bestiary: PlayerProfile.Bestiary,
+            ancestry: PlayerProfile.Ancestry,
+            profile: PlayerProfile.Meta,
+            startingStaff: request?.StartingStaff);
 
         Inn.Build(_session.Content);
         Inn.ShowGates(_session.ConvergingPlanes.Select(p => p.Id));
@@ -123,7 +122,7 @@ public partial class GameRoot : Node3D
         Hud.ResumePressed += OnResume;
         Hud.QuitPressed += OnQuit;
         Hud.RepairPressed += OnRepair;
-        Hud.NewRunPressed += OnNewRun;
+        Hud.TitlePressed += OnTitle;
         Hud.DevAddStaffPressed += OnDevAddStaff;
         Hud.DevPlanePressed += OnDevPlane;
         Hud.FiltersChanged += OnFiltersChanged;
@@ -139,23 +138,6 @@ public partial class GameRoot : Node3D
         Hud.ShowMessage(Tr("Place the innkeeper, your staff and your fixtures, then begin the mist."), 8);
     }
 
-    /// <summary>
-    /// Loads <c>res://data/</c> and validates it (DAT-02, DAT-04). An export build falls back to the copy built into
-    /// Core when the shipped files cannot be used; a debug build lets the error through so it is fixed.
-    /// </summary>
-    private static GameContent LoadContent()
-    {
-        try
-        {
-            return GameContent.Create(ContentLoader.Load(new GodotContentSource()));
-        }
-        catch (ContentException e) when (!OS.IsDebugBuild())
-        {
-            GD.PushError($"Misty Inn: using the built-in content instead of res://data/. {e.Message}");
-            return GameContent.Default;
-        }
-    }
-
     public override void _ExitTree()
     {
         Hud.BeginMistPressed -= OnBeginMist;
@@ -169,7 +151,7 @@ public partial class GameRoot : Node3D
         Hud.ResumePressed -= OnResume;
         Hud.QuitPressed -= OnQuit;
         Hud.RepairPressed -= OnRepair;
-        Hud.NewRunPressed -= OnNewRun;
+        Hud.TitlePressed -= OnTitle;
         Hud.DevAddStaffPressed -= OnDevAddStaff;
         Hud.DevPlanePressed -= OnDevPlane;
         Hud.FiltersChanged -= OnFiltersChanged;
@@ -422,9 +404,10 @@ public partial class GameRoot : Node3D
                 Hud.ShowMessage(Tr("The door is attacked! Both come out at once."));
                 break;
             case RunEnded ended:
-                Hud.ShowRunOver(ended.Reason == RunEndReason.InnkeeperFell
-                    ? Tr("The innkeeper has fallen. The mist takes the inn.")
-                    : Tr("The inn is too broken to stand another night."));
+                ShowRunEnd(ended);
+                break;
+            case OmenDrawn omen:
+                Hud.ShowMessage($"{Tr("An omen")}: {_session.Content.Omen(omen.OmenId).Name}.", 8);
                 break;
             case ContentFiltersChanged:
                 ShowBloodMarks();
@@ -724,7 +707,32 @@ public partial class GameRoot : Node3D
 
     private void OnRepair(int silver) => Report(_session.Execute(new RepairIntegrity(Math.Max(1, Math.Min(silver, _session.Silver)))));
 
-    private void OnNewRun() => GetTree().ReloadCurrentScene();
+    /// <summary>Back to the title screen (RUN-04, CYC-10). A run left before it ends earns nothing (D-090).</summary>
+    private void OnTitle() => GetTree().ChangeSceneToFile(TitleScreen.ScenePath);
+
+    /// <summary>The run end panel (UI-10, placeholder): win or loss and its cause, cycles survived, Essence, bestiary.</summary>
+    private void ShowRunEnd(RunEnded ended)
+    {
+        var summary = ended.Summary;
+        var cause = ended.Reason switch
+        {
+            RunEndReason.Survived => Tr("Dawn breaks over the Convergence, and the inn still stands."),
+            RunEndReason.InnkeeperFell => Tr("The innkeeper has fallen. The mist takes the inn."),
+            _ => Tr("The inn is too broken to stand another night."),
+        };
+
+        var progress = BestiaryBook.Progress(_session.Content, _session.Bestiary);
+        var text = string.Join("\n", new[]
+        {
+            cause,
+            $"{Tr("Cycles survived")}: {summary.CyclesSurvived}/{_session.RunLength}",
+            $"{Tr("Guests kept occupied")}: {summary.CreaturesOccupied}",
+            $"{Tr("Mist Essence earned")}: {summary.EssenceEarned}  ({Tr("total")} {_session.Profile.Essence})",
+            $"{Tr("Bestiary")}: {progress[BestiaryLevel.Seen]} {Tr("seen")}, {progress[BestiaryLevel.Studied]} {Tr("studied")}, "
+            + $"{progress[BestiaryLevel.Understood]} {Tr("understood")} {Tr("of")} {_session.Content.Creatures.Count}",
+        });
+        Hud.ShowRunOver(summary.Won ? Tr("The inn survives") : Tr("The inn has fallen"), text);
+    }
 
     private void OnDevAddStaff(string characterId) => Report(_session.Execute(new DevAddStaff(characterId)));
 
