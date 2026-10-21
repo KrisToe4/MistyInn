@@ -3,8 +3,8 @@
 
 | | |
 |---|---|
-| **Version** | 1.11 (approved) |
-| **Supersedes** | 1.10 |
+| **Version** | 1.12 (approved) |
+| **Supersedes** | 1.11 |
 | **Audience** | LLM-based coding agents and the human developer |
 | **Genre** | Dark roguelike autobattler: prepare the inn, then survive the mist |
 | **Engine** | Godot 4.7.2 (.NET build) |
@@ -76,6 +76,7 @@ step starts.
 
 | Version | Change | Reason |
 |---|---|---|
+| 1.12 | CRE-08: a guest with floor Company is not satisfied until it has had its room session, so Company comes first (`CMP-04`); a leaving guest is no longer shown as served | Step 6c report (D-085) |
 | 1.11 | New CRE-08: a guest whose agitation stays at 0 for 5 s (`balance.json`) is **satisfied**: it pays its tribute at once (with item and synergy bonuses), walks out of the front door and dissolves, and counts as served for the bestiary. CRE-05: a satisfied guest is gone by Dawn and pays nothing more. CAM-10: no panning at the screen edges. Section 6.4: the satisfaction time. New step 6c | The human's review of step 6b |
 | 1.10 | Basic service and moving staff. AGI-05: `Alcohol` replaces the `Drink` and `Food` appetites. New AGI-11: any staff member or the innkeeper can give **basic service** (food and drink) to any creature seated at a table, at ×0.3 of a craved appetite, with no supplies; the Food technique gives it at ×0.6. AGI-06, AGI-07, FIX-06, RUN-01: only `Drink` supplies, used by the Drink technique for `Alcohol`. STF-02: Drink answers `Alcohol`; Food is better basic service. STF-04: each staff member's placed tile is its **home**; fighters (bouncers) and companions stay there, everyone else walks to guests and fixtures to serve and drifts home when idle; the main class decides for two-class characters. ESC-06: the innkeeper walks to tables to give basic service. ESC-07: fighters guard from their home. CAM-10: dragging the left mouse button on open ground pans the camera. UI-06: a selected creature shows its appetites as the bestiary reveals them, and a debug-only toggle shows everything. CRE-04, FIX-02, section 6.4, Appendix E: updated to match. New step 6b | The human's review of step 6 play: in cycle 1 most guests could not be soothed at all, and one turning set off the rest |
 | 1.9 | ARC-10, ARC-11: shop and item commands (`BuyOffer(section, index)`, `Reroll`, `LockShop`, `ChooseUpgrade`, `SellUnit`, `EquipItem`, `UnequipItem`, `SellItem`) and their refusal reasons. DAT-03: the optional `adjacentTo` parameter. BRD-01, SIM-04: a locked annex `room-3` and inn-item display spots in `inn.json`. FIX-03: adjacency rules and the two prototype examples. STF-06: a rank multiplies health, attack and soothe. STF-08: a pending pick blocks every other command. STF-09: starting staff count as hired for their base cost. STF-10: the D-065 note removed. STF-16: revealed ancestries are kept outside the session until the profile saves them. SHP-02, SHP-05, SHP-06: the shop's own random stream, rerolls refill every slot, the lock lasts one Dusk, item rarity weights. ITM-02, ITM-04: no staff items for the innkeeper; at most 12 inn items, never offered twice. SYN-01, SYN-02: bonuses go to every staff member on the board; one origin synergy per plane. SAV-01: the shop's random state and owned items are saved | Step 6 report (D-077 to D-083) |
@@ -519,7 +520,8 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
   `satisfiedAfterSeconds`; any rise restarts the count) is **satisfied**. It pays its tribute at once (with the same
   bonuses as at Dawn), stops wanting anything, walks out of the front door and dissolves there; nothing agitates it on
   the way. It counts as served for the bestiary (`BST-02`) and frees its place for new arrivals (`INV-05`). The cycle
-  log records it (`INV-12`).
+  log records it (`INV-12`). **Company comes first:** a guest with floor company that has not had its room session yet
+  is not satisfied, so it can still go to a room (`CMP-04`); it comes out calm and is satisfied after the usual time.
 
 ---
 
@@ -1154,7 +1156,7 @@ acceptance criteria and a demo. After each step the human builds, tests, plays t
 
 **Common preamble** (put before every step prompt):
 
-> You are implementing Misty Inn from SDD v1.11. Work **only** on the step below; do not start later steps. Read
+> You are implementing Misty Inn from SDD v1.12. Work **only** on the step below; do not start later steps. Read
 > sections 0, 2, 17 and 22 and the sections the step lists first. Apply the invariants (section 2) and the agent
 > rules (section 22). If anything is ambiguous, contradictory or missing, **stop and ask** before writing code. Do not
 > run builds, tests, Godot or git: list the exact commands for the human and mark results NOT RUN. Finish with the

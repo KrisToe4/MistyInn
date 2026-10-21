@@ -5,7 +5,7 @@ inn up at Dusk; the Mist phase then plays out automatically until Dawn. Godot 4.
 hobby prototype. It is built one step at a time from the design document.
 
 ## Read first
-- `docs/SDD.md`: the design document (SDD v1.11, approved). Before any work, read sections 0, 2, 17 and 22 and
+- `docs/SDD.md`: the design document (SDD v1.12, approved). Before any work, read sections 0, 2, 17 and 22 and
   Appendix A, plus the sections the requested step lists. Appendix D indexes every requirement ID; Appendix E is the
   glossary. Earlier versions are kept as `docs/SDD_v<version>.md`.
 - `docs/PROGRESS.md`: step status, build, test and smoke-run results, toolchain and package versions.
@@ -13,7 +13,7 @@ hobby prototype. It is built one step at a time from the design document.
 - `docs/ASSETS.md`: third-party assets and their licences (created when the first asset is added).
 
 ## Current state
-- SDD v1.11 is approved. Steps 0 to 6 are complete (step 6 demo not reported yet).
+- SDD v1.12 is approved. Steps 0 to 6 are complete (step 6 demo not reported yet).
 - Step 1 built the solution structure and the Core skeleton: `src/MistyInn.Core` (GameSession, SeededRandom, event
   buffer, cycle log, entity IDs), `tests/MistyInn.Core.Tests` (49/49 pass in the .NET SDK container), shared build
   settings (D-037), the classic `.sln` with export build types mapped by hand (D-035), and the Windows export preset
@@ -48,7 +48,8 @@ hobby prototype. It is built one step at a time from the design document.
   Company) stay home (`Unit.IsRunner`); left-drag pans the camera; the selection line shows bestiary-revealed appetites,
   with a debug-only toggle for everything. D-084 is Accepted.
 - Step 6c (SDD v1.11) is complete: build, 341/341 tests, smoke run and demo passed: a guest at 0 agitation for 5 s
-  pays its tribute and walks out (CRE-08); no edge panning (CAM-10). D-085 is Accepted. The next step is step 7 (roguelike layer).
+  pays its tribute and walks out (CRE-08); no edge panning (CAM-10). D-085 is Accepted; SDD v1.12 adds its Company-first rule to CRE-08. The next step is step 7
+  (roguelike layer).
 - Godot is at `C:\Godot_v4.7.2`. If Smart App Control blocks `dotnet test`, the tests run in the .NET SDK Linux
   container.
 
