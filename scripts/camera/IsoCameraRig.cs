@@ -19,9 +19,7 @@ public partial class IsoCameraRig : Node3D
 
     [Export] public float PanSpeed { get; set; } = 14f;
 
-    [Export] public bool EdgePanning { get; set; } = true;
 
-    [Export] public float EdgeMarginPixels { get; set; } = 12f;
 
     [Export] public float MinZoom { get; set; } = 8f;
 
@@ -29,8 +27,14 @@ public partial class IsoCameraRig : Node3D
 
     [Export] public float ZoomStep { get; set; } = 1.12f;
 
+    /// <summary>A left press must move this far before it pans instead of clicking (CAM-10).</summary>
+    [Export] public float DragThresholdPixels { get; set; } = 6f;
+
     private float _targetYaw;
     private bool _middleDragging;
+    private bool _leftHeld;
+    private bool _leftPanning;
+    private Vector2 _leftStart;
     private Vector2 _min = new(-20, -20);
     private Vector2 _max = new(20, 20);
 
@@ -50,6 +54,47 @@ public partial class IsoCameraRig : Node3D
         _min = min;
         _max = max;
         ClampPosition();
+    }
+
+    /// <summary>
+    /// A left press on open ground (CAM-10): it pans once the mouse moves past the threshold; until then it may still be
+    /// a click. GameRoot calls this only when the press did not start on a unit, a fixture or the UI.
+    /// </summary>
+    public void StartLeftPan(Vector2 at)
+    {
+        _leftHeld = true;
+        _leftPanning = false;
+        _leftStart = at;
+    }
+
+    /// <summary>Ends a left press; true if it panned (so it was not a click).</summary>
+    public bool EndLeftPan()
+    {
+        var panned = _leftPanning;
+        _leftHeld = false;
+        _leftPanning = false;
+        return panned;
+    }
+
+    public override void _Input(InputEvent @event)
+    {
+        // Read before the GUI, so a pan that crosses a panel keeps going.
+        if (@event is not InputEventMouseMotion motion || !_leftHeld)
+        {
+            return;
+        }
+
+        if (!_leftPanning && motion.Position.DistanceTo(_leftStart) > DragThresholdPixels)
+        {
+            _leftPanning = true;
+            FollowTarget = null;
+        }
+
+        if (_leftPanning)
+        {
+            var worldPerPixel = Camera.Size / GetViewport().GetVisibleRect().Size.Y;
+            PanBy(-motion.Relative * worldPerPixel);
+        }
     }
 
     public override void _UnhandledInput(InputEvent @event)
@@ -85,19 +130,6 @@ public partial class IsoCameraRig : Node3D
     {
         var dt = (float)delta;
         var input = Input.GetVector(InputActions.PanLeft, InputActions.PanRight, InputActions.PanUp, InputActions.PanDown);
-
-        if (EdgePanning && GetWindow().HasFocus())
-        {
-            var mouse = GetViewport().GetMousePosition();
-            var size = GetViewport().GetVisibleRect().Size;
-            if (mouse.X >= 0 && mouse.Y >= 0 && mouse.X <= size.X && mouse.Y <= size.Y)
-            {
-                if (mouse.X < EdgeMarginPixels) input.X -= 1;
-                if (mouse.X > size.X - EdgeMarginPixels) input.X += 1;
-                if (mouse.Y < EdgeMarginPixels) input.Y -= 1;
-                if (mouse.Y > size.Y - EdgeMarginPixels) input.Y += 1;
-            }
-        }
 
         if (input != Vector2.Zero)
         {

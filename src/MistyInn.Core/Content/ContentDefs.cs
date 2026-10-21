@@ -21,6 +21,8 @@ public sealed record ContentSet(
 /// <summary><c>balance.json</c>: the tuning values of section 6.4 and the run's starting set-up.</summary>
 /// <param name="PlanesPerCycle">Converging planes for cycles 1, 2, 3...; the last entry repeats; 0 means all unlocked.</param>
 /// <param name="RankStatMultipliers">Base-stat multipliers for ★1 to ★5 (STF-06).</param>
+/// <param name="BasicServiceSoothe">Basic service's soothe for a server who does not know Food (AGI-11).</param>
+/// <param name="SatisfiedAfterSeconds">How long agitation must stay at 0 before a guest is satisfied (CRE-08).</param>
 public sealed record BalanceDef(
     int RunLength,
     double MistDurationSeconds,
@@ -58,7 +60,9 @@ public sealed record BalanceDef(
     BestiaryBalanceDef Bestiary,
     CombatBalanceDef Combat,
     CompanyBalanceDef Company,
-    ShopDef Shop);
+    ShopDef Shop,
+    double BasicServiceSoothe = 0.3,
+    double SatisfiedAfterSeconds = 5);
 
 /// <summary>A bundle of supplies in the build menu (FIX-06).</summary>
 public sealed record SupplyBundleDef(int Amount, int Price);

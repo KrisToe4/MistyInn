@@ -102,6 +102,9 @@ public partial class Hud : CanvasLayer
 
     public bool IsPauseMenuOpen => _pauseMenu.Visible;
 
+    /// <summary>Debug builds only (UI-06, D-074): show every creature's hidden appetites and triggers when selected.</summary>
+    public bool ShowHiddenCreatureInfo { get; private set; }
+
     public override void _Ready()
     {
         var info = new VBoxContainer { Position = new Vector2(16, 12), MouseFilter = Control.MouseFilterEnum.Ignore };
@@ -241,7 +244,7 @@ public partial class Hud : CanvasLayer
         }
 
         _status.Text = status;
-        _purse.Text = $"{Tr("Silver")} {session.Silver}  ·  {Tr("Drink")} {session.Supplies[Supply.Drink]}  ·  {Tr("Food")} {session.Supplies[Supply.Food]}"
+        _purse.Text = $"{Tr("Silver")} {session.Silver}  ·  {Tr("Drink")} {session.Supplies[Supply.Drink]}"
                       + $"  ·  {Tr("Integrity")} {Mathf.CeilToInt(session.Integrity)}/{Mathf.CeilToInt(session.MaxIntegrity)}";
         _forecast.Text = Forecast(session);
         _slots.Text = $"{Tr("Staff on the floor")}: {session.StaffOnBoard}/{session.MaxStaffOnBoard}";
@@ -255,7 +258,7 @@ public partial class Hud : CanvasLayer
         var missing = session.MaxIntegrity - session.Integrity;
         _repairBar.Visible = session.Phase == Phase.Dawn && missing > 0;
         _repairAll.Text = $"{Tr("Repair all")} ({Mathf.CeilToInt(missing / session.Content.Balance.Combat.IntegrityPerSilver)} {Tr("silver")})";
-        _devPanel.Visible = dusk && OS.IsDebugBuild();
+        _devPanel.Visible = session.Phase is Phase.Dusk or Phase.Mist && OS.IsDebugBuild();
         DevPanelOnce(session);
 
         RefreshBench(session.Units);
@@ -460,6 +463,10 @@ public partial class Hud : CanvasLayer
         hosting.Toggled += Changed;
         _devList.AddChild(blood);
         _devList.AddChild(hosting);
+
+        var hidden = new CheckButton { Text = Tr("Show hidden creature info") };
+        hidden.Toggled += on => ShowHiddenCreatureInfo = on;
+        _devList.AddChild(hidden);
 
         AddLabel(_devList, 15).Text = Tr("Converge only:");
         foreach (var plane in session.Content.Planes)

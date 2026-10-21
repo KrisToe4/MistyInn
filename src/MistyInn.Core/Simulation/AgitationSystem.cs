@@ -45,7 +45,8 @@ internal sealed class AgitationSystem
     {
         var turnedNow = new Queue<Creature>();
 
-        foreach (var creature in _run.Creatures.Where(c => !c.IsTurned))
+        // A satisfied guest on its way out is beyond agitation (CRE-08).
+        foreach (var creature in _run.Creatures.Where(c => !c.IsTurned && !c.IsLeaving))
         {
             var previousServer = creature.ServedBy;
             creature.ServedBy = rates.TryGetValue(creature.Id, out var served) ? served.By : null;
@@ -169,7 +170,7 @@ internal sealed class AgitationSystem
         while (turnedNow.Count > 0)
         {
             var turned = turnedNow.Dequeue();
-            foreach (var other in _run.CreaturesOnTheFloor.Where(c => !c.IsTurned && c.Position.DistanceTo(turned.Position) <= Tuning.ContagionRadius).ToList())
+            foreach (var other in _run.CreaturesOnTheFloor.Where(c => !c.IsTurned && !c.IsLeaving && c.Position.DistanceTo(turned.Position) <= Tuning.ContagionRadius).ToList())
             {
                 other.Agitation += Tuning.ContagionAgitation;
                 _sink.Log("agitation.contagion", "creature.turned", other.Id.ToRef(), turned.Id.ToRef());

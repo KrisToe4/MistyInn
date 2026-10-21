@@ -279,8 +279,10 @@ public static partial class ContentValidator
                 var where = $"techniques.json: technique '{t.Id}'";
                 if (t.Class != TechniqueCatalog.ClassOf(t.Technique))
                     Error($"{where}: {t.Technique} belongs to {TechniqueCatalog.ClassOf(t.Technique)}, not {t.Class} (STF-02).");
-                if ((t.Answers is null || t.Answers.Count == 0) && !t.EngagesTurned)
+                if ((t.Answers is null || t.Answers.Count == 0) && !t.EngagesTurned && t.Technique != Technique.Food)
                     Error($"{where}: answers no appetite and engages no turned creature.");
+                if (t.Technique == Technique.Food && (t.Answers is { Count: > 0 } || t.Supply is not null || !t.NeedsFixture))
+                    Error($"{where}: Food is basic service at tables: it answers no appetite, uses no supply and needs a table (AGI-11).");
                 if (t.Soothe < 0 || t.Capacity < 1 || t.Range <= 0) Error($"{where}: soothe, capacity or range is out of range.");
                 if (t.NeedsFixture && !_set.Fixtures.Any(f => (f.Effects ?? []).Any(e => e.Kind == EffectKind.Enables && e.Technique == t.Id)))
                     Error($"{where}: needs a fixture, but no fixture enables it (BRD-02).");
@@ -511,7 +513,8 @@ public static partial class ContentValidator
             if (b.RunLength < 1 || b.MistDurationSeconds <= 0 || b.BaseArrivalIntervalSeconds <= 0 || b.ArrivalIntervalPerCycle <= 0
                 || b.ConvergenceArrivalMultiplier <= 0 || b.MaxCreatures < 1 || b.BaseStaffSlots < 1
                 || b.MaxStaffSlots < b.BaseStaffSlots || b.BenchSize < 1 || b.Integrity < 1 || b.Rooms < 0
-                || b.StaffItemSlots < 0 || b.ItemStorage < 0 || b.MaxInnItemsShown < 0 || b.AncestrySoothe < 1)
+                || b.StaffItemSlots < 0 || b.ItemStorage < 0 || b.MaxInnItemsShown < 0 || b.AncestrySoothe < 1
+                || b.BasicServiceSoothe is <= 0 or > 1 || b.SatisfiedAfterSeconds <= 0)
                 Error($"{where}: a value is out of range.");
             if (b.ArrivalStopBeforeDawnSeconds < 0 || b.ArrivalStopBeforeDawnSeconds >= b.MistDurationSeconds)
                 Error($"{where}: arrivals must stop between 0 s and the end of the mist.");

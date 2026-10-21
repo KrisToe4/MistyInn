@@ -6,8 +6,8 @@ namespace MistyInn.Core.Content;
 /// <summary>What a creature wants (AGI-05).</summary>
 public enum Appetite
 {
-    Drink,
-    Food,
+    /// <summary>Strong drink at the bar (the Drink technique). Food and ordinary drink are basic service (AGI-11).</summary>
+    Alcohol,
     Company,
     Gambling,
     Music,
@@ -69,11 +69,10 @@ public enum Technique
     Tales,
 }
 
-/// <summary>The supplies that some techniques use (FIX-06).</summary>
+/// <summary>The supplies that some techniques use (FIX-06): Drink, for the Drink technique.</summary>
 public enum Supply
 {
     Drink,
-    Food,
 }
 
 /// <summary>The stages of a turned creature (ESC-01).</summary>

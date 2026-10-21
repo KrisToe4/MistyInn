@@ -89,6 +89,8 @@ proposed details were approved with SDD v1.0 (2026-10-20). **Proposed** marks a 
 | D-081 | Ranks, the pending pick, selling and the starting staff's value | Accepted | 2026-10-20 | STF-06, STF-08, STF-09, STF-10, ARC-11 |
 | D-082 | Revealed ancestries live outside the session | Accepted | 2026-10-20 | STF-15, STF-16, MET-01 |
 | D-083 | Items: instance IDs, slots, storage and how each prototype effect applies | Accepted | 2026-10-20 | ITM-01..07, DAT-03 |
+| D-084 | Basic service, runners and homes: implementation details | Accepted | 2026-10-21 | AGI-05, AGI-11, STF-04, ESC-06, CRE-04, CAM-10, UI-06 |
+| D-085 | Satisfied guests: implementation details | Accepted | 2026-10-21 | CRE-05, CRE-08, BST-02, CAM-10 |
 
 ---
 
@@ -1029,3 +1031,44 @@ proposed details were approved with SDD v1.0 (2026-10-20). **Proposed** marks a 
   staff limit and `Stat` with `target: Innkeeper` changes the innkeeper (Cursed Crown). Inn items work from purchase;
   every item sells for half its price.
 - **Requirement IDs affected:** ITM-01, ITM-02, ITM-03, ITM-04, ITM-05, ITM-06, ITM-07, DAT-03.
+
+## D-084 Basic service, runners and homes: implementation details
+- **Status:** Accepted (2026-10-21)
+- **Date / step:** 2026-10-21, step 6b
+- **Context:** SDD v1.10 (the human's redesign after step 6 play) leaves some mechanics to the implementation.
+- **Decision:**
+  - The Food technique's data entry stands for basic service: it answers no appetite, needs a table (a fixture that
+    enables Food), uses no supply and has soothe 0.6. Anyone can give it at `basicServiceSoothe` (0.3); a unit that
+    knows Food gives it at 0.6. Basic service counts as a craved appetite (strength 1). The validator requires Food to
+    stay this way.
+  - Runners re-plan every step. A runner serves what is in reach when nothing better waits elsewhere; otherwise it
+    walks towards the best creature it can serve (value, then distance, then ID) that no other runner has claimed, and
+    stops when it is in reach. With nothing to do it walks home (the combat system's return walk). The innkeeper is a
+    runner with basic service only; it still strikes turned creatures in reach and does not chase them.
+  - A creature with no match for its appetites takes a free seat at a table; with none free it wanders (CRE-04).
+  - Supplies: only `Drink`. The four creature appetites that were `Drink` became `Alcohol`; no creature had `Food`.
+  - Camera (CAM-10): a left press on open ground (no unit or fixture under it, not on the UI) pans after 6 px of
+    movement. During the mist, selection now happens on release, so a drag pans instead of selecting.
+  - UI-06: the selection line shows a creature's appetites once Studied and its triggers once Understood, "?" before.
+    The dev panel (debug builds) gains "Show hidden creature info" and is shown during the mist as well as at Dusk.
+- **Requirement IDs affected:** AGI-05, AGI-11, STF-02, STF-04, ESC-06, CRE-04, FIX-06, CAM-10, UI-06.
+
+## D-085 Satisfied guests: implementation details
+- **Status:** Accepted (2026-10-21)
+- **Date / step:** 2026-10-21, step 6c
+- **Context:** SDD v1.11 adds satisfied guests (CRE-08) and removes edge panning (CAM-10).
+- **Decision:**
+  - The check runs each step after agitation: a guest (not turned, not in a room, not already leaving) whose
+    agitation is 0 starts a timer; any rise clears it. At `satisfiedAfterSeconds` it pays its tribute plus `Tribute`
+    effects, raising `CreatureSatisfied` and `TributeLeft` (so the Dawn summary's tribute total includes it), and walks
+    to the front door as `Leaving`; there it dissolves (`CreatureDissolved`, logged `creature.left`).
+  - Company first (the human's answer after the first test run): a guest with floor company that has not had its room
+    session yet is not satisfied, so it can still go to a room (CMP-04); it comes out calm and is satisfied 5 s later.
+  - A leaving guest is beyond agitation and contagion and cannot be served (its served-by mark is cleared); a turned
+    creature can still attack it.
+  - Studied progress is given once per creature type per cycle, whether at Dawn or on leaving
+    (`RunState.StudiedThisCycle`).
+  - Edge panning is removed from the camera rig (its two exported settings go with it).
+  - One step 4 Dawn test sets `satisfiedAfterSeconds` very high so its served guest stays until Dawn; no `data/`
+    value changed for it (AGT-14).
+- **Requirement IDs affected:** CRE-05, CRE-08, CMP-04, BST-02, CAM-10.

@@ -3,8 +3,8 @@
 
 | | |
 |---|---|
-| **Version** | 1.9 (approved) |
-| **Supersedes** | 1.8 |
+| **Version** | 1.11 (approved) |
+| **Supersedes** | 1.10 |
 | **Audience** | LLM-based coding agents and the human developer |
 | **Genre** | Dark roguelike autobattler: prepare the inn, then survive the mist |
 | **Engine** | Godot 4.7.2 (.NET build) |
@@ -76,6 +76,8 @@ step starts.
 
 | Version | Change | Reason |
 |---|---|---|
+| 1.11 | New CRE-08: a guest whose agitation stays at 0 for 5 s (`balance.json`) is **satisfied**: it pays its tribute at once (with item and synergy bonuses), walks out of the front door and dissolves, and counts as served for the bestiary. CRE-05: a satisfied guest is gone by Dawn and pays nothing more. CAM-10: no panning at the screen edges. Section 6.4: the satisfaction time. New step 6c | The human's review of step 6b |
+| 1.10 | Basic service and moving staff. AGI-05: `Alcohol` replaces the `Drink` and `Food` appetites. New AGI-11: any staff member or the innkeeper can give **basic service** (food and drink) to any creature seated at a table, at ×0.3 of a craved appetite, with no supplies; the Food technique gives it at ×0.6. AGI-06, AGI-07, FIX-06, RUN-01: only `Drink` supplies, used by the Drink technique for `Alcohol`. STF-02: Drink answers `Alcohol`; Food is better basic service. STF-04: each staff member's placed tile is its **home**; fighters (bouncers) and companions stay there, everyone else walks to guests and fixtures to serve and drifts home when idle; the main class decides for two-class characters. ESC-06: the innkeeper walks to tables to give basic service. ESC-07: fighters guard from their home. CAM-10: dragging the left mouse button on open ground pans the camera. UI-06: a selected creature shows its appetites as the bestiary reveals them, and a debug-only toggle shows everything. CRE-04, FIX-02, section 6.4, Appendix E: updated to match. New step 6b | The human's review of step 6 play: in cycle 1 most guests could not be soothed at all, and one turning set off the rest |
 | 1.9 | ARC-10, ARC-11: shop and item commands (`BuyOffer(section, index)`, `Reroll`, `LockShop`, `ChooseUpgrade`, `SellUnit`, `EquipItem`, `UnequipItem`, `SellItem`) and their refusal reasons. DAT-03: the optional `adjacentTo` parameter. BRD-01, SIM-04: a locked annex `room-3` and inn-item display spots in `inn.json`. FIX-03: adjacency rules and the two prototype examples. STF-06: a rank multiplies health, attack and soothe. STF-08: a pending pick blocks every other command. STF-09: starting staff count as hired for their base cost. STF-10: the D-065 note removed. STF-16: revealed ancestries are kept outside the session until the profile saves them. SHP-02, SHP-05, SHP-06: the shop's own random stream, rerolls refill every slot, the lock lasts one Dusk, item rarity weights. ITM-02, ITM-04: no staff items for the innkeeper; at most 12 inn items, never offered twice. SYN-01, SYN-02: bonuses go to every staff member on the board; one origin synergy per plane. SAV-01: the shop's random state and owned items are saved | Step 6 report (D-077 to D-083) |
 | 1.8 | BRD-01: each back room is its own zone with a `RoomDoor` tile. BRD-06: integrity loses 25 % of fixture and door damage, and walls take damage directly. BRD-07: fixtures repair automatically and for free at Dawn; integrity costs 1 silver per 5 points. ESC-01: Prey does not target the innkeeper. ESC-06: the innkeeper strikes back from its post. CMP-04: one room session per guest per cycle; doors have health. STF-01: `prefers` and `refuses` lists. Section 6.4: `combat` and `company` tuning. ARC-11: development-only commands, and `SetContentFilters` in every phase | Step 5 report (D-069 to D-076) |
 | 1.7 | INV-12: the cycle log records causes and turning points, not every step of agitation. STF-10: until step 6 adds ranks, each unit knows only its ★1 base technique | Step 4 report (D-065 to D-068) |
@@ -404,7 +406,7 @@ Main (Node3D, GameRoot.cs)
 - **RUN-01** A run starts from a seed (random unless the player enters one) and the profile's unlocks. A new run
   starts at cycle 1 with the starting silver, the innkeeper, two starting staff at ★1, the base fixtures and supplies
   in storage, to be placed at the first Dusk (`balance.json`: a bar counter, two tables, a hearth and a lantern; 6
-  Drink and 4 Food), and no items.
+  Drink), and no items.
 - **RUN-02** A run is **won** by surviving the last cycle (`RunLength`, default 10). The last cycle is the
   **Convergence**: every unlocked plane opens at once and arrivals are faster.
 - **RUN-03** A run is **lost** at once when the innkeeper falls (`ESC-06`), or at the end of a mist phase if the inn's
@@ -455,6 +457,8 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
 | Shop offers | 3 staff + 3 items per Dusk |
 | Draw weights | pity ×1.5; home plane ×2 (`SHP-04`) |
 | Ancestry soothe bonus | ×1.25 (`STF-16`) |
+| Basic service | ×0.3 of a craved appetite; ×0.6 with the Food technique; one creature at a time (`AGI-11`) |
+| Satisfied guests | agitation 0 for 5 s: pays its tribute and leaves (`CRE-08`) |
 | Reroll cost | 2, then +1 per reroll in the same cycle; resets each Dusk |
 | Staff price | base cost (1-3) + 2 per rank above ★1 |
 | Rank odds | see `SHP-03` |
@@ -504,13 +508,18 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
   attack, attack interval, range, speed, armour), an escalation profile (`ESC-02`) and a tribute value.
 - **CRE-04** On arrival, a creature walks in through the front door and looks for something that matches one of its
   appetites: a free seat at the bar, a hearth, a table, a card table, the stage, a staff member offering company. It
-  walks to the best match it can reach
-  (`AGI-05`), or wanders the common room if there is none.
+  walks to the best match it can reach (`AGI-05`). With no match it takes a free seat at a table, where anyone can bring
+  it basic service (`AGI-11`), or wanders the common room if every table seat is taken.
 - **CRE-05** At dawn, a creature that has not turned leaves a **tribute** (silver, by its tribute value) and
-  dissolves. A turned creature dissolves with no tribute.
+  dissolves. A turned creature dissolves with no tribute. A satisfied creature (`CRE-08`) has already paid and left.
 - **CRE-06** Creatures act only through the simulation's rules; the player never commands them (`SCP-25`).
 - **CRE-07** Every creature that can take part in the Company service is sapient and adult (`RAT-01`); the data has
   `"sapient": true` and `"adult": true`, and the validator checks both (`DAT-04`).
+- **CRE-08** **Satisfied guests.** A creature whose agitation stays at 0 for 5 s (`balance.json`
+  `satisfiedAfterSeconds`; any rise restarts the count) is **satisfied**. It pays its tribute at once (with the same
+  bonuses as at Dawn), stops wanting anything, walks out of the front door and dissolves there; nothing agitates it on
+  the way. It counts as served for the bestiary (`BST-02`) and frees its place for new arrivals (`INV-05`). The cycle
+  log records it (`INV-12`).
 
 ---
 
@@ -535,17 +544,25 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
 
 ## 9.2 Appetites: keeping them occupied
 
-- **AGI-05** An appetite is something a creature wants: `Drink`, `Food`, `Company`, `Gambling`, `Music`,
-  `Spectacle`, `Brawl`, `Warmth`, `Quiet`, `Darkness`, `Order` (closed set, `DAT-03`). Each creature has one to three
-  appetites, each with a strength: **craves** (×1.0), **likes** (×0.5). An appetite may also name a **preferred
-  technique** (for example `Gambling` preferring Dice); served with that technique, it soothes ×1.25.
+- **AGI-05** An appetite is something a creature wants: `Alcohol`, `Company`, `Gambling`, `Music`, `Spectacle`, `Brawl`,
+  `Warmth`, `Quiet`, `Darkness`, `Order` (closed set, `DAT-03`). Food and ordinary drink are not appetites: every
+  creature takes them as basic service (`AGI-11`). Each creature has one to three appetites, each with a strength:
+  **craves** (×1.0), **likes** (×0.5). An appetite may also name a **preferred technique** (for example `Gambling`
+  preferring Dice); served with that technique, it soothes ×1.25.
 - **AGI-06** A creature is **occupied** while it is being served one of its appetites, by a staff member's technique
-  (`STF-03`) or by a fixture (a Hearth giving `Warmth`, a quiet corner giving `Quiet`). While occupied, its agitation
-  falls at the provider's **soothe** rate × the appetite strength, instead of rising.
+  (`STF-03`) or by a fixture (a Hearth giving `Warmth`, a quiet corner giving `Quiet`), or given basic service
+  (`AGI-11`). While occupied, its agitation falls at the provider's **soothe** rate × the appetite strength (× the basic
+  service value for basic service), instead of rising.
 - **AGI-07** A provider can serve a limited number of creatures at once: each technique states its capacity (a
   Drink technique: 1; Song: everyone in the zone; Cards: the seats at a card table; a Hearth: the 4 nearest tiles).
-  Techniques that need supplies (`Drink`, `Food`) use one supply per serving; with no supplies left they cannot be
-  used (`FIX-06`).
+  The Drink technique uses one `Drink` supply per serving; with none left it cannot be used (`FIX-06`). Basic service
+  uses no supplies.
+- **AGI-11** **Basic service.** Any staff member, and the innkeeper, can bring food and drink to any creature seated at
+  a table (a seat of a fixture that enables the Food technique), whatever its appetites. It soothes at the server's
+  soothe × rank × 0.3 (`balance.json`), as if the creature craved it; a server who knows the Food technique gives it at
+  the Food technique's soothe (0.6) instead. It serves one creature at a time, uses no supplies, counts as being served
+  (tributes, `BST-02`), and is chosen only when nothing better is in reach (`STF-04`). It means a guest can always be
+  soothed a little; it is not enough on its own against many guests.
 
 ## 9.3 Triggers and contagion
 
@@ -586,11 +603,12 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
   armour and speed. A hit does `max(1, attack − armour)` damage. There are no random critical hits or misses; variety
   comes from positions, timing and abilities.
 - **ESC-06** The innkeeper is a unit with low attack and moderate health. The player places it during Dusk like any
-  other unit (it may not be sold or benched). It never leaves its post, but strikes the nearest turned creature in
-  reach (D-073). **If the innkeeper falls, the run ends at once** (`RUN-03`).
+  other unit (it may not be sold or benched). It knows no technique but walks from its post to give basic service at
+  tables (`AGI-11`), and strikes the nearest turned creature in reach (D-073); it does not chase turned creatures. **If
+  the innkeeper falls, the run ends at once** (`RUN-03`).
 - **ESC-07** Staff with a Fighter technique (Fists or Weapons, `STF-02`) engage any turned creature in their zone or
-  within their guard radius, in order of threat (Hunt before Prey before Wreck, then nearest). Engaging a turned
-  creature always takes priority over serving appetites (`STF-04`).
+  within their guard radius of their home (`STF-04`), in order of threat (Hunt before Prey before Wreck, then nearest).
+  Engaging a turned creature always takes priority over serving appetites (`STF-04`).
 - **ESC-08** A turned creature reduced to 0 health is **banished**: it dissolves into mist, leaves no tribute, and
   gives bestiary progress (`BST-02`).
 - **ESC-09** A staff member reduced to 0 health **falls**. At Dawn, a fallen staff member is wounded (70 %) or dead
@@ -616,8 +634,8 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
   | Class | Technique | Answers | Notes |
   |---|---|---|---|
   | **Companion/Server** | Company | `Company` | On the floor or in a room (section 11.5) |
-  | | Food | `Food` | Needs a table; uses a Food supply |
-  | | Drink | `Drink` | Needs a bar counter; uses a Drink supply |
+  | | Food | Basic service (`AGI-11`) | At a table; better basic service (×0.6 instead of ×0.3); no supplies |
+  | | Drink | `Alcohol` | Needs a bar counter; uses a Drink supply |
   | | Comfort | `Quiet` | A soft voice and full attention; no supplies; one creature at a time |
   | **Gambler** | Cards | `Gambling` (skill); `Order` | Needs a card table; a game with strict rules also answers `Order` |
   | | Dice | `Gambling` (chance) | Needs a card table or any table |
@@ -634,14 +652,22 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
   its mastery values (`STF-17`) and, for Fighter techniques, its attack modifiers.
 - **STF-03** A character **has a class** if it knows at least one technique of that class. Items may add further
   class **tags**, which count only for synergies (`ITM-03`).
-- **STF-04** **What staff do in the mist phase.** Each time a staff member is free, it chooses in this order:
-  1. If it knows a Fighter technique and a turned creature is within its guard radius: engage it (`ESC-07`).
-  2. Otherwise, the technique and creature pair in reach with the highest value: appetite strength × preferred
-     technique bonus × the technique's soothe, respecting capacity, required fixtures, supplies and refusals
-     (`CMP-02`). Ties go to the lowest creature ID (`INV-02`).
-  3. Otherwise, wait at its post.
+- **STF-04** **What staff do in the mist phase.** The tile where the player places a staff member is its **home**.
+  Its role comes from its main class (for a character with two classes, the main class decides): a **bouncer**
+  (main class Fighter) and a **companion** (knows Company and its main class is not Fighter) stay at home; every other
+  staff member, and the innkeeper, is a **runner** and walks the floor. Each time a staff member is free, it chooses
+  in this order:
+  1. If it knows a Fighter technique and a turned creature is within its guard radius of its home: engage it
+     (`ESC-07`).
+  2. Otherwise, the technique and creature pair with the highest value: appetite strength × preferred technique bonus
+     × the technique's soothe, respecting capacity, required fixtures, supplies and refusals (`CMP-02`); basic
+     service (`AGI-11`) counts at its own value. A bouncer or companion considers only creatures in reach of its
+     home; a runner considers any creature it can walk to that no other runner is going to, and walks to a spot in
+     reach (for a technique that needs a fixture, in reach of that fixture). Ties go to the nearest, then the lowest
+     creature ID (`INV-02`).
+  3. Otherwise, a runner walks back home; a bouncer or companion waits there.
 
-  Staff stay at their placed tile, except fighters who engage and companions who go to a room (`CMP-04`).
+  A companion also leaves home to go to a room (`CMP-04`), and a fighter to engage (`ESC-07`).
 - **STF-05** Staff on the bench do nothing during the mist phase and cannot be hurt.
 
 ## 11.2 Ranks and upgrade trees
@@ -756,8 +782,8 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
 
   | Fixture | Effect |
   |---|---|
-  | Bar counter | Lets the Drink technique serve; 3 seats |
-  | Table | Lets the Food and Dice techniques serve; 2 seats |
+  | Bar counter | Lets the Drink technique serve `Alcohol`; 3 seats |
+  | Table | Basic service for anyone seated (`AGI-11`), better with Food; lets the Dice technique serve; 2 seats |
   | Card table | Lets the Cards and Dice techniques serve 4 seats |
   | Stage | Song and Dance from the stage reach the whole zone and one more; `Noise` trigger within 4 tiles |
   | Hearth | Gives `Warmth` to the 4 nearest tiles; `Heat` trigger within 3 tiles |
@@ -778,8 +804,8 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
   a specific fixture ID.
 - **FIX-05** **The build menu** is a fixed catalogue: every unlocked fixture, always available at a fixed price,
   separate from the random shop. Built fixtures go to storage until placed. Fixtures sell back for half.
-- **FIX-06** **Supplies** (`Drink`, `Food`) are bought in bundles from the build menu at Dusk and used by the Drink and
-  Food techniques (`AGI-07`). Unused supplies carry over.
+- **FIX-06** **Supplies** (`Drink`) are bought in bundles from the build menu at Dusk and used by the Drink technique
+  for `Alcohol` (`AGI-07`). Basic service needs none. Unused supplies carry over.
 
 ---
 
@@ -914,8 +940,9 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
 ## 15.1 Camera and input
 
 - **CAM-10** An isometric-style camera (orthographic or a narrow-FOV perspective, about 45° down) looking at the inn.
-  Pan with WASD, the arrow keys, the middle mouse button or the screen edges; zoom with the wheel; rotate in 90° steps
-  with Q and E. The camera stays inside the clearing.
+  Pan with WASD, the arrow keys, the middle mouse button, or by dragging the left mouse button on open ground (no
+  panning at the screen edges) (a press that starts on a unit, a fixture or the UI drags or selects that instead, and a click without a
+  drag still selects); zoom with the wheel; rotate in 90° steps with Q and E. The camera stays inside the clearing.
 - **CAM-11** The roof and the wall nearest the camera fade out so the board is always visible.
 - **CAM-12** During the mist phase, clicking a unit or creature selects it and shows its panel; F follows the
   selected one. Selection never changes the simulation (`SCP-25`).
@@ -937,8 +964,10 @@ Dusk (setup, untimed) ──BeginMist──▶ Mist (automatic, timed) ──tim
 - **UI-05** Over each creature: an agitation bar coloured by state (Calm, Restless, Menacing, Turned) and an icon for
   what it is doing. Over each unit: a health bar and an icon for what it is doing.
 - **UI-06** Unit and creature panels: for staff, rank, classes, origin, ancestry (shown as "?" until revealed), known
-  techniques, the upgrade tree (chosen, available and locked options), items and stats; for creatures, appetites, preferred techniques and triggers (only what the
-  bestiary has revealed); for both, the current activity.
+  techniques, the upgrade tree (chosen, available and locked options), items and stats; for creatures, appetites,
+  preferred techniques and triggers (only what the bestiary has revealed, "?" for the rest); for both, the current
+  activity. Until the UI pass (step 9) the selection line stands in for the panels. In debug builds only, a dev panel
+  toggle shows every creature's hidden appetites and triggers, for testing; it never changes the bestiary (D-074).
 - **UI-07** Dawn summary: tributes, turned creatures, banished creatures, fallen and dead staff, damage, new bestiary
   entries, and the **cycle timeline**: the cycle log (`INV-12`) as a scrubbable timeline that explains each turn and
   death.
@@ -1125,7 +1154,7 @@ acceptance criteria and a demo. After each step the human builds, tests, plays t
 
 **Common preamble** (put before every step prompt):
 
-> You are implementing Misty Inn from SDD v1.9. Work **only** on the step below; do not start later steps. Read
+> You are implementing Misty Inn from SDD v1.11. Work **only** on the step below; do not start later steps. Read
 > sections 0, 2, 17 and 22 and the sections the step lists first. Apply the invariants (section 2) and the agent
 > rules (section 22). If anything is ambiguous, contradictory or missing, **stop and ask** before writing code. Do not
 > run builds, tests, Godot or git: list the exact commands for the human and mark results NOT RUN. Finish with the
@@ -1228,6 +1257,37 @@ item part).
 synergy thresholds.
 **Demo:** Hire a character at ★2, find them again in the shop, upgrade them to ★3 and branch into a second class; buy
 an inn item and see it in the inn.
+
+## Step 6b: Basic service and moving staff
+
+**Read:** 9.2, 11.1, 10.2 (`ESC-06`, `ESC-07`), 12.2.
+**Prompt:** Replace the `Drink` and `Food` appetites with `Alcohol` and update the data (Drink answers `Alcohol`; only
+`Drink` supplies). Add basic service at tables for every staff member and the innkeeper, better with the Food
+technique. Give staff homes and roles: bouncers and companions stay home, runners and the innkeeper walk to guests and
+fixtures to serve and go home when idle, without two runners going to the same creature. Update the views so moving
+staff and the innkeeper are shown walking. Let the player pan the camera by dragging the left mouse button on open
+ground, without breaking unit and fixture drags or selection. Show a selected creature's appetites (and triggers) as
+far as the bestiary has revealed them, with a dev panel toggle in debug builds that shows everything.
+**Covers:** AGI-05, AGI-06, AGI-07, AGI-11, STF-02, STF-04, ESC-06, ESC-07, CRE-04, FIX-02, FIX-06, RUN-01, CAM-10, UI-06.
+**Acceptance:** Tests for basic service (any seated creature, the rate, Food's better rate, no supplies, chosen only
+when nothing better is in reach), the Alcohol appetite and Drink supplies, runners walking to a creature and back
+home, bouncers and companions staying home, the main class deciding the role, no two runners on one creature, and the
+innkeeper serving at a table.
+**Demo:** Start a run with only the starting staff: guests that nobody can serve properly sit at tables and are soothed
+a little; runners and the innkeeper walk between tables, the fighter stays by the door. Drag the left mouse button on
+the grass outside the inn to pan the camera; dragging a staff member still moves them. Click a guest during the mist:
+its appetites show as "?" until studied; tick the dev panel's "Show hidden creature info" to see them all.
+
+## Step 6c: Satisfied guests and camera edges
+
+**Read:** 8 (`CRE-05`, `CRE-08`), 15.1.
+**Prompt:** A guest whose agitation stays at 0 for the satisfaction time pays its tribute at once, walks out of the front
+door and dissolves, and counts as served for the bestiary; it pays nothing at Dawn. Remove panning at the screen edges.
+**Covers:** CRE-05, CRE-08, CAM-10.
+**Acceptance:** Tests for the satisfaction timer (0 agitation for the whole time, any rise restarting it), the payment
+with bonuses, the guest leaving by the front door and dissolving, no tribute again at Dawn, and the bestiary credit.
+**Demo:** Serve a guest until its meter empties; 5 s later it pays, walks out and fades; the silver shows at once.
+Moving the mouse to the screen edge no longer moves the camera.
 
 ## Step 7: Roguelike layer
 
@@ -1410,7 +1470,7 @@ Every requirement ID in this document, in order. Generated from the text by `too
 regenerate it whenever the SDD changes.
 
 <!-- REQUIREMENT-INDEX:START -->
-249 requirements.
+251 requirements.
 
 | ID | Summary | Section |
 |---|---|---|
@@ -1496,13 +1556,15 @@ regenerate it whenever the SDD changes.
 | CRE-05 | At dawn, a creature that has not turned leaves a tribute (silver, by its tribute... | 8 |
 | CRE-06 | Creatures act only through the simulation's rules; the player never commands them... | 8 |
 | CRE-07 | Every creature that can take part in the Company service is sapient and adult... | 8 |
+| CRE-08 | Satisfied guests. A creature whose agitation stays at 0 for 5 s (`balance.json`... | 8 |
 | AGI-01 | Each creature has agitation from 0 to 100, starting at its arrival value (usually 10-30) | 9.1 |
 | AGI-02 | Agitation rises at the creature's base rate every second | 9.1 |
 | AGI-03 | Thresholds: | 9.1 |
 | AGI-04 | A turned creature stays turned until it is banished (reduced to 0 health) or dawn breaks | 9.1 |
-| AGI-05 | An appetite is something a creature wants: `Drink`, `Food`, `Company`, `Gambling`,... | 9.2 |
+| AGI-05 | An appetite is something a creature wants: `Alcohol`, `Company`, `Gambling`, `Music`,... | 9.2 |
 | AGI-06 | A creature is occupied while it is being served one of its appetites, by a staff... | 9.2 |
 | AGI-07 | A provider can serve a limited number of creatures at once: each technique states its... | 9.2 |
+| AGI-11 | Basic service. Any staff member, and the innkeeper, can bring food and drink to any... | 9.2 |
 | AGI-08 | A trigger is a condition that raises a creature's agitation at once or speeds it up... | 9.3 |
 | AGI-09 | Contagion: when a creature turns, every creature within 4 tiles that sees it gains +15... | 9.3 |
 | AGI-10 | Triggers and appetites are hidden until the bestiary reveals them (`BST-02`), but... | 9.3 |
@@ -1519,7 +1581,7 @@ regenerate it whenever the SDD changes.
 | STF-01 | Staff are unique named characters (`data/staff.json`), each with an ID, a name, an... | 11.1 |
 | STF-02 | Classes and their techniques (closed sets, `DAT-03`): | 11.1 |
 | STF-03 | A character has a class if it knows at least one technique of that class | 11.1 |
-| STF-04 | What staff do in the mist phase. Each time a staff member is free, it chooses in this... | 11.1 |
+| STF-04 | What staff do in the mist phase. The tile where the player places a staff member is... | 11.1 |
 | STF-05 | Staff on the bench do nothing during the mist phase and cannot be hurt | 11.1 |
 | STF-06 | Characters have five ranks, ★1 to ★5 | 11.2 |
 | STF-07 | Each character has an upgrade tree: for each of ranks ★2 to ★5, two or three options,... | 11.2 |
@@ -1551,7 +1613,7 @@ regenerate it whenever the SDD changes.
 | FIX-03 | Adjacency effects apply to fixtures and units next to each other (8 neighbours) | 12.2 |
 | FIX-04 | Fixture effects are applied by Core systems reading the board's modifiers, never by... | 12.2 |
 | FIX-05 | The build menu is a fixed catalogue: every unlocked fixture, always available at a... | 12.2 |
-| FIX-06 | Supplies (`Drink`, `Food`) are bought in bundles from the build menu at Dusk and used... | 12.2 |
+| FIX-06 | Supplies (`Drink`) are bought in bundles from the build menu at Dusk and used by the... | 12.2 |
 | SHP-01 | Silver is the run's only currency | 13.1 |
 | SHP-02 | Each Dusk the shop shows 3 staff offers and 3 item offers, drawn with the shop's own... | 13.1 |
 | SHP-03 | Rank odds grow over the run (tuning values in `data/balance.json`): | 13.1 |
@@ -1664,7 +1726,7 @@ regenerate it whenever the SDD changes.
 | AGT-13 | Keep `README.md` current when controls, run instructions or the folder layout change | 22 |
 | AGT-14 | Balance changes go in `data/`, with a decision entry (section 0.1) | 22 |
 
-**By prefix:** `SCP` (22), `INV` (12), `STR` (11), `ARC` (11), `SIM` (4), `RUN` (4), `CYC` (6), `PLN` (5), `CRE` (7), `AGI` (10), `ESC` (10), `STF` (17), `CMP` (6), `BRD` (7), `FIX` (6), `SHP` (9), `ITM` (7), `SYN` (3), `OMN` (3), `BST` (4), `MET` (3), `CAM` (4), `UI` (11), `ART` (8), `AUD` (5), `RAT` (10), `DAT` (6), `SAV` (6), `SET` (6), `TST` (12), `AGT` (14)
+**By prefix:** `SCP` (22), `INV` (12), `STR` (11), `ARC` (11), `SIM` (4), `RUN` (4), `CYC` (6), `PLN` (5), `CRE` (8), `AGI` (11), `ESC` (10), `STF` (17), `CMP` (6), `BRD` (7), `FIX` (6), `SHP` (9), `ITM` (7), `SYN` (3), `OMN` (3), `BST` (4), `MET` (3), `CAM` (4), `UI` (11), `ART` (8), `AUD` (5), `RAT` (10), `DAT` (6), `SAV` (6), `SET` (6), `TST` (12), `AGT` (14)
 <!-- REQUIREMENT-INDEX:END -->
 
 # Appendix E: Glossary
@@ -1673,7 +1735,8 @@ regenerate it whenever the SDD changes.
 |---|---|
 | **Agitation** | A creature's 0-100 meter; at 100 it turns |
 | **Ancestry** | A character's hidden link to a plane; weights the shop at once, and helps once revealed |
-| **Appetite** | Something a creature wants (`Drink`, `Music`, `Company`...); serving it keeps the creature occupied |
+| **Appetite** | Something a creature wants (`Alcohol`, `Music`, `Company`...); serving it keeps the creature occupied |
+| **Basic service** | Food and drink brought to any seated guest by any staff member; weak, but always available (`AGI-11`) |
 | **Banished** | A turned creature reduced to 0 health; it dissolves with no tribute |
 | **Bench** | Where bought staff wait; they do nothing in the mist phase |
 | **Build menu** | The fixed catalogue of fixtures and supplies, separate from the random shop |

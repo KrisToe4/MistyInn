@@ -6,12 +6,12 @@
   },
   {
     "id": "food", "technique": "Food", "name": "Food", "class": "CompanionServer",
-    "answers": ["Food"], "soothe": 1.0, "capacity": 1, "range": 1.5, "needsFixture": true, "supply": "Food",
+    "answers": [], "soothe": 0.6, "capacity": 1, "range": 1.5, "needsFixture": true,
     "mastery": { "sootheMultiplier": 1.5, "capacityBonus": 1 }
   },
   {
     "id": "drink", "technique": "Drink", "name": "Drink", "class": "CompanionServer",
-    "answers": ["Drink"], "soothe": 1.0, "capacity": 1, "range": 1.5, "needsFixture": true, "supply": "Drink",
+    "answers": ["Alcohol"], "soothe": 1.0, "capacity": 1, "range": 1.5, "needsFixture": true, "supply": "Drink",
     "mastery": { "sootheMultiplier": 1.5, "capacityBonus": 1 }
   },
   {

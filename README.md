@@ -28,6 +28,8 @@ life: creatures get agitated, seek what they want, and are soothed by your staff
 turning dangerous: turned creatures wreck, prey and hunt the innkeeper, fighters defend the inn, and companions take
 guests to the back rooms. Step 6 adds the shop: hire staff at a rank, buy them again to upgrade them one rank and pick
 from their tree, give them items, buy inn items that show in the inn, and build synergies from classes and origins.
+Step 6b makes every guest soothable a little: anyone, the innkeeper included, brings food and drink to guests at
+tables, runners walk the floor to serve, and fighters stay by the door as bouncers.
 
 ## Design documents
 
@@ -72,15 +74,15 @@ dotnet test MistyInn.sln
 | Staff and items tab (top right) | Sell staff, give items from storage (*Give to…*), unequip, sell items and inn items (Dusk) |
 | Drag a fixture from storage or the floor; R while dragging | Place or move it; rotate it (Dusk) |
 | Right-click a placed fixture; Sell in storage | Put it back in storage; sell it for half (Dusk) |
-| WASD / arrow keys, middle mouse drag, screen edges | Pan the camera |
+| WASD / arrow keys, middle mouse drag, left drag on open ground | Pan the camera |
 | Mouse wheel | Zoom |
 | Hover over the board | The HUD shows the tile (x,y) and its zone; a drag label shows the drop tile |
 | Q / E | Rotate the camera 90° |
-| Left-click (mist) | Select a creature or unit; a staff member shows rank, classes, origin, ancestry (? until revealed), techniques and items |
+| Left-click (mist) | Select a creature or unit; a guest shows its appetites and triggers as far as the bestiary knows them; a staff member shows rank, classes, origin, ancestry (? until revealed), techniques and items |
 | F | Follow the selection |
 | Pause, 1×, 2×, 4× buttons | Mist speed |
 | Repair buttons (Dawn) | Repair integrity, 1 silver per 5 points; fixtures repair for free |
-| Dev panel (right, debug builds, Dusk) | Add any character to the bench, choose the converging planes, try the content filters |
+| Dev panel (right, debug builds) | Add any character to the bench and choose the converging planes (Dusk), try the content filters, show hidden creature info |
 | Esc | Pause menu |
 
 ## Layout

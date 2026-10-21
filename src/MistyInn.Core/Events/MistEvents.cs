@@ -14,6 +14,9 @@ public sealed record CreatureTurned(TimeSpan At, CreatureId Creature) : DomainEv
 /// <summary>A staff member began a service session (STF-04).</summary>
 public sealed record ServiceStarted(TimeSpan At, UnitId Unit, string TechniqueId, IReadOnlyList<CreatureId> Creatures) : DomainEvent(At);
 
+/// <summary>A guest stayed at 0 agitation long enough: it paid and is walking out (CRE-08).</summary>
+public sealed record CreatureSatisfied(TimeSpan At, CreatureId Creature, int Silver) : DomainEvent(At);
+
 /// <summary>A creature left a tribute at dawn (CRE-05).</summary>
 public sealed record TributeLeft(TimeSpan At, CreatureId Creature, int Silver) : DomainEvent(At);
 

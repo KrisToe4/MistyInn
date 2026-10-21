@@ -33,12 +33,16 @@ internal sealed class ServiceSystem
 
     private AgitationBalanceDef Tuning => _content.Balance.Agitation;
 
-    public void Step(double now)
+    /// <summary>
+    /// One step of service (STF-04): every unit on the floor that is free keeps or starts a session; runners walk to
+    /// the best creature they can serve and go home when there is none.
+    /// </summary>
+    public void Step(double stepSeconds, double now)
     {
         _rates.Clear();
         var inSession = new HashSet<CreatureId>();
 
-        foreach (var unit in _run.AvailableStaff.OrderBy(u => u.Id.Value))
+        foreach (var unit in Servers().OrderBy(u => u.Id.Value).ToList())
         {
             if (unit.Session is { } session)
             {
@@ -49,8 +53,22 @@ internal sealed class ServiceSystem
                 }
             }
 
-            unit.Session ??= StartSession(unit, now, inSession);
-            unit.Activity = unit.Session is null ? UnitActivity.AtPost : UnitActivity.Serving;
+            if (unit.Session is null)
+            {
+                if (unit.IsRunner)
+                {
+                    Run(unit, stepSeconds, now, inSession);
+                }
+                else
+                {
+                    unit.Session = StartSession(unit, now, inSession);
+                    unit.Activity = unit.Session is null ? UnitActivity.AtPost : UnitActivity.Serving;
+                }
+            }
+            else
+            {
+                unit.Activity = UnitActivity.Serving;
+            }
 
             if (unit.Session is { } active)
             {
@@ -66,9 +84,123 @@ internal sealed class ServiceSystem
         FixtureService();
     }
 
-    /// <summary>The strength of the strongest appetite <paramref name="technique"/> answers (AGI-05), or 0.</summary>
+    /// <summary>
+    /// Units that may serve this step: staff and the innkeeper on the floor, at home, serving or walking to serve, and
+    /// runners on their way home (who may pick up work on the way).
+    /// </summary>
+    private IEnumerable<Unit> Servers() =>
+        _run.Units.Where(u => u.Tile is not null && !u.IsFallen
+                              && (u.Activity is UnitActivity.AtPost or UnitActivity.Serving or UnitActivity.Walking
+                                  || (u.Activity == UnitActivity.Returning && u.IsRunner)));
+
+    /// <summary>
+    /// A runner with no session (STF-04): it serves what is in reach if nothing better waits elsewhere, otherwise walks
+    /// to the best creature no other runner is going to, or goes home.
+    /// </summary>
+    private void Run(Unit unit, double stepSeconds, double now, HashSet<CreatureId> inSession)
+    {
+        var claimed = _run.Units.Where(u => u != unit && u.ServeTarget is not null).Select(u => u.ServeTarget!.Value).ToHashSet();
+        var from = unit.Position.NearestTile;
+        var nearBest = Candidates(unit, inSession, claimed, from).FirstOrDefault();
+        var target = Candidates(unit, inSession, claimed, from: null)
+            .FirstOrDefault(c => c.Creature.Id == unit.ServeTarget || _run.Board.FindPath(from, c.Creature.Position.NearestTile) is not null);
+
+        if (nearBest.Creature is not null && (target.Creature is null || nearBest.Value >= target.Value))
+        {
+            unit.Session = StartSession(unit, now, inSession);
+            if (unit.Session is not null)
+            {
+                unit.ServeTarget = null;
+                unit.ClearPath();
+                unit.Activity = UnitActivity.Serving;
+                return;
+            }
+        }
+
+        if (target.Creature is null)
+        {
+            unit.ServeTarget = null;
+            var home = TilePosition.Center(unit.Tile!.Value);
+            if (unit.Position == home)
+            {
+                unit.Activity = UnitActivity.AtPost;
+            }
+            else if (unit.Activity != UnitActivity.Returning)
+            {
+                // The combat system walks returning units home (STF-04).
+                unit.Activity = UnitActivity.Returning;
+                unit.ClearPath();
+            }
+
+            return;
+        }
+
+        if (unit.ServeTarget != target.Creature.Id || unit.Path.Count == 0 || now >= unit.RepathAt)
+        {
+            unit.SetPath(_run.Board.FindPath(from, target.Creature.Position.NearestTile) ?? []);
+            unit.RepathAt = now + _content.Balance.Combat.RepathSeconds;
+        }
+
+        unit.ServeTarget = target.Creature.Id;
+        unit.Activity = UnitActivity.Walking;
+        unit.Advance(unit.Stats.Speed * stepSeconds);
+    }
+
+    /// <summary>
+    /// The technique and creature pairs this unit could serve, best first: value, then the nearest, then the lowest
+    /// creature ID (STF-04). With <paramref name="from"/> only pairs in reach from that tile; without it, every pair
+    /// the unit could serve once there.
+    /// </summary>
+    private IEnumerable<(TechniqueDef Technique, Creature Creature, double Value)> Candidates(
+        Unit unit, HashSet<CreatureId> inSession, HashSet<CreatureId> claimed, Tile? from)
+    {
+        var list = new List<(TechniqueDef Technique, Creature Creature, double Value)>();
+        foreach (var technique in TechniquesOf(unit))
+        {
+            if (technique.Supply is { } supply && _run.Supplies[supply] <= 0)
+            {
+                continue;
+            }
+
+            foreach (var creature in _run.Creatures.Where(c => !inSession.Contains(c.Id) && !claimed.Contains(c.Id)))
+            {
+                var ok = from is { } at
+                    ? CanServe(unit, technique, creature, from: at)
+                    : Eligible(unit, technique, creature) && Seated(technique, creature);
+                if (ok)
+                {
+                    list.Add((technique, creature, Strength(creature.Def, technique) * SootheValue(unit, technique)));
+                }
+            }
+        }
+
+        return list.OrderByDescending(c => c.Value)
+            .ThenBy(c => unit.Position.DistanceTo(c.Creature.Position))
+            .ThenBy(c => c.Creature.Id.Value);
+    }
+
+    /// <summary>
+    /// What a unit can give: its techniques that answer an appetite, and basic service (AGI-11), which everyone can
+    /// give at a table; the Food technique is the same service done better.
+    /// </summary>
+    public IEnumerable<TechniqueDef> TechniquesOf(Unit unit) =>
+        unit.Techniques.Where(t => t.Answers.Count > 0 && t.Technique != Technique.Food).Append(BasicService);
+
+    /// <summary>The Food technique stands for basic service (AGI-11).</summary>
+    private TechniqueDef BasicService => _content.Techniques.First(t => t.Technique == Technique.Food);
+
+    /// <summary>A technique's soothe for this unit: basic service is ×0.3, or the Food technique's soothe if it knows Food.</summary>
+    public double SootheValue(Unit unit, TechniqueDef technique) =>
+        technique.Technique != Technique.Food ? technique.Soothe
+        : unit.Techniques.Any(t => t.Technique == Technique.Food) ? technique.Soothe
+        : _content.Balance.BasicServiceSoothe;
+
+    /// <summary>
+    /// The strength of the strongest appetite <paramref name="technique"/> answers (AGI-05), or 0. Basic service counts as
+    /// craved by everyone (AGI-11).
+    /// </summary>
     public double Strength(CreatureDef creature, TechniqueDef technique) =>
-        creature.Appetites
+        technique.Technique == Technique.Food ? 1 : creature.Appetites
             .Where(a => technique.Answers.Contains(a.Appetite))
             .Select(a => StrengthOf(a) * (a.PreferredTechnique == technique.Id ? Tuning.PreferredBonus : 1))
             .DefaultIfEmpty(0)
@@ -77,12 +209,24 @@ internal sealed class ServiceSystem
     public double StrengthOf(AppetiteDef appetite) => appetite.Strength == AppetiteStrength.Craves ? 1 : Tuning.LikesStrength;
 
     /// <summary>
-    /// Whether this staff member could use this technique on this creature now (STF-04 step 2): Company only for
-    /// sapient adults the companion does not refuse (CMP-02), and never with violence close by (CMP-05).
+    /// Whether this unit could use this technique on this creature now, from <paramref name="from"/> (by default its
+    /// home, or where a runner stands) (STF-04 step 2): Company only for sapient adults the companion does not refuse
+    /// (CMP-02), and never with violence close by (CMP-05).
     /// </summary>
-    public bool CanServe(Unit unit, TechniqueDef technique, Creature creature, bool logInterruption = false)
+    public bool CanServe(Unit unit, TechniqueDef technique, Creature creature, bool logInterruption = false, Tile? from = null)
     {
-        if (creature.IsTurned || unit.Tile is not { } post
+        if (unit.Tile is not { } post || !Eligible(unit, technique, creature, logInterruption))
+        {
+            return false;
+        }
+
+        return Reaches(from ?? (unit.IsRunner ? unit.Position.NearestTile : post), technique, creature, unit);
+    }
+
+    /// <summary>Everything in <see cref="CanServe"/> except reach.</summary>
+    private bool Eligible(Unit unit, TechniqueDef technique, Creature creature, bool logInterruption = false)
+    {
+        if (creature.IsTurned
             || creature.Activity is not (CreatureActivity.Waiting or CreatureActivity.Idle)
             || Strength(creature.Def, technique) <= 0)
         {
@@ -107,8 +251,14 @@ internal sealed class ServiceSystem
             }
         }
 
-        return Reaches(post, technique, creature, unit);
+        return true;
     }
+
+    /// <summary>A technique that needs a fixture can only serve a creature seated at one that enables it (D-064).</summary>
+    private bool Seated(TechniqueDef technique, Creature creature) =>
+        !technique.NeedsFixture
+        || (creature.Spot is { } spot && creature.Position.NearestTile == spot
+            && _sense.Working(EffectKind.Enables).Any(w => w.Effect.Technique == technique.Id && w.Fixture.Seats.Contains(spot)));
 
     /// <summary>A companion's refusals are always honoured (CMP-02, RAT-07).</summary>
     public static bool Refuses(Unit unit, CreatureDef creature) => unit.Def.RefusesOrEmpty.Contains(creature.Id);
@@ -156,7 +306,7 @@ internal sealed class ServiceSystem
     /// guest (CMP-02) and ×0.8 while Shaken (STF-12).
     /// </summary>
     public double SootheRate(Unit unit, TechniqueDef technique, Creature creature) =>
-        unit.Stats.Soothe * unit.RankMultiplier * technique.Soothe
+        unit.Stats.Soothe * unit.RankMultiplier * SootheValue(unit, technique)
         * unit.SootheBonus(technique, creature.Def.PlaneId) * _ancestry.SootheBonus(unit, creature.Def)
         * Strength(creature.Def, technique) * Tuning.SootheScale
         * (technique.Technique == Technique.Company && unit.Def.PrefersOrEmpty.Contains(creature.Def.Id)
@@ -168,7 +318,7 @@ internal sealed class ServiceSystem
     {
         (TechniqueDef Technique, double Value, int CreatureId)? best = null;
 
-        foreach (var technique in unit.Techniques.Where(t => t.Answers.Count > 0))
+        foreach (var technique in TechniquesOf(unit))
         {
             if (technique.Supply is { } supply && _run.Supplies[supply] <= 0)
             {
@@ -177,7 +327,7 @@ internal sealed class ServiceSystem
 
             foreach (var creature in _run.Creatures.Where(c => !taken.Contains(c.Id) && CanServe(unit, technique, c)))
             {
-                var value = Strength(creature.Def, technique) * technique.Soothe;
+                var value = Strength(creature.Def, technique) * SootheValue(unit, technique);
                 if (best is null || value > best.Value.Value || (value == best.Value.Value && creature.Id.Value < best.Value.CreatureId))
                 {
                     best = (technique, value, creature.Id.Value);

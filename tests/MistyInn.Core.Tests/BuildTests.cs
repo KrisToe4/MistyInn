@@ -21,8 +21,7 @@ public class BuildTests
         var session = NewSession();
 
         Assert.That(session.Silver, Is.EqualTo(10));
-        Assert.That(session.Supplies[Supply.Drink], Is.EqualTo(6));
-        Assert.That(session.Supplies[Supply.Food], Is.EqualTo(4));
+        Assert.That(session.Supplies[Supply.Drink], Is.EqualTo(6), "Drink is the only supply (FIX-06, v1.10)");
         Assert.That(session.Fixtures.Select(f => f.FixtureDefId),
             Is.EqualTo(new[] { "bar-counter", "table", "table", "hearth", "lantern" }));
         Assert.That(session.Fixtures.All(f => f.IsInStorage), Is.True);
@@ -53,8 +52,8 @@ public class BuildTests
 
         Assert.That(session.Supplies[Supply.Drink], Is.EqualTo(10));
         Assert.That(session.Silver, Is.EqualTo(8));
-        Assert.That(session.Execute(new BuySupplies(Supply.Food, 0)).Failure, Is.EqualTo(CommandFailure.InvalidValue));
-        Assert.That(session.Execute(new BuySupplies(Supply.Food, 5)).Failure, Is.EqualTo(CommandFailure.NotEnoughSilver));
+        Assert.That(session.Execute(new BuySupplies(Supply.Drink, 0)).Failure, Is.EqualTo(CommandFailure.InvalidValue));
+        Assert.That(session.Execute(new BuySupplies(Supply.Drink, 5)).Failure, Is.EqualTo(CommandFailure.NotEnoughSilver));
     }
 
     [Test]

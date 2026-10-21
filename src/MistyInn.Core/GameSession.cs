@@ -513,7 +513,8 @@ public sealed class GameSession : IEventSink
                 .Add(unit.Session?.Technique.Id ?? "").Add(unit.Session?.EndsAt ?? -1)
                 .Add(unit.Position.X).Add(unit.Position.Y).Add(unit.Health).Add((int)unit.Activity).Add(unit.Shaken)
                 .Add(unit.Engaging?.Value ?? -1).Add(unit.NextAttackAt).Add(unit.RestUntil).Add(unit.Path.Count)
-                .Add(unit.Rank).Add(unit.Spent).Add(unit.UpgradePending).Add(string.Join(",", unit.Chosen));
+                .Add(unit.Rank).Add(unit.Spent).Add(unit.UpgradePending).Add(string.Join(",", unit.Chosen))
+                .Add(unit.ServeTarget?.Value ?? -1);
             foreach (var target in unit.Session?.Targets ?? [])
             {
                 h.Add(target.Value);
@@ -533,7 +534,7 @@ public sealed class GameSession : IEventSink
                 .Add(c.UnservedSince).Add(c.NextBreakAt).Add(c.WasServed).Add(c.Frightened)
                 .Add(c.Path.Count).Add(c.Health).Add((int)c.Stage).Add(c.StageSince).Add(c.EngagedBy?.Value ?? -1)
                 .Add(c.GrappledBy?.Value ?? -1).Add(c.NextAttackAt).Add(c.CompanyWith?.Value ?? -1).Add(c.CompanySince)
-                .Add(c.HadRoom);
+                .Add(c.HadRoom).Add(c.CalmSince ?? -1).Add(c.HasLeft);
             foreach (var tile in c.Path)
             {
                 h.Add(tile.X).Add(tile.Y);
@@ -657,9 +658,11 @@ public sealed class GameSession : IEventSink
 
         _arrivals.Update(now);
         _behaviour.Step(StepSeconds, now);
-        _service.Step(now);
+        RemoveLeftGuests();
+        _service.Step(StepSeconds, now);
         _company.Step(StepSeconds, now);
         _agitation.Step(StepSeconds, now, _service.Rates);
+        SatisfyGuests(now);
         _combat.Step(StepSeconds, now);
 
         if (Phase != Phase.Mist)
@@ -670,6 +673,54 @@ public sealed class GameSession : IEventSink
         if (now >= Content.Balance.MistDurationSeconds)
         {
             BreakDawn();
+        }
+    }
+
+    /// <summary>
+    /// A guest whose agitation has stayed at 0 for the satisfaction time pays its tribute, with the same bonuses as at
+    /// Dawn, and walks out (CRE-08); it counts as served for the bestiary (BST-02). A guest with floor company is not
+    /// satisfied until it has had its room session (D-085).
+    /// </summary>
+    private void SatisfyGuests(double now)
+    {
+        foreach (var creature in _run.Creatures.Where(c => !c.IsTurned && !c.IsLeaving && !c.IsInRoom).ToList())
+        {
+            // Company comes first: a guest with floor company that has not had its room yet waits for the room (CMP-04).
+            if (creature.Agitation > 0 || (creature.CompanyWith is not null && !creature.HadRoom))
+            {
+                creature.CalmSince = null;
+                continue;
+            }
+
+            creature.CalmSince ??= now;
+            if (now - creature.CalmSince.Value < Content.Balance.SatisfiedAfterSeconds - 1e-9)
+            {
+                continue;
+            }
+
+            var tribute = Math.Max(0, (int)Math.Round(creature.Def.Tribute, MidpointRounding.AwayFromZero) + _modifiers.InnWide(EffectKind.Tribute));
+            _run.Silver += tribute;
+            Raise(new CreatureSatisfied(Time, creature.Id, tribute));
+            Raise(new TributeLeft(Time, creature.Id, tribute));
+            Raise(new SilverChanged(Time, _run.Silver));
+            Log("creature.satisfied", "agitation.zero", creature.Id.ToRef());
+            if (creature.WasServed && _run.StudiedThisCycle.Add(creature.Def.Id))
+            {
+                _bestiary.Studied(creature.Def);
+            }
+
+            _behaviour.SendOut(creature);
+        }
+    }
+
+    /// <summary>Satisfied guests that reached the front door dissolve (CRE-08).</summary>
+    private void RemoveLeftGuests()
+    {
+        foreach (var creature in _run.Creatures.Where(c => c.HasLeft).ToList())
+        {
+            _run.Creatures.Remove(creature);
+            Raise(new CreatureDissolved(Time, creature.Id));
+            Log("creature.left", "satisfied", creature.Id.ToRef());
         }
     }
 
@@ -707,7 +758,6 @@ public sealed class GameSession : IEventSink
     private void BreakDawn()
     {
         _company.EndAll();
-        var studied = new HashSet<string>();
         var tributeBonus = _modifiers.InnWide(EffectKind.Tribute);
         foreach (var creature in _run.Creatures.Where(c => !c.IsTurned))
         {
@@ -717,7 +767,7 @@ public sealed class GameSession : IEventSink
             Raise(new TributeLeft(Time, creature.Id, tribute));
             Log("tribute.left", "dawn.calm", creature.Id.ToRef());
 
-            if (creature.WasServed && studied.Add(creature.Def.Id))
+            if (creature.WasServed && _run.StudiedThisCycle.Add(creature.Def.Id))
             {
                 _bestiary.Studied(creature.Def);
             }
@@ -884,6 +934,7 @@ public sealed class GameSession : IEventSink
         _steps = 0;
         _owed = 0;
         _run.Phase = Phase.Mist;
+        _run.StudiedThisCycle.Clear();
         foreach (var unit in _run.Units)
         {
             unit.ResetToPost();

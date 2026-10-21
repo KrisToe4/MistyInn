@@ -13,7 +13,8 @@ public sealed record UnitTemplate(
     StatsDef Stats,
     IReadOnlyList<string> TechniqueIds,
     IReadOnlyList<string>? Prefers = null,
-    IReadOnlyList<string>? Refuses = null)
+    IReadOnlyList<string>? Refuses = null,
+    StaffClass? MainClass = null)
 {
     public IReadOnlyList<string> PrefersOrEmpty => Prefers ?? Array.Empty<string>();
 
@@ -115,7 +116,7 @@ public sealed class GameContent
     public UnitTemplate TemplateFor(string characterId)
     {
         var c = Character(characterId);
-        return new UnitTemplate(c.Id, c.Name, IsInnkeeper: false, c.Stats, new[] { c.BaseTechnique }, c.Prefers, c.Refuses);
+        return new UnitTemplate(c.Id, c.Name, IsInnkeeper: false, c.Stats, new[] { c.BaseTechnique }, c.Prefers, c.Refuses, c.MainClass);
     }
 
     public CreatureDef Creature(string id) =>

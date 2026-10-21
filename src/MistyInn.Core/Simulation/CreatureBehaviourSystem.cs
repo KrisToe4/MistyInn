@@ -76,6 +76,11 @@ internal sealed class CreatureBehaviourSystem
                 case CreatureActivity.Idle when now >= creature.IdleUntil:
                     Decide(creature, now, arriving: false);
                     break;
+
+                case CreatureActivity.Leaving:
+                    creature.Advance(creature.Def.Speed * stepSeconds);
+                    creature.HasLeft = creature.Path.Count == 0;
+                    break;
             }
         }
     }
@@ -122,6 +127,18 @@ internal sealed class CreatureBehaviourSystem
             creature.Activity = CreatureActivity.Idle;
             creature.IdleUntil = now + _content.Balance.IdleMinSeconds;
         }
+    }
+
+    /// <summary>A satisfied guest gives up its spot and walks out of the front door (CRE-08).</summary>
+    public void SendOut(Creature creature)
+    {
+        Release(creature);
+        creature.CompanyWith = null;
+        creature.ServedBy = null;
+        creature.Activity = CreatureActivity.Leaving;
+        var path = _run.Board.FindPath(creature.Position.NearestTile, _content.Layout.FrontDoor);
+        creature.SetPath(path ?? []);
+        creature.HasLeft = path is null || path.Count <= 1;
     }
 
     public void Release(Creature creature)
@@ -172,7 +189,7 @@ internal sealed class CreatureBehaviourSystem
                 var technique = _content.Technique(effect.Technique!);
                 if (!technique.NeedsFixture || !technique.Answers.Contains(appetite.Appetite)
                     || !staff.Any(u => u.Techniques.Contains(technique)
-                        && InnSense.DistanceToTiles(TilePosition.Center(u.Tile!.Value), fixture.Tiles) <= technique.Range + 0.5))
+                        && (u.IsRunner || InnSense.DistanceToTiles(TilePosition.Center(u.Tile!.Value), fixture.Tiles) <= technique.Range + 0.5)))
                 {
                     continue;
                 }
@@ -194,6 +211,16 @@ internal sealed class CreatureBehaviourSystem
                     var score = strength * (appetite.PreferredTechnique == technique.Id ? _content.Balance.Agitation.PreferredBonus : 1);
                     candidates.AddRange(TilesInRange(unit.Tile!.Value, technique.Range).Where(s => IsFree(s, creature)).Select(s => (s, score)));
                 }
+            }
+        }
+
+        // Nothing for its appetites: a free seat at a table, where anyone can bring basic service (CRE-04, AGI-11).
+        if (candidates.Count == 0)
+        {
+            foreach (var (fixture, effect) in _sense.Working(EffectKind.Enables)
+                         .Where(w => _content.Technique(w.Effect.Technique!).Technique == Technique.Food))
+            {
+                candidates.AddRange(fixture.Seats.Where(s => IsFree(s, creature)).Select(s => (s, 0.0)));
             }
         }
 

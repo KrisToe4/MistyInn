@@ -27,6 +27,9 @@ public enum CreatureActivity
 
     /// <summary>In a back room: off the board, occupied (CMP-04).</summary>
     InRoom,
+
+    /// <summary>Satisfied: walking out of the front door, beyond agitation (CRE-08).</summary>
+    Leaving,
 }
 
 /// <summary>A creature's agitation state (AGI-03).</summary>
@@ -100,6 +103,15 @@ internal sealed class Creature
 
     /// <summary>Off the board, in a back room (CMP-04): nothing outside can see it or reach it.</summary>
     public bool IsInRoom => Activity == CreatureActivity.InRoom;
+
+    /// <summary>Satisfied and on its way out (CRE-08).</summary>
+    public bool IsLeaving => Activity == CreatureActivity.Leaving;
+
+    /// <summary>When its agitation last reached 0 and stayed there, or null (CRE-08).</summary>
+    public double? CalmSince { get; set; }
+
+    /// <summary>It walked out of the front door and dissolves this step (CRE-08).</summary>
+    public bool HasLeft { get; set; }
 
     /// <summary>A turned creature's escalation stage (ESC-01).</summary>
     public EscalationStage Stage { get; set; }

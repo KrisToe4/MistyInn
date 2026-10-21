@@ -122,6 +122,9 @@ internal sealed class RunState
     /// <summary>Where units fell this mist, for <c>Blood</c> (AGI-08, ESC-04). Bounded (INV-05).</summary>
     public List<TilePosition> BloodMarks { get; } = new();
 
+    /// <summary>Creature types already given Studied progress this cycle, at Dawn or by leaving satisfied (BST-02).</summary>
+    public HashSet<string> StudiedThisCycle { get; } = new();
+
     /// <summary>Why the run ended, once it has (RUN-03).</summary>
     public RunEndReason? EndReason { get; set; }
 

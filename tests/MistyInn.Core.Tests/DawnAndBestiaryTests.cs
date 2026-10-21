@@ -20,8 +20,13 @@ public class DawnAndBestiaryTests
     public void CalmCreaturesLeaveATributeAtDawnAndTurnedOnesDoNot()
     {
         // Served at the bar, Creature 01 stays calm all night; unserved it would turn at about 114 s. Creature 02 turns
-        // in the last seconds, far from the bar, so it has no time to reach anyone (step 5 added combat).
-        var s = new Scenario(balance: b => b with { StartingSupplies = new Dictionary<Supply, int> { [Supply.Drink] = 100 } });
+        // in the last seconds, far from the bar, so it has no time to reach anyone (step 5 added combat). Satisfied
+        // guests leave early (CRE-08, step 6c), so this test keeps Creature 01 in the inn until Dawn.
+        var s = new Scenario(balance: b => b with
+        {
+            StartingSupplies = new Dictionary<Supply, int> { [Supply.Drink] = 100 },
+            SatisfiedAfterSeconds = 1_000_000,
+        });
         s.Place("bar-counter", new Tile(11, 4));
         s.PlaceStaff("staff-01", new Tile(12, 5));
         s.Begin();

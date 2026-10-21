@@ -16,6 +16,9 @@ public enum UnitActivity
     /// <summary>A fighter going for, or striking, a turned creature (ESC-07).</summary>
     Fighting,
 
+    /// <summary>A runner walking to a creature it will serve (STF-04).</summary>
+    Walking,
+
     /// <summary>Walking back to its post.</summary>
     Returning,
 
@@ -131,8 +134,18 @@ internal sealed class Unit
     /// <summary>Its first Fighter technique, if it has one (ESC-07).</summary>
     public TechniqueDef? FighterTechnique => Techniques.FirstOrDefault(t => t.EngagesTurned);
 
-    /// <summary>Its post: the tile it was placed on, or null when it is on the bench.</summary>
+    /// <summary>
+    /// A runner walks the floor to serve (STF-04): the innkeeper, and every staff member that is neither a bouncer (main
+    /// class Fighter) nor a companion (knows Company). Bouncers and companions serve from home.
+    /// </summary>
+    public bool IsRunner =>
+        Def.IsInnkeeper || (Def.MainClass != StaffClass.Fighter && _techniques.All(t => t.Technique != Technique.Company));
+
+    /// <summary>Its home (STF-04): the tile it was placed on, or null when it is on the bench.</summary>
     public Tile? Tile { get; set; }
+
+    /// <summary>The creature a runner is walking to serve; other runners leave it alone (STF-04).</summary>
+    public CreatureId? ServeTarget { get; set; }
 
     /// <summary>Where it is in the mist (SIM-03); at its post unless it fights or goes to a room.</summary>
     public TilePosition Position { get; set; }
@@ -146,8 +159,8 @@ internal sealed class Unit
 
     public bool IsFallen => Activity == UnitActivity.Fallen;
 
-    /// <summary>On the floor and free to serve: at its post, idle or serving (STF-04).</summary>
-    public bool IsAvailable => Tile is not null && Activity is UnitActivity.AtPost or UnitActivity.Serving;
+    /// <summary>On the floor and free to serve: at home, serving, or (a runner) walking to serve (STF-04).</summary>
+    public bool IsAvailable => Tile is not null && Activity is UnitActivity.AtPost or UnitActivity.Serving or UnitActivity.Walking;
 
     /// <summary>Fell last cycle and survived: −20 % soothe this cycle (STF-12).</summary>
     public bool Shaken { get; set; }
@@ -185,6 +198,7 @@ internal sealed class Unit
         _path.Clear();
         Activity = UnitActivity.AtPost;
         Engaging = null;
+        ServeTarget = null;
         Session = null;
         NextAttackAt = 0;
         RepathAt = 0;

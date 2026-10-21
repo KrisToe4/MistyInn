@@ -61,8 +61,8 @@ public class ContentValidatorTests
     {
         AssertRejected(WithCreature("creature-01", c => c with
         {
-            Appetites = [new AppetiteDef(Appetite.Drink, AppetiteStrength.Craves, "song")],
-        }), "does not answer Drink");
+            Appetites = [new AppetiteDef(Appetite.Alcohol, AppetiteStrength.Craves, "song")],
+        }), "does not answer Alcohol");
     }
 
     [Test]

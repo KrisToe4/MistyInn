@@ -66,6 +66,7 @@ public partial class GameRoot : Node3D
     private static readonly AncestryRecord Ancestry = new();
     private GameSession _session = null!;
     private UnitId? _dragging;
+    private Vector2? _pendingSelect;
     private FixtureId? _draggingFixture;
     private int _rotation;
     private string _dragName = "";
@@ -226,6 +227,7 @@ public partial class GameRoot : Node3D
         }
 
         UpdateDragCursor();
+        ShowSelection();
         Hud.Refresh(_session);
     }
 
@@ -264,6 +266,12 @@ public partial class GameRoot : Node3D
         {
             if (PickTile(click.Position) is not { } tile)
             {
+                // Open ground outside the inn: a left drag pans the camera (CAM-10).
+                if (click.ButtonIndex == MouseButton.Left)
+                {
+                    CameraRig.StartLeftPan(click.Position);
+                }
+
                 return;
             }
 
@@ -289,10 +297,16 @@ public partial class GameRoot : Node3D
                     Report(_session.Execute(new StoreFixture(fixture.Id)));
                 }
             }
+            else if (click.ButtonIndex == MouseButton.Left)
+            {
+                CameraRig.StartLeftPan(click.Position);
+            }
         }
         else if (click.ButtonIndex == MouseButton.Left)
         {
-            Select(click.Position);
+            // Selection happens on release, unless the press turned into a pan (CAM-10, CAM-12).
+            _pendingSelect = click.Position;
+            CameraRig.StartLeftPan(click.Position);
         }
     }
 
@@ -302,6 +316,16 @@ public partial class GameRoot : Node3D
         if (@event is not InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: false } release)
         {
             return;
+        }
+
+        var panned = CameraRig.EndLeftPan();
+        if (_pendingSelect is { } pressedAt)
+        {
+            _pendingSelect = null;
+            if (!panned && !_paused)
+            {
+                Select(pressedAt);
+            }
         }
 
         if (_dragging is { } unitId)
@@ -422,6 +446,9 @@ public partial class GameRoot : Node3D
             case CreatureTurned turned when _creatures.TryGetValue(turned.Creature, out var view):
                 Hud.ShowMessage($"{view.DisplayName} {Tr("has turned!")}");
                 break;
+            case CreatureSatisfied satisfied when _creatures.TryGetValue(satisfied.Creature, out var view):
+                Hud.ShowMessage($"{view.DisplayName} {Tr("is satisfied, pays")} {satisfied.Silver} {Tr("silver and leaves.")}");
+                break;
             case TributeLeft tribute:
                 _tributesTonight += tribute.Silver;
                 break;
@@ -500,6 +527,7 @@ public partial class GameRoot : Node3D
         UnitActivity.Returning => Tr("Returning"),
         UnitActivity.GoingToRoom => _session.Filters.NoSuggestive ? Tr("To a private audience") : Tr("To a back room"),
         UnitActivity.Resting => Tr("Resting"),
+        UnitActivity.Walking => Tr("Going to serve"),
         UnitActivity.Fallen => Tr("Fallen"),
         _ => unit.Shaken ? Tr("Shaken") : null,
     };
@@ -749,12 +777,47 @@ public partial class GameRoot : Node3D
         }
 
         _selected = nearest;
-        Hud.SetSelection(nearest switch
+        ShowSelection();
+    }
+
+    /// <summary>The selection line (CAM-12, UI-06 until step 9); refreshed every frame so it follows the dev toggle.</summary>
+    private void ShowSelection()
+    {
+        if (_selected is null)
         {
-            CreatureView creature => $"{Tr("Selected")}: {creature.DisplayName}  ({Tr("F to follow")})",
+            return;
+        }
+
+        Hud.SetSelection(_selected switch
+        {
+            CreatureView creature => $"{Tr("Selected")}: {CreatureDetails(creature.Id) ?? creature.DisplayName}  ({Tr("F to follow")})",
             UnitView unit => $"{Tr("Selected")}: {UnitDetails(unit.Id) ?? unit.DisplayName}  ({Tr("F to follow")})",
             _ => null,
         });
+    }
+
+    /// <summary>
+    /// A creature's appetites and triggers, as far as the bestiary has revealed them (UI-06, BST-02): appetites once
+    /// Studied, triggers once Understood, "?" before. The debug-only dev toggle shows everything and changes nothing.
+    /// </summary>
+    private string? CreatureDetails(CreatureId id)
+    {
+        if (_session.Creatures.FirstOrDefault(c => c.Id == id) is not { } creature)
+        {
+            return null;
+        }
+
+        var def = _session.Content.Creature(creature.CreatureDefId);
+        var level = _session.Bestiary.LevelOf(def, _session.Content.Balance.Bestiary);
+        var all = Hud.ShowHiddenCreatureInfo;
+        var appetites = all || level >= BestiaryLevel.Studied
+            ? string.Join(", ", def.Appetites.Select(a =>
+                $"{a.Appetite}{(a.Strength == AppetiteStrength.Likes ? " (likes)" : "")}{(a.PreferredTechnique is { } t ? $" [{_session.TechniqueName(t)}]" : "")}"))
+            : "?";
+        var triggers = all || level >= BestiaryLevel.Understood
+            ? (def.Triggers.Count == 0 ? Tr("none") : string.Join(", ", def.Triggers.Select(t => t.Trigger)))
+            : "?";
+        return $"{creature.Name}  ·  {Tr("wants")} {appetites}  ·  {Tr("hates")} {triggers}  ·  {creature.State}";
     }
 
     /// <summary>

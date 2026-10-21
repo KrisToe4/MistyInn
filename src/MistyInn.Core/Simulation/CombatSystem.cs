@@ -95,9 +95,14 @@ internal sealed class CombatSystem
             if (unit.Def.IsInnkeeper)
             {
                 Defend(unit, now);
+                if (unit.Activity == UnitActivity.Returning)
+                {
+                    Return(unit, stepSeconds);
+                }
             }
             else if (unit.FighterTechnique is { } technique
-                     && unit.Activity is UnitActivity.AtPost or UnitActivity.Serving or UnitActivity.Fighting or UnitActivity.Returning)
+                     && unit.Activity is UnitActivity.AtPost or UnitActivity.Serving or UnitActivity.Walking
+                         or UnitActivity.Fighting or UnitActivity.Returning)
             {
                 Fight(unit, technique, stepSeconds, now);
             }
@@ -470,6 +475,7 @@ internal sealed class CombatSystem
         }
 
         unit.Session = null;
+        unit.ServeTarget = null;
         unit.Activity = UnitActivity.Fighting;
         unit.Engaging = target.Id;
 
@@ -521,7 +527,7 @@ internal sealed class CombatSystem
             .FirstOrDefault();
     }
 
-    /// <summary>The innkeeper does not leave its post, but strikes a turned creature that reaches it (ESC-06).</summary>
+    /// <summary>The innkeeper does not chase turned creatures, but strikes one that comes within reach (ESC-06).</summary>
     private void Defend(Unit keeper, double now)
     {
         if (now < keeper.NextAttackAt)
