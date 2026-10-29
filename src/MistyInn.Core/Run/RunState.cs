@@ -2,6 +2,7 @@ using MistyInn.Core.Board;
 using MistyInn.Core.Content;
 using MistyInn.Core.Entities;
 using MistyInn.Core.Meta;
+using MistyInn.Core.Persistence;
 
 namespace MistyInn.Core.Run;
 
@@ -34,11 +35,10 @@ internal sealed record RunStart(
 internal sealed class RunState
 {
     public RunState(GameContent content, IdAllocator ids, RunStart start)
+        : this(content, start)
     {
-        Board = new InnBoard(content.Layout);
-        Start = start;
-        Units = content.StartingUnits.Take(1).Concat(start.StartingStaff.Select(content.TemplateFor))
-            .Select(def => NewUnit(content, ids, def)).ToList();
+        Units.AddRange(content.StartingUnits.Take(1).Concat(start.StartingStaff.Select(content.TemplateFor))
+            .Select(def => NewUnit(content, ids, def)));
         foreach (var unit in Units.Where(u => !u.Def.IsInnkeeper))
         {
             // A starting character counts as hired at ★1 for its base cost, so selling it returns something (D-081).
@@ -47,10 +47,6 @@ internal sealed class RunState
 
         Silver = content.Balance.StartingSilver;
         Integrity = content.Balance.Integrity;
-        UnlockedPlanes = start.Planes.ToList();
-        _content = content;
-        Rooms = new List<Room>();
-        SyncRooms(0);
         foreach (var supply in Enum.GetValues<Supply>())
         {
             Supplies[supply] = content.Balance.StartingSupplies.TryGetValue(supply, out var n) ? n : 0;
@@ -60,6 +56,103 @@ internal sealed class RunState
         {
             Fixtures.Add(new Fixture(ids.NextFixture(), content.Fixture(fixtureId)));
         }
+    }
+
+    /// <summary>An empty inn: no units, fixtures or silver yet (a new run fills it; so does a restored save).</summary>
+    private RunState(GameContent content, RunStart start)
+    {
+        _content = content;
+        Board = new InnBoard(content.Layout);
+        Start = start;
+        UnlockedPlanes = start.Planes.ToList();
+        Rooms = new List<Room>();
+        SyncRooms(0);
+
+        // Before anything is placed, so a restored run wanders exactly like the run that was saved (INV-02).
+        WanderTiles = Board.WalkableTilesIn(content.WanderZones);
+    }
+
+    /// <summary>Where calm creatures wander (CRE-04): the wander zones' open tiles on the empty board.</summary>
+    public IReadOnlyList<Tile> WanderTiles { get; }
+
+    /// <summary>
+    /// The run as it was saved at the start of a Dusk (SAV-01, SAV-03), with units and fixtures back on the board.
+    /// The save has passed <see cref="RunSaves.Check"/>. The rooms the items open, the seats, the unit effects and the
+    /// random streams are put back by the session.
+    /// </summary>
+    public static RunState Restore(GameContent content, RunSave save)
+    {
+        var start = new RunStart(save.StartingStaff.ToList(), save.UnlockedPlanes.ToList(),
+            save.LockedCharacters.ToHashSet(), save.LockedItems.ToHashSet(), save.LockedFixtures.ToHashSet());
+        var run = new RunState(content, start)
+        {
+            Cycle = save.Cycle,
+            Phase = Phase.Dusk,
+            Silver = save.Silver,
+            Integrity = save.Integrity,
+            PreviousPlaneSet = save.PreviousPlaneSet.ToList(),
+            CreaturesOccupied = save.CreaturesOccupied,
+        };
+
+        foreach (var supply in Enum.GetValues<Supply>())
+        {
+            run.Supplies[supply] = save.Supplies.TryGetValue(supply, out var n) ? n : 0;
+        }
+
+        run.ConvergingPlanes.AddRange(save.ConvergingPlanes.Select(content.Plane));
+        if (save.Omen is { } omenId)
+        {
+            run.Omen = content.Omen(omenId);
+            run.OmenEffects.AddRange(run.Omen.Effects.Select((e, i) => e with { Plane = save.OmenEffectPlanes[i] }));
+        }
+
+        foreach (var s in save.Units)
+        {
+            var template = s.IsInnkeeper ? content.StartingUnits[0] : content.TemplateFor(s.DefId);
+            var unit = new Unit(new UnitId(s.Id), template, s.Techniques.Select(content.Technique), content.Balance.RankStatMultipliers[s.Rank - 1])
+            {
+                Rank = s.Rank,
+                Spent = s.Spent,
+                UpgradePending = s.UpgradePending,
+                Shaken = s.Shaken,
+                Tile = s.Tile,
+            };
+            unit.Chosen.AddRange(s.Chosen);
+            unit.Mastered.UnionWith(s.Mastered);
+            if (s.Tile is { } home)
+            {
+                run.Board.PutUnit(unit.Id, home);
+            }
+
+            unit.ResetToPost();
+            run.Units.Add(unit);
+        }
+
+        foreach (var s in save.Fixtures)
+        {
+            var fixture = new Fixture(new FixtureId(s.Id), content.Fixture(s.DefId)) { Health = s.Health };
+            if (s.Origin is { } origin)
+            {
+                fixture.Place(origin, s.Rotation);
+                run.Board.PutFixture(fixture.Id, fixture.Tiles);
+            }
+
+            run.Fixtures.Add(fixture);
+        }
+
+        foreach (var s in save.Items)
+        {
+            run.Items.Add(new OwnedItem(new ItemId(s.Id), content.Item(s.DefId), s.Paid)
+            {
+                Carrier = s.Carrier is { } carrier ? new UnitId(carrier) : null,
+            });
+        }
+
+        run.Shop.Staff.AddRange(save.Shop.Staff);
+        run.Shop.Items.AddRange(save.Shop.Items);
+        run.Shop.Locked = save.Shop.Locked;
+        run.Shop.RerollsThisCycle = save.Shop.Rerolls;
+        return run;
     }
 
     private readonly GameContent _content;
@@ -73,7 +166,7 @@ internal sealed class RunState
 
     public InnBoard Board { get; }
 
-    public List<Unit> Units { get; }
+    public List<Unit> Units { get; } = new();
 
     public List<Creature> Creatures { get; } = new();
 

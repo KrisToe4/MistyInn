@@ -100,6 +100,12 @@ proposed details were approved with SDD v1.0 (2026-10-20). **Proposed** marks a 
 | D-092 | A placeholder title screen and run end panel | Accepted | 2026-10-21 | UI-01, UI-10, CYC-10, RUN-04, TST-12 |
 | D-093 | Earlier tests run without omens or locks | Accepted | 2026-10-21 | TST-01, INV-08 |
 | D-094 | A guest still walking out at dawn pays nothing more | Accepted | 2026-10-21 | CRE-05, CRE-08, MET-02 |
+| D-095 | Save files: when the run is saved, where, and the smoke run | Proposed | 2026-10-26 | SAV-01, SAV-03, SAV-05, SAV-06, INV-02, TST-12 |
+| D-096 | Save schema versions and migrations | Proposed | 2026-10-26 | SAV-04, SAV-06, INV-07, TST-08 |
+| D-097 | The content version, and saves made with other data | Proposed | 2026-10-26 | SAV-01, SAV-04, DAT-01, DAT-05, INV-07 |
+| D-098 | Continue, quitting to the title, and giving up a saved run | Accepted (the human's answer before step 8) | 2026-10-26 | SAV-02, SAV-03, RUN-04, MET-01, MET-03, UI-01, CYC-10 |
+| D-099 | Settings: the values, no edge panning, a placeholder page, buses and the content note | Accepted in part (the human's answers before step 8) | 2026-10-26 | SET-01..06, CAM-10, AUD-10, RAT-09, RAT-10, SAV-02 |
+| D-100 | A dead staff member's items go back to storage | Accepted | 2026-10-26 | ESC-09, ITM-02 |
 
 ---
 
@@ -1209,3 +1215,108 @@ proposed details were approved with SDD v1.0 (2026-10-20). **Proposed** marks a 
   been studied and been counted when they were satisfied (CRE-08, D-085, D-090). They still dissolve at dawn.
 - **Alternatives considered:** None; this is the behaviour CRE-05 already requires.
 - **Requirement IDs affected:** CRE-05, CRE-08, MET-02.
+
+## D-095 Save files: when the run is saved, where, and the smoke run
+- **Status:** Proposed
+- **Date / step:** 2026-10-26, step 8
+- **Context:** SAV-01 saves the run when the player leaves Dawn, and SAV-03 resumes at the start of the saved Dusk.
+  SAV-05 and SAV-06 name `*.tmp`, `*.bak` and `*.corrupt-<n>.json` but not the exact file names. Section 5.1 puts
+  `ISaveStore` in Core and `GodotSaveStore` in the game.
+- **Decision:** The game takes the save right after `ContinueFromDawn` succeeds, so it is the new Dusk exactly as it
+  starts (planes, omen and shop already drawn); `GameSession.CreateSave(seed)` refuses outside Dusk.
+  `GameSession.Restore(save, ...)` builds the same Dusk again, with all three random streams carrying on from their
+  saved states. Mist state (creatures, sessions, timers) is never saved. The files are `run.json` and `profile.json` in
+  `user://saves`; a write goes to `run.tmp`, then `File.Replace` puts it in place and keeps the old file as `run.bak`;
+  a corrupt file moves to `run.corrupt-1.json`, `-2` and so on, never overwriting an earlier one. The rules live in
+  Core's `SaveFiles` over a small `ISaveStore`; `FolderSaveStore` uses `System.IO` on the folder Godot's
+  `ProjectSettings.GlobalizePath("user://saves")` gives, because Godot's `FileAccess` has no atomic replace. The tests
+  use the same store on a temporary folder (TST-01). Creatures' wander tiles are now taken from the board before
+  anything is placed (`RunState.WanderTiles`), as a new run always did, so a restored run wanders exactly like the
+  saved one. The smoke run (`++ --new-run`) neither reads nor writes the save folder, so it cannot touch the player's
+  saves or profile.
+- **Alternatives considered:** Saving at Dawn and replaying `ContinueFromDawn` on load (the save would then hold Dawn
+  state); Godot's `FileAccess` with a copy for the backup (not atomic).
+- **Requirement IDs affected:** SAV-01, SAV-03, SAV-05, SAV-06, INV-02, TST-12.
+
+## D-096 Save schema versions and migrations
+- **Status:** Proposed
+- **Date / step:** 2026-10-26, step 8
+- **Context:** SAV-04 asks for a `schemaVersion`, step-by-step migrations and refusing newer saves. These are the first
+  save formats, so there is no older version to migrate yet.
+- **Decision:** Both formats start at version 1 (`RunSaves.SchemaVersion`, `ProfileSaves.SchemaVersion`). A save is
+  read as a JSON object first; its `schemaVersion` is checked, then `SaveMigrator` applies one step per version (each
+  a function from a version `n` document to a version `n + 1` one) before the records are read. A format change adds
+  a step there. The test proves the chain with a made-up history (renaming a property, then adding one). Text that is
+  not a save, a missing `schemaVersion`, an unknown property (as in D-055) or a missing step makes the file
+  **corrupt** and quarantined (SAV-06). A **newer** file is not loaded and stays where it is: a newer run save
+  disables Continue (with the reason); a newer profile is not written over for the rest of that launch, and the
+  player is told progress will not be saved until they play that version again (INV-07).
+- **Alternatives considered:** Quarantining newer files too (they are valid, just not readable here).
+- **Requirement IDs affected:** SAV-04, SAV-06, INV-07, TST-08.
+
+## D-097 The content version, and saves made with other data
+- **Status:** Proposed (the approach was the human's answer before step 8)
+- **Date / step:** 2026-10-26, step 8
+- **Context:** SAV-01 saves "the content version", which did not exist. Content IDs never change once a save may
+  contain them (DAT-05), but entries can be removed.
+- **Decision:** `balance.json` has `contentVersion` (an integer, now 1, raised by hand; at least 1). The run save
+  records it for information only. A run save is checked before it becomes a session (`RunSaves.Check`): missing lists
+  or values out of range make it corrupt (quarantined); IDs (planes, characters, techniques, fixtures, items, the omen)
+  or tiles that this game's data does not have make it **incompatible**: Continue is disabled with a message naming
+  them, and the file is kept (it is not damaged). New Run can still replace it, after asking (D-098). The profile keeps
+  bestiary entries, unlocks and ancestries for IDs the data no longer has, so editing the data never loses progress.
+- **Alternatives considered:** A hash of the data files (any edit, even a name, would refuse every run save).
+- **Requirement IDs affected:** SAV-01, SAV-04, DAT-01, DAT-05, INV-07.
+
+## D-098 Continue, quitting to the title, and giving up a saved run
+- **Status:** Accepted (the human's answer before step 8); the details below are Proposed
+- **Date / step:** 2026-10-26, step 8
+- **Context:** With saves, Quit to title from the pause menu keeps the run save so Continue works. SDD section 19 does
+  not say what New Run does when a run save exists, and INV-07 forbids overwriting a save silently.
+- **Decision:** New Run with a run save asks first. Confirming deletes the save; the given-up run counts in the
+  statistics as a **lost** run (`RunEndReason.Abandoned`), with cycles survived = the saved cycle − 1 and its guests
+  kept occupied, and earns no Essence (`MetaProfile.RecordAbandoned`). A save that cannot be continued (too new or
+  incompatible) can be replaced the same way, after a message saying why; it is not counted. The pause menu says
+  what Quit to title costs: before the first save, the run (no Essence, RUN-04); after it, the cycle in progress
+  (Continue starts again from its Dusk, SAV-03). A continued run keeps the unlocks it started with, even if more were
+  bought on the title screen in between (MET-03: unlocks take effect from the next run). The profile is saved at every
+  Dawn (SAV-02), so a player who quits at Dawn without moving on keeps that mist's bestiary and ancestry progress but
+  replays the cycle; SAV-03's "bestiary progress from the lost cycle is also lost" holds for a quit during the mist.
+  The profile is also saved when a run ends, when an unlock is bought and when a run is given up.
+- **Alternatives considered:** Giving up quietly without counting it; blocking New Run while a save exists.
+- **Requirement IDs affected:** SAV-02, SAV-03, RUN-04, MET-01, MET-03, UI-01, CYC-10.
+
+## D-099 Settings: the values, no edge panning, a placeholder page, buses and the content note
+- **Status:** Accepted in part (the human chose: no edge-panning setting; a placeholder page with the four audio
+  buses); the details below are Proposed
+- **Date / step:** 2026-10-26, step 8
+- **Context:** SET-03 lists "edge panning on or off", but CAM-10 removed edge panning in v1.11. SET-01 to SET-06 give
+  the settings but not their ranges; the UI pass is step 9 and audio is step 10. SAV-02 keeps a content note
+  acknowledgement, and RAT-10 asks for a content note on first launch.
+- **Decision:** Core's `GameSettings` record holds the values and `Normalised()` keeps them in range (volumes 0 to 1;
+  camera pan and zoom speed as multipliers 0.25 to 3; window Windowed, Borderless or Fullscreen; V-Sync; render scale
+  0.5 to 1; mist start speed 1×, 2× or 4×; pause on the first hit on the innkeeper in each mist, on by default; Blood
+  and Suggestive filters). There is no edge-panning setting. `SettingsStore` reads and writes `user://settings.cfg`
+  with `ConfigFile` (sections audio, controls, content, display, gameplay); a missing file, a wrong type or a value out
+  of range falls back to the default. A placeholder Settings page, shared by the title screen and the pause menu,
+  applies and saves each change at once. `default_bus_layout.tres` adds the Music, SFX and Ambience buses beside
+  Master (AUD-10). The mist starts at the chosen speed when Begin the Mist is pressed; the automatic pause uses the
+  speed control's pause, so it changes nothing in the simulation. The content filters come from Settings, so the dev
+  panel's filter toggles are gone. The title screen shows the RAT-10 note once ("moderate blood and violence, and
+  suggestive themes; both can be reduced in Settings") and saves its acknowledgement in the profile.
+- **Alternatives considered:** Bringing edge panning back as an option (CAM-10 would change); storing the audio
+  volumes until step 10 adds the buses.
+- **Requirement IDs affected:** SET-01..06, CAM-10, AUD-10, RAT-09, RAT-10, SAV-02.
+
+## D-100 A dead staff member's items go back to storage
+- **Status:** Accepted (the human, 2026-10-26: overfilling storage is fine)
+- **Date / step:** 2026-10-26, step 8 (a defect from step 6, found by the run save's checks)
+- **Context:** ESC-09 says a dead staff member is removed "with their items returned to storage", but Dawn removed the
+  unit and left its items carried by a unit that no longer existed: they vanished from storage and could not be sold
+  or given away. The step 8 save check rejected such a run save as corrupt, which failed two tests. Storage holds 8
+  items (ITM-02), and the SDD does not say what happens when the dead staff member's items do not fit.
+- **Decision:** At Dawn a dead staff member's items go back to storage, even past its size; until the player sells or
+  hands some on, buying an item or unequipping one into storage is refused as usual (`StorageFull`). An
+  `ItemsChanged` event is raised.
+- **Alternatives considered:** Selling the items that do not fit for half their price; losing them.
+- **Requirement IDs affected:** ESC-09, ITM-02.

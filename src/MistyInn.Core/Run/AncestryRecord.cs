@@ -2,7 +2,7 @@ namespace MistyInn.Core.Run;
 
 /// <summary>
 /// The characters whose hidden ancestry has been revealed by observation (STF-16). Like the bestiary (D-066) it lives
-/// outside the session and is kept across runs: pass the same instance to each new session; step 8 saves it with the
+/// outside the session and is kept across runs: pass the same instance to each new session; it is saved with the
 /// profile (MET-01, D-082).
 /// </summary>
 public sealed class AncestryRecord

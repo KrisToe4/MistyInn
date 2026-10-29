@@ -6,6 +6,7 @@ using MistyInn.Core.Entities;
 using MistyInn.Core.Events;
 using MistyInn.Core.Logging;
 using MistyInn.Core.Meta;
+using MistyInn.Core.Persistence;
 using MistyInn.Core.Randomness;
 using MistyInn.Core.Run;
 using MistyInn.Core.Simulation;
@@ -68,12 +69,26 @@ public sealed class GameSession : IEventSink
         AncestryRecord? ancestry = null,
         MetaProfile? profile = null,
         IReadOnlyList<string>? startingStaff = null)
+        : this(random, limits, content, bestiary, ancestry, profile, startingStaff, save: null)
+    {
+    }
+
+    /// <summary>A new run, or (with <paramref name="save"/>) a saved run at the start of its Dusk (SAV-03).</summary>
+    private GameSession(
+        IRandomSource random,
+        GameSessionLimits? limits,
+        GameContent? content,
+        CreatureBestiary? bestiary,
+        AncestryRecord? ancestry,
+        MetaProfile? profile,
+        IReadOnlyList<string>? startingStaff,
+        RunSave? save)
     {
         ArgumentNullException.ThrowIfNull(random);
 
         limits ??= GameSessionLimits.Default;
         Random = random;
-        Ids = new IdAllocator();
+        Ids = save is null ? new IdAllocator() : new IdAllocator(save.Ids);
         _events = new DomainEventBuffer(limits.EventCapacity);
         _cycleLog = new CycleLog(limits.CycleLogCapacity);
         Content = content ?? GameContent.Default;
@@ -85,9 +100,9 @@ public sealed class GameSession : IEventSink
             throw new ArgumentException(problem, nameof(startingStaff));
         }
 
-        _run = new RunState(Content, Ids, RunStart.For(Content, Profile, startingStaff));
+        _run = save is null ? new RunState(Content, Ids, RunStart.For(Content, Profile, startingStaff)) : RunState.Restore(Content, save);
 
-        var wanderTiles = _run.Board.WalkableTilesIn(Content.WanderZones);
+        var wanderTiles = _run.WanderTiles;
         if (wanderTiles.Count == 0)
         {
             throw new ArgumentException("The wander zones have no walkable tiles.", nameof(content));
@@ -105,6 +120,15 @@ public sealed class GameSession : IEventSink
         _combat = new CombatSystem(Content, _run, this, _damage, _bestiary, _behaviour, _company, _ancestry);
         _arrivals = new ArrivalSystem(Content, _run, random, Ids, this, _behaviour, _bestiary, _modifiers);
 
+        if (save is not null)
+        {
+            // The streams carry on from where they were saved (SAV-01).
+            _shop = new ShopSystem(Content, _run, new SeededRandom(save.ShopRandom), _modifiers);
+            _omenRandom = new SeededRandom(save.OmenRandom);
+            FinishRestore();
+            return;
+        }
+
         // The shop's own stream, derived from the run's starting state without drawing from it (D-080).
         var start = random.GetState();
         _shop = new ShopSystem(Content, _run, new SeededRandom(start.S0 ^ ((start.S2 << 17) | (start.S2 >> 47)) ^ ShopStreamSalt), _modifiers);
@@ -114,6 +138,82 @@ public sealed class GameSession : IEventSink
 
         // The first Dusk is the starting state; views read it through the queries, so no events are raised for it.
         StartCycle(1, raiseEvents: false);
+    }
+
+    /// <summary>
+    /// Continue (SAV-03): the saved run at the start of its Dusk, sharing the profile's bestiary, ancestries and meta
+    /// profile like a new run. The run keeps the unlocks it started with, whatever was bought since (MET-03).
+    /// </summary>
+    /// <exception cref="SaveException">The save is damaged, or names content this game does not have (D-097).</exception>
+    public static GameSession Restore(
+        RunSave save,
+        GameContent? content = null,
+        CreatureBestiary? bestiary = null,
+        AncestryRecord? ancestry = null,
+        MetaProfile? profile = null,
+        GameSessionLimits? limits = null)
+    {
+        ArgumentNullException.ThrowIfNull(save);
+        content ??= GameContent.Default;
+        if (RunSaves.Check(save, content) is { } problem)
+        {
+            throw problem;
+        }
+
+        return new GameSession(new SeededRandom(save.Random), limits, content, bestiary, ancestry, profile, startingStaff: null, save);
+    }
+
+    /// <summary>
+    /// The run save (SAV-01), taken at Dusk; the game takes it right after <c>ContinueFromDawn</c>, so Continue resumes
+    /// at the start of that Dusk (SAV-03). <paramref name="seed"/> is the seed the run started from.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Not at Dusk: saves are only between cycles (SAV-03).</exception>
+    public RunSave CreateSave(ulong seed)
+    {
+        if (Phase != Phase.Dusk)
+        {
+            throw new InvalidOperationException("The run is saved only at Dusk, between cycles (SAV-03).");
+        }
+
+        return new RunSave(
+            RunSaves.SchemaVersion,
+            Content.Balance.ContentVersion,
+            seed,
+            Cycle,
+            Random.GetState(),
+            _shop.Random.GetState(),
+            _omenRandom.GetState(),
+            Ids.GetState(),
+            _run.Silver,
+            _run.Integrity,
+            new Dictionary<Supply, int>(_run.Supplies),
+            _run.Start.StartingStaff.ToList(),
+            _run.UnlockedPlanes.ToList(),
+            _run.Start.LockedCharacters.Order(StringComparer.Ordinal).ToList(),
+            _run.Start.LockedItems.Order(StringComparer.Ordinal).ToList(),
+            _run.Start.LockedFixtures.Order(StringComparer.Ordinal).ToList(),
+            _run.ConvergingPlanes.Select(p => p.Id).ToList(),
+            _run.PreviousPlaneSet.ToList(),
+            _run.Omen?.Id,
+            _run.OmenEffects.Select(e => e.Plane).ToList(),
+            _run.CreaturesOccupied,
+            _run.Units.Select(u => new UnitSave(
+                u.Id.Value, u.Def.Id, u.Def.IsInnkeeper, u.Tile, u.Rank,
+                u.Techniques.Select(t => t.Id).ToList(), u.Chosen.ToList(), u.Mastered.Order(StringComparer.Ordinal).ToList(),
+                u.Spent, u.UpgradePending, u.Shaken)).ToList(),
+            _run.Fixtures.Select(f => new FixtureSave(f.Id.Value, f.Def.Id, f.Origin, f.Rotation, f.Health)).ToList(),
+            _run.Items.Select(i => new ItemSave(i.Id.Value, i.Def.Id, i.Paid, i.Carrier?.Value)).ToList(),
+            new ShopSave(_run.Shop.Staff.ToList(), _run.Shop.Items.ToList(), _run.Shop.Locked, _run.Shop.RerollsThisCycle));
+    }
+
+    /// <summary>What a restored Dusk derives rather than saves: the rooms items open, seats, effects and health.</summary>
+    private void FinishRestore()
+    {
+        _steps = 0;
+        _owed = 0;
+        _modifiers.Refresh(heal: true);
+        _run.SyncRooms(_modifiers.InnWide(EffectKind.RoomSlots));
+        RefreshSeats();
     }
 
     public GameContent Content { get; }
@@ -924,8 +1024,19 @@ public sealed class GameSession : IEventSink
                 _run.Board.RemoveUnit(post);
             }
 
+            // Their items go back to storage (ESC-09), even past its size: the player sells or hands them on (D-100).
+            var carried = _run.CarriedBy(unit.Id);
+            foreach (var item in carried)
+            {
+                item.Carrier = null;
+            }
+
             _run.Units.Remove(unit);
             Raise(new StaffDied(Time, unit.Id, unit.Def.Id, unit.Def.Name));
+            if (carried.Count > 0)
+            {
+                Raise(new ItemsChanged(Time));
+            }
             Log("staff.died", "dawn.roll", unit.Id.ToRef());
         }
 

@@ -250,6 +250,29 @@ public class EscalationTests
     }
 
     [Test]
+    [Property("Requirement", "ESC-09")]
+    [Property("Requirement", "ITM-02")]
+    public void ADeadStaffMembersItemsGoBackToStorage()
+    {
+        var s = new Scenario(balance: b => b with { Combat = b.Combat with { WoundChance = 0 } });
+        s.Session.SetShopForTests(s.Session.RunForTests.Shop.Staff.ToList(), [new ItemOffer("lute", 0)]);
+        Assert.That(s.Session.Execute(new BuyOffer(ShopSection.Items, 0)).Succeeded, Is.True);
+        var lute = s.Session.Items.Single().Id;
+        Assert.That(s.Session.Execute(new EquipItem(lute, s.Staff("staff-01").Id)).Succeeded, Is.True);
+        s.PlaceStaff("staff-01", new Tile(12, 8));
+        s.Begin();
+        s.SpawnTurned("creature-09", new Tile(13, 8));
+
+        s.RunUntilCollecting(() => s.Unit("staff-01").IsFallen, 10);
+        s.Session.RunMistToDawn();
+
+        Assert.That(s.Session.Units.Any(u => u.StaffId == "staff-01"), Is.False, "dead");
+        var item = s.Session.Items.Single();
+        Assert.That(item.Carrier, Is.Null);
+        Assert.That(item.IsInStorage, Is.True, "back in storage, to give to someone else or sell");
+    }
+
+    [Test]
     [Property("Requirement", "STF-12")]
     public void ShakenStaffSootheLessForACycle()
     {

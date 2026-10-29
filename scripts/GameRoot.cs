@@ -11,10 +11,13 @@ using MistyInn.Core.Commands;
 using MistyInn.Core.Content;
 using MistyInn.Core.Entities;
 using MistyInn.Core.Events;
+using MistyInn.Core.Persistence;
 using MistyInn.Core.Randomness;
 using MistyInn.Core.Run;
+using MistyInn.Core.Settings;
 using MistyInn.Fixtures;
 using MistyInn.Profile;
+using MistyInn.Settings;
 using MistyInn.UI;
 using MistyInn.Units;
 
@@ -26,8 +29,10 @@ namespace MistyInn;
 /// dragging staff and fixtures onto tiles at Dusk (CAM-13), the build menu (FIX-05), selection in the mist (CAM-12),
 /// speed and the pause menu (SCP-13, CYC-10), integrity repairs at Dawn (BRD-07) and the debug dev panel (D-074).
 /// Hits flash, and fallen units leave a blood mark unless the Blood filter is on (RAT-05, RAT-09). The run starts from
-/// the title screen's request with the shared profile (RUN-01, MET-03), and ends on the run end panel, which returns to
-/// the title screen (RUN-04).
+/// the title screen's request with the shared profile (RUN-01, MET-03), or from the run save on Continue (SAV-03), and
+/// ends on the run end panel, which returns to the title screen (RUN-04). Leaving Dawn saves the run (SAV-01); every
+/// Dawn and the run's end save the profile (SAV-02); the end deletes the run save (SAV-06). The settings give the
+/// content filters, the camera speeds, the mist's starting speed and the automatic pause (SET-03, SET-04, SET-06).
 /// </summary>
 public partial class GameRoot : Node3D
 {
@@ -69,6 +74,9 @@ public partial class GameRoot : Node3D
     private string _dragName = "";
     private Node3D? _selected;
     private bool _paused;
+    private ulong _seed;
+    private bool _runSaved;
+    private bool _innkeeperAlerted;
     private long _droppedEvents;
     private int _tributesTonight;
 
@@ -86,16 +94,43 @@ public partial class GameRoot : Node3D
             return;
         }
 
-        // The profile outlives the run and the scene (BST-04, STF-16, MET-01, D-091); step 8 saves it.
+        SettingsStore.Apply();
+
+        // The profile outlives the run and the scene (BST-04, STF-16, MET-01, D-091) and is saved with it (SAV-02).
         var request = PlayerProfile.TakePendingRun();
-        var seed = request?.Seed ?? (Seed != 0 ? (ulong)Seed : (ulong)System.Random.Shared.NextInt64(1, long.MaxValue));
-        _session = new GameSession(
-            new SeededRandom(seed),
-            content: content,
-            bestiary: PlayerProfile.Bestiary,
-            ancestry: PlayerProfile.Ancestry,
-            profile: PlayerProfile.Meta,
-            startingStaff: request?.StartingStaff);
+        if (request?.Save is { } save)
+        {
+            try
+            {
+                _session = GameSession.Restore(save, content, PlayerProfile.Bestiary, PlayerProfile.Ancestry, PlayerProfile.Meta);
+            }
+            catch (SaveException e)
+            {
+                // The title screen checks the save first, so this is only a safety net (INV-07).
+                Hud.ShowFatal($"{Tr("The saved run cannot be continued")}:\n\n{e.Message}");
+                SetProcess(false);
+                SetProcessInput(false);
+                SetProcessUnhandledInput(false);
+                return;
+            }
+
+            _seed = save.Seed;
+            _runSaved = true;
+        }
+        else
+        {
+            _seed = request?.Seed ?? (Seed != 0 ? (ulong)Seed : (ulong)System.Random.Shared.NextInt64(1, long.MaxValue));
+            _session = new GameSession(
+                new SeededRandom(_seed),
+                content: content,
+                bestiary: PlayerProfile.Bestiary,
+                ancestry: PlayerProfile.Ancestry,
+                profile: PlayerProfile.Meta,
+                startingStaff: request?.StartingStaff);
+        }
+
+        ApplySettings(SettingsStore.Current);
+        SettingsStore.Changed += ApplySettings;
 
         Inn.Build(_session.Content);
         Inn.ShowGates(_session.ConvergingPlanes.Select(p => p.Id));
@@ -110,7 +145,8 @@ public partial class GameRoot : Node3D
 
         RefreshFixtures();
 
-        Hud.SetSeed(seed);
+        Hud.SetSeed(_seed);
+        Hud.SetRunSaved(_runSaved);
         Hud.BeginMistPressed += OnBeginMist;
         Hud.ContinuePressed += OnContinue;
         Hud.SpeedPressed += OnSpeed;
@@ -125,7 +161,6 @@ public partial class GameRoot : Node3D
         Hud.TitlePressed += OnTitle;
         Hud.DevAddStaffPressed += OnDevAddStaff;
         Hud.DevPlanePressed += OnDevPlane;
-        Hud.FiltersChanged += OnFiltersChanged;
         Hud.BuyOfferPressed += OnBuyOffer;
         Hud.RerollPressed += OnReroll;
         Hud.LockToggled += OnLock;
@@ -140,6 +175,7 @@ public partial class GameRoot : Node3D
 
     public override void _ExitTree()
     {
+        SettingsStore.Changed -= ApplySettings;
         Hud.BeginMistPressed -= OnBeginMist;
         Hud.ContinuePressed -= OnContinue;
         Hud.SpeedPressed -= OnSpeed;
@@ -154,7 +190,6 @@ public partial class GameRoot : Node3D
         Hud.TitlePressed -= OnTitle;
         Hud.DevAddStaffPressed -= OnDevAddStaff;
         Hud.DevPlanePressed -= OnDevPlane;
-        Hud.FiltersChanged -= OnFiltersChanged;
         Hud.BuyOfferPressed -= OnBuyOffer;
         Hud.RerollPressed -= OnReroll;
         Hud.LockToggled -= OnLock;
@@ -393,6 +428,7 @@ public partial class GameRoot : Node3D
                 break;
             case AttackLanded hit:
                 FlashHit(hit.Target);
+                PauseIfInnkeeperHit(hit);
                 break;
             case CreatureBanished banished when _creatures.TryGetValue(banished.Creature, out var view):
                 Hud.ShowMessage($"{view.DisplayName} {Tr("is banished into the mist.")}");
@@ -404,6 +440,10 @@ public partial class GameRoot : Node3D
                 Hud.ShowMessage(Tr("The door is attacked! Both come out at once."));
                 break;
             case RunEnded ended:
+                // The run is over: its save goes, and the profile keeps the Essence and statistics (SAV-02, SAV-06).
+                PlayerProfile.DeleteRun();
+                _runSaved = false;
+                ReportSave(PlayerProfile.Save());
                 ShowRunEnd(ended);
                 break;
             case OmenDrawn omen:
@@ -442,6 +482,7 @@ public partial class GameRoot : Node3D
                 Inn.ShowGates(drawn.PlaneIds);
                 break;
             case PhaseChanged { Phase: Phase.Mist }:
+                _innkeeperAlerted = false;
                 _tributesTonight = 0;
                 _fellTonight.Clear();
                 _diedTonight.Clear();
@@ -449,6 +490,9 @@ public partial class GameRoot : Node3D
             case PhaseChanged { Phase: Phase.Dawn }:
                 ClearBloodMarks();
                 Hud.ShowMessage(DawnSummary(), 10);
+
+                // The bestiary and ancestries learned this mist are kept, even if the player quits now (SAV-02).
+                ReportSave(PlayerProfile.Save());
                 break;
         }
     }
@@ -688,10 +732,62 @@ public partial class GameRoot : Node3D
         if (Report(_session.Execute(new BeginMist())))
         {
             ClearSelection();
+
+            // Each mist starts at the speed chosen in Settings (SET-06).
+            Report(_session.Execute(new SetSpeed(SettingsStore.Current.MistSpeed)));
         }
     }
 
-    private void OnContinue() => Report(_session.Execute(new ContinueFromDawn()));
+    /// <summary>Leaving Dawn saves the run at the start of the next Dusk (SAV-01, SAV-03).</summary>
+    private void OnContinue()
+    {
+        if (!Report(_session.Execute(new ContinueFromDawn())))
+        {
+            return;
+        }
+
+        if (PlayerProfile.SaveRun(_session.CreateSave(_seed)) is { } problem)
+        {
+            Hud.ShowMessage(problem, 10);
+            return;
+        }
+
+        _runSaved = !PlayerProfile.ReadOnly;
+        Hud.SetRunSaved(_runSaved);
+    }
+
+    private void ReportSave(string? problem)
+    {
+        if (problem is not null)
+        {
+            Hud.ShowMessage(problem, 10);
+        }
+    }
+
+    /// <summary>The settings this scene uses (SET-03, SET-04); called again whenever they change.</summary>
+    private void ApplySettings(GameSettings settings)
+    {
+        Report(_session.Execute(new SetContentFilters(settings.Filters)));
+        CameraRig.ApplySettings(settings.CameraPanSpeed, settings.ZoomSpeed);
+    }
+
+    /// <summary>
+    /// The first hit on the innkeeper in a mist pauses it, if the player wants that (SET-06). Pausing is the speed
+    /// control's pause, so it changes nothing in the simulation (SCP-13).
+    /// </summary>
+    private void PauseIfInnkeeperHit(AttackLanded hit)
+    {
+        if (_innkeeperAlerted || !SettingsStore.Current.PauseWhenInnkeeperAttacked || _session.Phase != Phase.Mist
+            || hit.Target is not { Kind: EntityKind.Unit } target
+            || _session.Units.FirstOrDefault(u => u.Id.Value == target.Id) is not { IsInnkeeper: true })
+        {
+            return;
+        }
+
+        _innkeeperAlerted = true;
+        Report(_session.Execute(new SetSpeed(0)));
+        Hud.ShowMessage(Tr("The innkeeper is under attack! The mist is paused."), 8);
+    }
 
     private void OnSpeed(int speed) => Report(_session.Execute(new SetSpeed(speed)));
 
@@ -737,8 +833,6 @@ public partial class GameRoot : Node3D
     private void OnDevAddStaff(string characterId) => Report(_session.Execute(new DevAddStaff(characterId)));
 
     private void OnDevPlane(string planeId) => Report(_session.Execute(new DevSetConvergingPlanes(new[] { planeId })));
-
-    private void OnFiltersChanged(ContentFilters filters) => Report(_session.Execute(new SetContentFilters(filters)));
 
     private void OnBuyOffer(ShopSection section, int index) => Report(_session.Execute(new BuyOffer(section, index)));
 

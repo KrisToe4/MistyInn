@@ -26,7 +26,7 @@ internal sealed class ShopSystem
 
     private ShopDef Tuning => _content.Balance.Shop;
 
-    /// <summary>The random stream the shop draws from; saved with the run in step 8.</summary>
+    /// <summary>The random stream the shop draws from; saved with the run (SAV-01).</summary>
     public IRandomSource Random => _random;
 
     /// <summary>The next reroll's price: 2, then 1 more per reroll this cycle, less <c>RerollCost</c> effects, never below 0.</summary>

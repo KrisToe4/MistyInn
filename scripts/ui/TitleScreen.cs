@@ -6,15 +6,18 @@ using MistyInn.Core.Bestiary;
 using MistyInn.Core.Content;
 using MistyInn.Core.Meta;
 using MistyInn.Profile;
+using MistyInn.Settings;
 using static MistyInn.UI.UiKit;
 
 namespace MistyInn.UI;
 
 /// <summary>
 /// Placeholder title screen (UI-01): New Run with an optional seed (RUN-01) and, once unlocked, a choice of starting
-/// staff (MET-03, D-089); the Bestiary page (BST-01, BST-04) and the Unlocks page, where Mist Essence buys unlocks
-/// (MET-03); and Quit. Continue and Settings arrive with saves in step 8; the UI pass (step 9) replaces this screen.
-/// Started with the user argument <c>--new-run</c> (after <c>++</c>), it opens a run at once, for the smoke run (TST-12).
+/// staff (MET-03, D-089); Continue when a run save exists (SAV-03), with New Run asking before it gives that run up
+/// (D-098); the Bestiary page (BST-01, BST-04); the Unlocks page, where Mist Essence buys unlocks (MET-03); Settings
+/// (D-099); and Quit. The first launch shows the content note (RAT-10). The UI pass (step 9) replaces this screen.
+/// Started with the user argument <c>--new-run</c> (after <c>++</c>), it opens a run at once, for the smoke run (TST-12),
+/// without reading or writing the player's saves (D-095).
 /// </summary>
 public partial class TitleScreen : Control
 {
@@ -35,10 +38,13 @@ public partial class TitleScreen : Control
     private Control _unlocksPage = null!;
     private VBoxContainer _unlocksList = null!;
     private Label _unlocksEssence = null!;
+    private Button _continue = null!;
+    private SettingsPanel? _settings;
 
     public override void _Ready()
     {
         SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+        SettingsStore.Apply();
         var background = new ColorRect { Color = new Color(0.06f, 0.07f, 0.1f), MouseFilter = MouseFilterEnum.Ignore };
         AddChild(background);
         background.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
@@ -62,11 +68,34 @@ public partial class TitleScreen : Control
         _unlocksPage = BuildPage(Tr("Unlocks"), out _unlocksList, out _unlocksEssence);
         ShowPage(_menu);
         RefreshMenu();
+        if (PlayerProfile.LoadMessage is { } problem)
+        {
+            _message.Text = problem;
+        }
 
         if (OS.GetCmdlineUserArgs().Contains("--new-run"))
         {
             Callable.From(StartRun).CallDeferred();
         }
+        else if (!PlayerProfile.ContentNoteAcknowledged)
+        {
+            Callable.From(ShowContentNote).CallDeferred();
+        }
+    }
+
+    /// <summary>The content note on first launch (RAT-10); its acknowledgement is kept in the profile (SAV-02).</summary>
+    private void ShowContentNote()
+    {
+        var note = new AcceptDialog
+        {
+            Title = Tr("Content note"),
+            DialogText = Tr("Misty Inn has moderate blood and violence, and suggestive themes. Both can be reduced in Settings."),
+            OkButtonText = Tr("I understand"),
+        };
+        AddChild(note);
+        note.Confirmed += PlayerProfile.AcknowledgeContentNote;
+        note.Canceled += PlayerProfile.AcknowledgeContentNote;
+        note.PopupCentered();
     }
 
     private CenterContainer Centered()
@@ -108,6 +137,8 @@ public partial class TitleScreen : Control
             _staffPickers.Add(picker);
         }
 
+        _continue = AddButton(box, Tr("Continue"));
+        _continue.Pressed += ContinueRun;
         AddButton(box, Tr("New Run")).Pressed += StartRun;
         AddButton(box, Tr("Bestiary")).Pressed += () =>
         {
@@ -119,6 +150,7 @@ public partial class TitleScreen : Control
             RefreshUnlocks();
             ShowPage(_unlocksPage);
         };
+        AddButton(box, Tr("Settings")).Pressed += OpenSettings;
         AddButton(box, Tr("Quit")).Pressed += () => GetTree().Quit();
 
         _message = AddLabel(box, 16, new Color(1f, 0.72f, 0.45f));
@@ -162,8 +194,37 @@ public partial class TitleScreen : Control
         }
     }
 
+    private void OpenSettings()
+    {
+        _settings = new SettingsPanel();
+        _settings.Closed += CloseSettings;
+        AddChild(_settings);
+        _menu.Visible = false;
+    }
+
+    private void CloseSettings()
+    {
+        if (_settings is not null)
+        {
+            _settings.Closed -= CloseSettings;
+            _settings.QueueFree();
+            _settings = null;
+        }
+
+        ShowPage(_menu);
+    }
+
     private void RefreshMenu()
     {
+        var run = PlayerProfile.LoadRunSave(_content);
+        _continue.Visible = run.Exists;
+        _continue.Disabled = run.Save is null;
+        _continue.Text = run.Save is { } save ? $"{Tr("Continue")} ({Tr("cycle")} {save.Cycle}/{_content.Balance.RunLength})" : Tr("Continue");
+        if (run.Problem is { } problem)
+        {
+            _message.Text = problem;
+        }
+
         var meta = PlayerProfile.Meta;
         var s = meta.Statistics;
         _essence.Text = $"{Tr("Mist Essence")}: {meta.Essence}";
@@ -214,7 +275,56 @@ public partial class TitleScreen : Control
             }
         }
 
-        PlayerProfile.PendingRun = new RunRequest(seed, staff);
+        var request = new RunRequest(seed, staff);
+        var saved = PlayerProfile.LoadRunSave(_content);
+        if (!saved.Exists)
+        {
+            Open(request);
+            return;
+        }
+
+        // A saved run is never given up silently (INV-07): it counts as a lost run, with no Essence (D-098).
+        var confirm = new ConfirmationDialog
+        {
+            Title = Tr("Give up the saved run?"),
+            DialogText = saved.Save is { } save
+                ? $"{Tr("The saved run")} ({Tr("cycle")} {save.Cycle}/{_content.Balance.RunLength}) "
+                  + Tr("will be deleted. It counts as a lost run and earns no Mist Essence.")
+                : $"{saved.Problem}\n\n{Tr("Start a new run and delete that save?")}",
+            OkButtonText = Tr("Start a new run"),
+        };
+        AddChild(confirm);
+        confirm.Confirmed += () =>
+        {
+            if (saved.Save is { } abandoned)
+            {
+                PlayerProfile.Meta.RecordAbandoned(abandoned.Cycle - 1, abandoned.CreaturesOccupied);
+            }
+
+            PlayerProfile.DeleteRun();
+            PlayerProfile.Save();
+            Open(request);
+        };
+        confirm.PopupCentered();
+    }
+
+    /// <summary>Continue (SAV-03): the saved run, at the start of its Dusk.</summary>
+    private void ContinueRun()
+    {
+        var run = PlayerProfile.LoadRunSave(_content);
+        if (run.Save is not { } save)
+        {
+            RefreshMenu();
+            _message.Text = run.Problem ?? Tr("There is no saved run.");
+            return;
+        }
+
+        Open(new RunRequest(save.Seed, null, save));
+    }
+
+    private void Open(RunRequest request)
+    {
+        PlayerProfile.PendingRun = request;
         GetTree().ChangeSceneToFile(GameScenePath);
     }
 
@@ -281,6 +391,12 @@ public partial class TitleScreen : Control
             button.Pressed += () =>
             {
                 meta.Buy(_content, id);
+                if (PlayerProfile.Save() is { } problem)
+                {
+                    _unlocksEssence.Text = problem;
+                    return;
+                }
+
                 RefreshUnlocks();
             };
         }

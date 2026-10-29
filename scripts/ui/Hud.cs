@@ -41,6 +41,7 @@ public partial class Hud : CanvasLayer
     private Button _continue = null!;
     private HBoxContainer _speedBar = null!;
     private Control _pauseMenu = null!;
+    private Button _quitToTitle = null!;
     private HBoxContainer _repairBar = null!;
     private Button _repairAll = null!;
     private Control _runOver = null!;
@@ -83,8 +84,6 @@ public partial class Hud : CanvasLayer
     public event Action<string>? DevAddStaffPressed;
 
     public event Action<string>? DevPlanePressed;
-
-    public event Action<ContentFilters>? FiltersChanged;
 
     public event Action<ShopSection, int>? BuyOfferPressed;
 
@@ -459,8 +458,8 @@ public partial class Hud : CanvasLayer
     }
 
     /// <summary>
-    /// Debug builds only (D-074): add any character to the bench, choose the converging planes, and try the content
-    /// filters (SET-04) until the settings screen arrives in step 8.
+    /// Debug builds only (D-074): add any character to the bench, choose the converging planes, and show hidden
+    /// creature info. The content filters moved to Settings in step 8 (SET-04, D-099).
     /// </summary>
     private void DevPanelOnce(GameSession session)
     {
@@ -471,14 +470,6 @@ public partial class Hud : CanvasLayer
 
         _devBuilt = true;
         AddLabel(_devList, 16).Text = Tr("Dev panel (debug builds)");
-
-        var blood = new CheckButton { Text = Tr("Reduced blood") };
-        var hosting = new CheckButton { Text = Tr("No suggestive content (Hosting)") };
-        void Changed(bool _) => FiltersChanged?.Invoke(new ContentFilters(blood.ButtonPressed, hosting.ButtonPressed));
-        blood.Toggled += Changed;
-        hosting.Toggled += Changed;
-        _devList.AddChild(blood);
-        _devList.AddChild(hosting);
 
         var hidden = new CheckButton { Text = Tr("Show hidden creature info") };
         hidden.Toggled += on => ShowHiddenCreatureInfo = on;
@@ -536,9 +527,32 @@ public partial class Hud : CanvasLayer
 
         var resume = AddButton(box, Tr("Resume"));
         resume.Pressed += () => ResumePressed?.Invoke();
-        var quit = AddButton(box, Tr("Quit to title (the run is lost and earns no Essence)"));
-        quit.Pressed += () => TitlePressed?.Invoke();
+        AddButton(box, Tr("Settings")).Pressed += () => OpenSettings(panel);
+        _quitToTitle = AddButton(box, "");
+        _quitToTitle.Pressed += () => TitlePressed?.Invoke();
+        SetRunSaved(false);
         return center;
+    }
+
+    /// <summary>
+    /// What quitting to the title costs (SAV-03, RUN-04): with a run save, only the cycle in progress (Continue starts
+    /// again from its Dusk); without one, the whole run.
+    /// </summary>
+    public void SetRunSaved(bool saved) => _quitToTitle.Text = saved
+        ? Tr("Quit to title (this cycle is lost; Continue starts again from its Dusk)")
+        : Tr("Quit to title (the run is lost and earns no Essence)");
+
+    /// <summary>The Settings page over the pause menu (CYC-10, D-099).</summary>
+    private void OpenSettings(Control pausePanel)
+    {
+        pausePanel.Visible = false;
+        var settings = new SettingsPanel();
+        settings.Closed += () =>
+        {
+            settings.QueueFree();
+            pausePanel.Visible = true;
+        };
+        _pauseMenu.AddChild(settings);
     }
 
     private static Label AddLabel(Control parent, int fontSize, Color? color = null)

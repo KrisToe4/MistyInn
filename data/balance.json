@@ -1,4 +1,5 @@
 {
+  "contentVersion": 1,
   "runLength": 10,
   "mistDurationSeconds": 120,
   "arrivalStopBeforeDawnSeconds": 20,

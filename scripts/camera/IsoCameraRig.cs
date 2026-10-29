@@ -4,7 +4,7 @@ namespace MistyInn.Camera;
 
 /// <summary>
 /// The isometric-style camera (CAM-10): an orthographic camera looking down at the inn. Pan with WASD, the arrow keys,
-/// the middle mouse button or the screen edges; zoom with the wheel; rotate in 90° steps with Q and E. It stays inside
+/// the middle mouse button or a left drag on open ground; zoom with the wheel; rotate in 90° steps with Q and E. It stays inside
 /// the clearing. It can follow a selected unit or creature (CAM-12).
 /// </summary>
 public partial class IsoCameraRig : Node3D
@@ -19,8 +19,6 @@ public partial class IsoCameraRig : Node3D
 
     [Export] public float PanSpeed { get; set; } = 14f;
 
-
-
     [Export] public float MinZoom { get; set; } = 8f;
 
     [Export] public float MaxZoom { get; set; } = 34f;
@@ -31,12 +29,16 @@ public partial class IsoCameraRig : Node3D
     [Export] public float DragThresholdPixels { get; set; } = 6f;
 
     private float _targetYaw;
+    private float _panMultiplier = 1f;
+    private float _zoomMultiplier = 1f;
     private bool _middleDragging;
     private bool _leftHeld;
     private bool _leftPanning;
     private Vector2 _leftStart;
     private Vector2 _min = new(-20, -20);
     private Vector2 _max = new(20, 20);
+
+    private float ScaledZoomStep => 1f + (ZoomStep - 1f) * _zoomMultiplier;
 
     /// <summary>When set, the camera keeps this node centred until the player pans.</summary>
     public Node3D? FollowTarget { get; set; }
@@ -46,6 +48,13 @@ public partial class IsoCameraRig : Node3D
         Pitch.RotationDegrees = new Vector3(PitchDegrees, 0, 0);
         _targetYaw = Mathf.DegToRad(StartYawDegrees);
         Rotation = new Vector3(0, _targetYaw, 0);
+    }
+
+    /// <summary>The player's camera pan and zoom speeds, as multipliers (SET-03).</summary>
+    public void ApplySettings(double panSpeed, double zoomSpeed)
+    {
+        _panMultiplier = (float)panSpeed;
+        _zoomMultiplier = (float)zoomSpeed;
     }
 
     /// <summary>Keeps the camera's focus point inside this rectangle of the ground (x, z).</summary>
@@ -102,10 +111,10 @@ public partial class IsoCameraRig : Node3D
         switch (@event)
         {
             case InputEventMouseButton { ButtonIndex: MouseButton.WheelUp, Pressed: true }:
-                Zoom(1 / ZoomStep);
+                Zoom(1 / ScaledZoomStep);
                 break;
             case InputEventMouseButton { ButtonIndex: MouseButton.WheelDown, Pressed: true }:
-                Zoom(ZoomStep);
+                Zoom(ScaledZoomStep);
                 break;
             case InputEventMouseButton { ButtonIndex: MouseButton.Middle } middle:
                 _middleDragging = middle.Pressed;
@@ -134,7 +143,7 @@ public partial class IsoCameraRig : Node3D
         if (input != Vector2.Zero)
         {
             FollowTarget = null;
-            PanBy(input.LimitLength(1) * PanSpeed * dt * (Camera.Size / 20f));
+            PanBy(input.LimitLength(1) * PanSpeed * _panMultiplier * dt * (Camera.Size / 20f));
         }
 
         if (FollowTarget is not null)

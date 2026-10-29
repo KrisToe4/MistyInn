@@ -522,7 +522,7 @@ public static partial class ContentValidator
                 || b.ConvergenceArrivalMultiplier <= 0 || b.MaxCreatures < 1 || b.BaseStaffSlots < 1
                 || b.MaxStaffSlots < b.BaseStaffSlots || b.BenchSize < 1 || b.Integrity < 1 || b.Rooms < 0
                 || b.StaffItemSlots < 0 || b.ItemStorage < 0 || b.MaxInnItemsShown < 0 || b.AncestrySoothe < 1
-                || b.BasicServiceSoothe is <= 0 or > 1 || b.SatisfiedAfterSeconds <= 0)
+                || b.BasicServiceSoothe is <= 0 or > 1 || b.SatisfiedAfterSeconds <= 0 || b.ContentVersion < 1)
                 Error($"{where}: a value is out of range.");
             if (b.ArrivalStopBeforeDawnSeconds < 0 || b.ArrivalStopBeforeDawnSeconds >= b.MistDurationSeconds)
                 Error($"{where}: arrivals must stop between 0 s and the end of the mist.");

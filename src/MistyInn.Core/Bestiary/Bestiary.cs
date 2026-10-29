@@ -29,7 +29,7 @@ public sealed record BestiaryEntry(
 
 /// <summary>
 /// The bestiary (BST-01 to BST-04). It belongs to the profile, not the run: pass the same instance to every
-/// <see cref="GameSession"/> so knowledge carries across runs. Saving it is step 8 (SAV-02).
+/// <see cref="GameSession"/> so knowledge carries across runs. It is saved with the profile (SAV-02, ProfileSaves).
 /// </summary>
 public sealed class CreatureBestiary
 {
@@ -72,6 +72,14 @@ public sealed class CreatureBestiary
 
     /// <summary>A creature was banished (from step 5).</summary>
     internal void AddBanishPoint(string creatureId) => Get(creatureId).BanishPoints++;
+
+    /// <summary>Puts back one creature's saved progress (SAV-02); it replaces anything already recorded for it.</summary>
+    internal void Load(string creatureId, bool seen, int studyPoints, IEnumerable<TriggerKind> triggersSeen, int banishPoints)
+    {
+        var p = new Progress { Seen = seen, StudyPoints = studyPoints, BanishPoints = banishPoints };
+        p.TriggersSeen.UnionWith(triggersSeen);
+        _progress[creatureId] = p;
+    }
 
     internal IEnumerable<(string Id, bool Seen, int Study, IReadOnlyCollection<TriggerKind> Triggers, int Banish)> State() =>
         _progress.OrderBy(p => p.Key, StringComparer.Ordinal)

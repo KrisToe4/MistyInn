@@ -25,6 +25,7 @@ public sealed record ContentSet(
 /// <param name="RankStatMultipliers">Base-stat multipliers for ★1 to ★5 (STF-06).</param>
 /// <param name="BasicServiceSoothe">Basic service's soothe for a server who does not know Food (AGI-11).</param>
 /// <param name="SatisfiedAfterSeconds">How long agitation must stay at 0 before a guest is satisfied (CRE-08).</param>
+/// <param name="ContentVersion">Raised by hand when the data changes in a way saves should know about; saved with the run (SAV-01, D-097).</param>
 public sealed record BalanceDef(
     int RunLength,
     double MistDurationSeconds,
@@ -66,7 +67,8 @@ public sealed record BalanceDef(
     CompanyBalanceDef Company,
     ShopDef Shop,
     double BasicServiceSoothe = 0.3,
-    double SatisfiedAfterSeconds = 5);
+    double SatisfiedAfterSeconds = 5,
+    int ContentVersion = 1);
 
 /// <summary>A bundle of supplies in the build menu (FIX-06).</summary>
 public sealed record SupplyBundleDef(int Amount, int Price);

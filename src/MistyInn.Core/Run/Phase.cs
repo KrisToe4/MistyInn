@@ -27,6 +27,9 @@ public enum RunEndReason
 
     /// <summary>The inn survived the Convergence, the last cycle: the run is won (RUN-02).</summary>
     Survived,
+
+    /// <summary>A saved run given up for a New Run: a loss in the statistics, with no Essence (D-098).</summary>
+    Abandoned,
 }
 
 /// <summary>

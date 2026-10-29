@@ -32,7 +32,7 @@ public sealed record RunStatistics(
 /// <summary>
 /// The profile's meta-progression (MET-01 to MET-03): Mist Essence, the unlocks bought with it and the run statistics.
 /// Like the bestiary it lives outside the session and is kept across runs: pass the same instance to each new
-/// session; step 8 saves it with the profile (SAV-02, D-091). Essence is spent only on the title screen, between runs.
+/// session; it is saved with the profile (SAV-02, D-091). Essence is spent only on the title screen, between runs.
 /// </summary>
 public sealed class MetaProfile
 {
@@ -158,6 +158,17 @@ public sealed class MetaProfile
             CreaturesOccupied = s.CreaturesOccupied + summary.CreaturesOccupied,
             EssenceEarned = s.EssenceEarned + summary.EssenceEarned,
         };
+    }
+
+    /// <summary>
+    /// A saved run given up for a New Run (D-098): it counts in the statistics as a lost run, with the cycles it came
+    /// through and the guests it kept occupied, and earns no Essence (like a run left from the pause menu, RUN-04).
+    /// </summary>
+    public void RecordAbandoned(int cyclesSurvived, int creaturesOccupied)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(cyclesSurvived);
+        ArgumentOutOfRangeException.ThrowIfNegative(creaturesOccupied);
+        Record(new RunSummary(RunEndReason.Abandoned, cyclesSurvived, creaturesOccupied, EssenceEarned: 0));
     }
 
     /// <summary>
